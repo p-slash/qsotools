@@ -129,6 +129,10 @@ def lognPowerSpGH(z, numvpoints=2**18, dv=1., corr=False):
     else:
         return k_arr, power_results_arr
 
+def lognNoisePowerSp(err_flux, z, dv):
+    rs = err_flux / lognMeanFluxGH(z) * dv
+    return rs**2
+
 class LyaMocks():
     """
     Generates lognormal mocks with a power spectrum similar to Lya 1D power spectrum up to small scales ~0.0003-0.2 s/km.
