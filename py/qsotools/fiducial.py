@@ -12,6 +12,9 @@ LYA_CENTER_WVL  = (LYA_LAST_WVL + LYA_LAST_WVL) / 2
 LIGHT_SPEED      = 299792.458
 ONE_SIGMA_2_FWHM = 2.35482004503
 
+# -----------------------------------------------------
+# Power spectrum begins
+# -----------------------------------------------------
 #                                 A               n                alpha            B               beta             lmd
 PD13_fiducial_parameters        = 6.62141965e-02, -2.68534876e+00, -2.23276251e-01, 3.59124427e+00, -1.76804541e-01, 3.59826056e+02
 PD13_fiducial_parameters_0beta  = 6.62141965e-02, -2.68534876e+00, -2.23276251e-01, 3.59124427e+00, 0,               3.59826056e+02
@@ -64,11 +67,6 @@ def jacobianPD13Lorentz(X, A, n, alpha, B, beta, lmd):
     result = np.column_stack((result, col_lmd))
 
     return result
-
-def meanFluxFG08(z):
-    tau = 0.001845 * np.power(1. + z, 3.924)
-
-    return np.exp(-tau)
 
 # All 1d arrays
 # Pass z=None to turn off B, beta parameters
@@ -123,12 +121,60 @@ def fitPD13Lorentzian(k, z, power, error, initial_params=PD13_fiducial_parameter
         pnew[0], pnew[1], pnew[2], pnew[3], pnew[4], pnew[5])
 
     print(fit_param_text)
-    print("chisq = %.2f"%chisq, "dof = ", df)
+    print("chisq = %.2f,"%chisq, "dof = ", df)
     
-    return pnew
+    return pnew, pcov
 
+# -----------------------------------------------------
+# Power spectrum ends
+# -----------------------------------------------------
+# -----------------------------------------------------
+# Mean flux begins
+# -----------------------------------------------------
+BECKER13_parameters = 0.751, 2.90, -0.132, 3.5
 
+def meanFluxFG08(z):
+    tau = 0.001845 * np.power(1. + z, 3.924)
 
+    return np.exp(-tau)
+
+def evaluateBecker13MeanFlux(z, tau0, beta, C, z0=BECKER13_parameters[-1]):
+    x0 = (1+z) / (1+z0)
+
+    tau_eff = C + tau0 * np.power(x0, beta)
+
+    return np.exp(-tau_eff)
+
+def fitBecker13MeanFlux(z, F, e):
+    print("z0 is fixed to {:.1f}".format(BECKER13_parameters[-1]))
+
+    try:
+        pnew, pcov = curve_fit(evaluateBecker13MeanFlux, z, F, BECKER13_parameters, sigma=e, \
+            absolute_sigma=True)
+    except ValueError:
+        raise
+        exit(1)
+    except RuntimeError:
+        raise
+        exit(1)
+    except OptimizeWarning:
+        raise
+        exit(1)
+
+    fitted_mF = evaluateBecker13MeanFlux(z, *pnew)
+    r     = F - fitted_mF
+    chisq = np.sum((r/e)**2)
+    df    = len(F) - 3
+
+    fit_param_text = ("tau0     = %.3e\n" "beta     = %.3e\n" "C        = %.3e\n") % (
+        pnew[0], pnew[1], pnew[2])
+
+    print(fit_param_text)
+    print("chisq = %.2f,"%chisq, "dof = ", df)
+
+    return pnew, pcov
+
+    
 
 
 
