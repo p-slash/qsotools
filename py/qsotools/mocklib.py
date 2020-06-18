@@ -133,6 +133,12 @@ def lognNoisePowerSp(err_flux, z, dv):
     rs = err_flux / lognMeanFluxGH(z) * dv
     return rs**2
 
+def genContinuumError(wave, se0, se1):
+    lnwave = np.log(wave)
+    slope  = (lnwave - lnwave[0]) / (lnwave[-1] - lnwave[0])
+
+    return se0 + se1 * slope
+
 class LyaMocks():
     """
     Generates lognormal mocks with a power spectrum similar to Lya 1D power spectrum up to small scales ~0.0003-0.2 s/km.
