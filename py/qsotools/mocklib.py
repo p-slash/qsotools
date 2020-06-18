@@ -297,7 +297,7 @@ class LyaMocks():
     def transformFlux(self):
         self.delta_F = np.exp(-self.delta_F)
 
-    def generateMocks(self, NMocks=1, spectrograph_resolution=None, R_tau=None, add_err=0):
+    def generateMocks(self, NMocks=1, spectrograph_resolution=None, R_tau=None):
         self.createField(NMocks)
         
         if self.GAUSSIAN_MOCKS:
