@@ -15,7 +15,7 @@ import argparse
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-import qsotools.io.binary_qso as bq
+from qsotools.io import BinaryQSO
 import qsotools.fiducial as fid
 
 def save_parameters(txt_basefilename, args):
@@ -58,7 +58,7 @@ def save_plots(wch, fch, ech, fnames, args):
 
 def save_data(wave, fmocks, emocks, fnames, args):
     for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
-        mfile = bq.BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
+        mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
         mfile.save(w, f, e, len(w), 0., 0., 0., 0., args.specres, args.pixel_dv)
 
 if __name__ == '__main__':

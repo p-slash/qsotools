@@ -16,8 +16,8 @@ import argparse
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-import qsotools.io.binary_qso as bq
-from qsotools.io.kodiaq import KIterator as ki
+from qsotools.io import BinaryQSO
+from qsotools.kodiaqio import KIterator as ki
 import qsotools.fiducial as fid
 
 # Define Saving Functions
@@ -69,7 +69,7 @@ def save_plots(wch, fch, ech, fnames, obs_fits):
 
 def save_data(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width):
     for (w, f, e, fname) in zip(waves, fluxes, errors, fnames):
-        mfile = bq.BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
+        mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
         mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.DECL, obs_fits.RA, obs_fits.S2N, spec_res, pixel_width)
 
 def save_list_byline(array, fname):
