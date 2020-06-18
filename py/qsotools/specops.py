@@ -102,15 +102,16 @@ def chunkDynamic(wave, flux, error, no_forest_pixels):
 def getStats(wave, flux, error, z_edges):
     z = wave / LYA_WAVELENGTH - 1.
     
-    total_flux_hist, binedges, binnumber = binned_statistic(z, flux, statistic='sum', bins=z_edges)
+    tot_flux_hist, binedges, binnumber = binned_statistic(z, flux, statistic='sum', bins=z_edges)
     counts = np.bincount(binnumber, minlength=len(z_edges)+1)
     
-    totoal_error_hist, binedges, binnumber = binned_statistic(z, error, statistic='sum', bins=z_edges)
+    tot_error_hist = binned_statistic(z, error, statistic='sum', bins=z_edges)[0]
+    tot_err2_hist  = binned_statistic(z, error**2, statistic='sum', bins=z_edges)[0]
 
     # Pixel statistics: Pixel redshift Histogram
     z_hist, temp_z_bins = np.histogram(z, bins=z_edges)
 
-    return z_hist, total_flux_hist, totoal_error_hist, counts
+    return counts, z_hist, tot_flux_hist, tot_error_hist, tot_err2_hist
 
 # Assuming R is integer resolution power
 # dv in km/s and k in s/km
