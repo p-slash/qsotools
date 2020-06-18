@@ -10,7 +10,7 @@ from astropy.io        import ascii
 
 import qsotools.mocklib as lm
 import qsotools.fiducial as fid
-import qsotools.io.binary_qso     as bq
+from qsotools.io import BinaryQSO
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -69,7 +69,7 @@ if __name__ == '__main__':
 
     for fl in file_list:
         try:
-            spectrum = bq.BinaryQSO(ospath_join(args.InputDir, fl.rstrip()), 'r')
+            spectrum = BinaryQSO(ospath_join(args.InputDir, fl.rstrip()), 'r')
             spectrum.read()
         except:
             print("Problem reading ", ospath_join(args.InputDir, fl.rstrip()), flush=True)

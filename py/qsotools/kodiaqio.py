@@ -6,7 +6,7 @@ from astropy.units import hourangle, deg
 from os.path import join as ospath_join
 
 from qsotools.fiducial import LIGHT_SPEED
-from qsotools.io.spectrum import Spectrum
+from qsotools.io import Spectrum
 
 class KODIAQFits(Spectrum):
     """

@@ -7,7 +7,7 @@ from scipy.special import lambertw as scipy_lambertw
 from scipy.interpolate import interp1d as scipy_interp1d
 
 from qsotools import specops
-from qsotools import fiducial as fid
+import qsotools.fiducial as fid
 
 # Power spectrum functions
 # ----------------------------
