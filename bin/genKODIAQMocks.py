@@ -95,6 +95,8 @@ if __name__ == '__main__':
     parser.add_argument("--chunk-dyn", \
         help="Dynamic chunking splits a spectrum into three chunks if l>L/2 or into two chunks if l>L/3.", \
         action="store_true")
+    parser.add_argument("--kodiaq-errors", help="Add exact KODIAQ errors onto final grid. Beware of resampling.",\
+        action="store_true")
     parser.add_argument("--noerrors", help="Generate error free mocks", action="store_true")
 
     parser.add_argument("--skip", help="Skip short chunks lower than given ratio", type=float)
@@ -115,6 +117,7 @@ if __name__ == '__main__':
         type=float, default=1.3/3)
     args = parser.parse_args()
     
+    # Initialize lists
     no_lya_quasar_list = []
 
     selected_qso_list = []
@@ -126,11 +129,13 @@ if __name__ == '__main__':
     selected_qso_resampled_npixels = []
     selected_qso_specres_list = []
 
+    # Pick mean flux function
     if args.gauss:
         mean_flux_function = fid.meanFluxFG08
     else:
         mean_flux_function = lm.lognMeanFluxGH
 
+    # Decide if it's real data
     if "mock0/data" in args.Outputdir:
         print("MOCK0 is real data!")
         REAL_DATA = True
@@ -138,6 +143,7 @@ if __name__ == '__main__':
     else:
         REAL_DATA = False
 
+    # Set settings text
     settings_txt  = '_gaussian' if args.gauss else '_lognormal' 
     settings_txt += '_dv%.1f' % args.lowdv if args.lowdv else ''
     settings_txt += '_noz' if args.without_z_evo else ''
@@ -182,20 +188,24 @@ if __name__ == '__main__':
         print("Ly-alpha forest central redshift is ", z_center)
 
         pixel_width  = args.lowdv if args.lowdv else max_obs_spectrum.dv
-        low_spec_res = max_obs_spectrum.SPECRES
+        low_spec_res = max_obs_spectrum.specres
         MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / pixel_width)
 
-        print("Spectral Res: from %d to %d." % (max_obs_spectrum.SPECRES, low_spec_res))
+        print("Spectral Res: from %d to %d." % (max_obs_spectrum.specres, low_spec_res))
         print("Pixel width: from %.2f to %.2f km/s" %(max_obs_spectrum.dv, pixel_width))
 
         specres_list.add(low_spec_res)
 
         if not REAL_DATA:
             lya_m.setCentralRedshift(z_center)
-            wave, fluxes, errors = lya_m.resampledMocks(1, err_per_final_pixel=0 if not args.noerrors else 0.1, \
+
+            # Decide error on final pixels
+            final_error = 0 if args.noerrors or args.kodiaq_errors else 0.1
+
+            wave, fluxes, errors = lya_m.resampledMocks(1, err_per_final_pixel=final_error, \
                 spectrograph_resolution=low_spec_res, resample_dv=args.lowdv, obs_wave_centers=max_obs_spectrum.wave)
         else:
-            max_obs_spectrum.apply_mask()
+            max_obs_spectrum.applyMask()
             print("Number of pixel in original resolution for the entire spectrum is %d."%max_obs_spectrum.N)
             
             # Re-sample real data onto lower resolution grid
