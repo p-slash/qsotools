@@ -6,7 +6,7 @@
 # Add --dla option to add DLAs
 import numpy as np
 import matplotlib.pyplot as plt
-
+from pkg_resources import resource_filename
 from astropy.table                      import Table
 
 from os.path     import join as ospath_join
@@ -19,6 +19,8 @@ import qsotools.specops  as so
 from qsotools.io import BinaryQSO
 import qsotools.kodiaqio as ki
 import qsotools.fiducial as fid
+
+PKG_ASU_TABLE = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 
 # Define Saving Functions
 # ------------------------------
@@ -87,6 +89,7 @@ if __name__ == '__main__':
     parser.add_argument("Outputdir", help="Output directory")
     parser.add_argument("Seed", help="Seed to generate random numbers.", type=int)
 
+    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=PKG_ASU_TABLE)
     parser.add_argument("--save_full_flux", help="When passed saves flux instead of fluctuations around truth.", \
         action="store_true")
 
@@ -157,7 +160,7 @@ if __name__ == '__main__':
     filename_list = []
     specres_list  = set()
 
-    qso_iter = ki.KODIAQ_QSO_Iterator(args.KODIAQdir, "tables/kodiaq_asu.tsv", clean_pix=False)
+    qso_iter = ki.KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
     
     if not REAL_DATA:
         lya_m = lm.LyaMocks(args.Seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, REDSHIFT_ON=not args.without_z_evo, \
