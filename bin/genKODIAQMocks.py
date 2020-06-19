@@ -17,7 +17,7 @@ import argparse
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
 from qsotools.io import BinaryQSO
-from qsotools.kodiaqio import KIterator as ki
+import qsotools.kodiaqio as ki
 import qsotools.fiducial as fid
 
 # Define Saving Functions
@@ -222,7 +222,7 @@ if __name__ == '__main__':
         # Cut Lyman-alpha forest region
         lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+qso.z_qso), wave <= fid.LYA_LAST_WVL * (1+qso.z_qso))
         # Cut analysis boundaries
-        forest_boundary = np.logical_and(wave >= lm.LYA_WAVELENGTH*(1+args.z_forest_min), wave <= lm.LYA_WAVELENGTH*(1+args.z_forest_max))
+        forest_boundary = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
         lyman_alpha_ind = np.logical_and(lyman_alpha_ind, forest_boundary)
 
         wave   = wave[lyman_alpha_ind]
@@ -232,7 +232,7 @@ if __name__ == '__main__':
         if args.without_z_evo:
             spectrum_z = z_center * np.ones_like(wave)
         else:
-            spectrum_z = np.array(wave, dtype=np.double)  / lm.LYA_WAVELENGTH - 1
+            spectrum_z = np.array(wave, dtype=np.double)  / fid.LYA_WAVELENGTH - 1
 
         if not args.save_full_flux:
             true_mean_flux = mean_flux_function(spectrum_z)
@@ -245,7 +245,7 @@ if __name__ == '__main__':
         selected_qso_observation_pi.append(max_obs_spectrum.pi_date)
         selected_qso_pixwidth.append(max_obs_spectrum.dv)
         selected_qso_zem_list.append(qso.z_qso)
-        selected_qso_specres_list.append(max_obs_spectrum.SPECRES)
+        selected_qso_specres_list.append(max_obs_spectrum.specres)
         # selected_qso_DR.append(readme_table[IND_PICKED]['kodrelease'])
         selected_qso_s2n_lya.append(maxs2n)
         selected_qso_resampled_npixels.append(len(wave))
@@ -266,7 +266,7 @@ if __name__ == '__main__':
         else:
             wave  = [wave]
             temp_fname = ["%s_%s_%s_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
-                max_obs_spectrum.spec_prefix, wave[0][0], wave[0][-1], settings_txt) for nc in range(nchunks)]
+                max_obs_spectrum.spec_prefix, wave[0][0], wave[0][-1], settings_txt)]
             
         filename_list.extend(temp_fname) 
 

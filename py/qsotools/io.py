@@ -20,13 +20,13 @@ class Spectrum():
         Spectral resolution of the instrument.
     dv : float
         Pixel width.
-    RA : float
-        RA in radians
-    DECL : float
-        DECL in radians
+    ra : float
+        Right ascension in radians
+    dec : float
+        Declination in radians
 
     __init__(self, wave, flux, error, z_qso, specres, dv, ra, dec)
-        Creates this spectrum object. Computes S2N.
+        Creates this spectrum object. Computes s2n.
 
     Attributes
     ----------
@@ -117,18 +117,18 @@ class BinaryQSO:
         Emission redshift of the quasar.
     dv : float
         Pixel width of the spectrum.
-    SPECRES : int
+    specres : int
         Spectral resolution of the instrument.
-    S2N : float
+    s2n : float
         Signal to noise ratio of the entire spectrum given by KODIAQ.
-    RA : float
-        RA in radians
-    DECL : float
-        DECL in radians
+    ra : float
+        ra in radians
+    dec : float
+        dec in radians
 
     Methods
     -------
-    save(wave, flux, error, N, z_qso, DECL, RA, S2N, SPECRES, dv)
+    save(wave, flux, error, N, z_qso, dec, ra, s2n, specres, dv)
         Saves the given parameters in binary format. Does not hold them as attributes.
 
     read()
@@ -137,12 +137,12 @@ class BinaryQSO:
             Number of pixels
         z_qso : double
             Emission redshift of the quasar.
-        DECL : double
-        RA : double
+        dec : double
+        ra : double
             Declination and right ascension in radians
-        SPECRES : int
+        specres : int
             Dimensionless resolving power.
-        S2N : double
+        s2n : double
             Signal to noise
         dv : double
             Pixel width in km/s
@@ -165,7 +165,7 @@ class BinaryQSO:
     def close(self):
         self.file.close()
 
-    def save(self, wave, flux, error, N, z_qso, DECL, RA, S2N, SPECRES, dv): 
+    def save(self, wave, flux, error, N, z_qso, dec, ra, s2n, specres, dv): 
         # Set up binary data
         low_ob_l = wave[0]
         upp_ob_l = wave[-1]
@@ -173,7 +173,7 @@ class BinaryQSO:
         low_re_l = low_ob_l / (1. + z_qso)
         upp_re_l = upp_ob_l / (1. + z_qso)
 
-        hdr = struct.pack('idddidddddd', N, z_qso, DECL, RA, SPECRES, S2N, dv, \
+        hdr = struct.pack('idddidddddd', N, z_qso, dec, ra, specres, s2n, dv, \
                           low_ob_l, upp_ob_l, low_re_l, upp_re_l)
         wave_bin = struct.pack('d' * N, *wave)
         flux_bin = struct.pack('d' * N, *flux)
@@ -196,7 +196,7 @@ class BinaryQSO:
         low_re_l = low_ob_l / (1. + self.z_qso)
         upp_re_l = upp_ob_l / (1. + self.z_qso)
 
-        hdr = struct.pack('idddidddddd', self.N, self.z_qso, self.DECL, self.RA, self.SPECRES, self.S2N, self.dv, \
+        hdr = struct.pack('idddidddddd', self.N, self.z_qso, self.dec, self.ra, self.specres, self.s2n, self.dv, \
                           low_ob_l, upp_ob_l, low_re_l, upp_re_l)
         wave_bin = struct.pack('d' * self.N, *self.wave)
         flux_bin = struct.pack('d' * self.N, *self.flux)
@@ -215,8 +215,8 @@ class BinaryQSO:
 
         d = self.file.read(header_size)
 
-        self.N, self.z_qso, self.DECL, self.RA, \
-        self.SPECRES, self.S2N, self.dv, \
+        self.N, self.z_qso, self.dec, self.ra, \
+        self.specres, self.s2n, self.dv, \
         low_ob_l, upp_ob_l, low_re_l, upp_re_l  = struct.unpack(header_fmt, d)
 
         array_fmt  = 'd' * self.N
@@ -231,7 +231,7 @@ class BinaryQSO:
         
         self.file.close()
 
-        return  self.N, self.z_qso, self.DECL, self.RA, self.SPECRES, self.S2N, self.dv, \
+        return  self.N, self.z_qso, self.dec, self.ra, self.specres, self.s2n, self.dv, \
                 low_ob_l, upp_ob_l, low_re_l, upp_re_l, \
                 self.wave, self.flux, self.error
 
