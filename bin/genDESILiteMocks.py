@@ -8,7 +8,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-from pkg_resources import resource_filename
+from pkg_resources import resource_filename, resource_exists
 
 from os.path import join as ospath_join
 from os      import makedirs as os_makedirs
@@ -49,9 +49,6 @@ def save_parameters(txt_basefilename, args):
     toWrite.close()
 
 def save_plots(wch, fch, ech, fnames, args):
-    # fig_title = "%s/%s/%s at z=%.2f" % (obs_fits.qso_name, obs_fits.pi_date, obs_fits.spec_prefix, obs_fits.z_qso)
-    # plt.title(fig_title)
-
     for (f, e, fname) in zip(fch, ech, fnames):
         plt.cla()
         plt.plot(wch, f, 'b-')
@@ -67,29 +64,44 @@ def save_data(wave, fmocks, emocks, fnames, args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Outputdir", help="Output directory")
-    parser.add_argument("--nmocks", help="Number of mocks to generate. Redshift of qso picked at random given n(z). Default: %(default)s", type=int, default=10000)
-    parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", type=int, default=332298)
+    parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
+        "Redshift of qso picked at random given n(z). Default: %(default)s"), type=int, default=1)
+    parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
+        type=int, default=332298)
         
-    parser.add_argument("--sigma_per_pixel", help="Add Gaussian error to mocks with given sigma. Default: %(default)s", type=float, default=0.7)
-    parser.add_argument("--specres", help="Spectral resolution. Default: %(default)s", type=int, default=3200)
-    parser.add_argument("--pixel_dv", help="Pixel size (km/s) of the log-spaced wave grid. Default: %(default)s", type=float, default=30.)
+    parser.add_argument("--sigma_per_pixel", help=("Add Gaussian error to mocks with given sigma. "\
+        "Default: %(default)s"), type=float, default=0.7)
+    parser.add_argument("--specres", help="Spectral resolution. Default: %(default)s", type=int, \
+        default=3200)
+    parser.add_argument("--pixel_dv", help=("Pixel size (km/s) of the log-spaced wave grid. "\
+        "Default: %(default)s"), type=float, default=30.)
 
-    parser.add_argument("--desi_w1", help="Lower wavelength of DESI wave grid in A. Default: %(default)s A", type=float, default=3600.)
-    parser.add_argument("--desi_w2", help="Higher wavelength of DESI wave grid in A. Default: %(default)s A", type=float, default=9800.)
+    parser.add_argument("--desi_w1", help=("Lower wavelength of DESI wave grid in A. "\
+        "Default: %(default)s A"), type=float, default=3600.)
+    parser.add_argument("--desi_w2", help=("Higher wavelength of DESI wave grid in A. "\
+        "Default: %(default)s A"), type=float, default=9800.)
 
-    parser.add_argument("--invcdf_nz", help="Table for inverse cdf of n(z). Default: %(default)s", default=PKG_ICDF_Z_TABLE)
+    parser.add_argument("--invcdf_nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
+        default=PKG_ICDF_Z_TABLE)
     
-    parser.add_argument("--chunk-dyn", help="Dynamic chunking splits a spectrum into three chunks if l>L/2 or into two chunks if l>L/3.", action="store_true")
-    parser.add_argument("--nosave", help="Does not save mocks to output when passed", action="store_true")
+    parser.add_argument("--chunk-dyn", help=("Dynamic chunking splits a spectrum into "\
+        "three chunks if l>L/2 or into two chunks if l>L/3."), action="store_true")
+    parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
+        action="store_true")
     parser.add_argument("--plot", help="Saves plots to output when passed", action="store_true")
 
     parser.add_argument("--gauss", help="Generate Gaussian mocks", action="store_true")
     parser.add_argument("--without_z_evo", help="Turn off redshift evolution", action="store_true")
-    parser.add_argument("--save_full_flux", help="When passed saves flux instead of fluctuations around truth.", action="store_true")
+    parser.add_argument("--save_full_flux", action="store_true", \
+        help="When passed saves flux instead of fluctuations around truth.")
 
-    parser.add_argument("--use_eds_v", help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", action="store_true")
-    parser.add_argument("--ngrid", help="Number of grid points. Default is 2^16", type=int, default=2**16)
-    parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", type=float, default=3.)
+    parser.add_argument("--use_eds_v", \
+        help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
+        action="store_true")
+    parser.add_argument("--ngrid", help="Number of grid points. Default is 2^16", type=int, \
+        default=2**16)
+    parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
+        type=float, default=3.)
     args = parser.parse_args()
 
     # Create/Check directory
@@ -107,8 +119,8 @@ if __name__ == '__main__':
     # Iteration
     filename_list = []
 
-    lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, REDSHIFT_ON=not args.without_z_evo, \
-        GAUSSIAN_MOCKS=args.gauss, USE_LOG_V=not args.use_eds_v)
+    lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
+        REDSHIFT_ON=not args.without_z_evo, GAUSSIAN_MOCKS=args.gauss, USE_LOG_V=not args.use_eds_v)
 
     if args.gauss:
         mean_flux_function = fid.meanFluxFG08
@@ -135,7 +147,8 @@ if __name__ == '__main__':
             spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID)
         
         # Cut Lyman-alpha forest region
-        lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), wave <= fid.LYA_LAST_WVL * (1+z_qso))
+        lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
+            wave <= fid.LYA_LAST_WVL * (1+z_qso))
         wave = wave[lyman_alpha_ind]
         fluxes = np.array([f[lyman_alpha_ind] for f in fluxes])
         errors = np.array([e[lyman_alpha_ind] for e in errors])
@@ -154,7 +167,8 @@ if __name__ == '__main__':
         if args.chunk_dyn:
             wave, fluxes, errors, nchunks = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
 
-            fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" % (args.seed, nid, nc, z_qso, settings_txt) for nc in range(nchunks)]
+            fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
+            % (args.seed, nid, nc, z_qso, settings_txt) for nc in range(nchunks)]
         else:
             wave  = [wave]
             fname = ["desilite_seed%d_id%d_z%.1f%s.dat" % (args.seed, nid, z_qso, settings_txt)]
