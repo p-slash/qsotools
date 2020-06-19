@@ -8,6 +8,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
+from pkg_resources import resource_filename
 
 from os.path import join as ospath_join
 from os      import makedirs as os_makedirs
@@ -17,6 +18,8 @@ import qsotools.mocklib  as lm
 import qsotools.specops  as so
 from qsotools.io import BinaryQSO
 import qsotools.fiducial as fid
+
+PKG_ICDF_Z_TABLE = resource_filename('qsotools', 'tables/invcdf_nz_qso_zmin2.1_zmax4.4.dat')
 
 def save_parameters(txt_basefilename, args):
     Parameters_txt = ("Parameters for these mocks\n"
@@ -74,7 +77,7 @@ if __name__ == '__main__':
     parser.add_argument("--desi_w1", help="Lower wavelength of DESI wave grid in A. Default: %(default)s A", type=float, default=3600.)
     parser.add_argument("--desi_w2", help="Higher wavelength of DESI wave grid in A. Default: %(default)s A", type=float, default=9800.)
 
-    parser.add_argument("--invcdf_nz", help="Table for inverse cdf of n(z). Default: %(default)s", default="tables/invcdf_nz_qso_zmin2.1_zmax4.4.dat")
+    parser.add_argument("--invcdf_nz", help="Table for inverse cdf of n(z). Default: %(default)s", default=PKG_ICDF_Z_TABLE)
     
     parser.add_argument("--chunk-dyn", help="Dynamic chunking splits a spectrum into three chunks if l>L/2 or into two chunks if l>L/3.", action="store_true")
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", action="store_true")
