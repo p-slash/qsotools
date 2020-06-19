@@ -45,7 +45,7 @@ class KODIAQFits(Spectrum):
     
     z_qso : float
         Emission redshift of the quasar.
-    SPECRES : int
+    specres : int
         Spectral resolution of the instrument.
     dv : float
         Pixel width.
@@ -57,9 +57,9 @@ class KODIAQFits(Spectrum):
         Signal to noise ratio of the Lya forest. 
         Initial value is 0. Run getS2NLya to calculate this value.
         -1 if there is no Lya coverage for a given spectrum.
-    RA : float
+    ra : float
         RA in radians
-    DECL : float
+    dec : float
         DECL in radians
 
     qso_name : str
@@ -409,12 +409,12 @@ class KODIAQMasterTable():
 
                 data_relases.append(obs.dr)
 
-                entire_spec_s2ns.append(obs.spectrum.S2N)
-                dimless_specres.append(obs.spectrum.SPECRES)
+                entire_spec_s2ns.append(obs.spectrum.s2n)
+                dimless_specres.append(obs.spectrum.specres)
                 pixel_widths.append("%.2f"%obs.spectrum.dv)
 
-                right_ascensions.append(obs.spectrum.RA)
-                declinations.append(obs.spectrum.DECL)
+                right_ascensions.append(obs.spectrum.ra)
+                declinations.append(obs.spectrum.dec)
 
 
         self.master_table = Table([qso_names, observations, spec_prefixes, \
