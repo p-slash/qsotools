@@ -5,18 +5,17 @@ binscripts = [os.path.join("bin", f) for f in os.listdir("bin") if f.endswith(".
 setup(
     name="qsotools",
     version="1.0",
-    packages=find_packages(),
+    packages=['qsotools'],
+    package_dir={'qsotools': 'py/qsotools'},
+    package_data={"qsotools": ["tables/*"]},
+    include_package_data=True,
     scripts=binscripts,
 
     # Project uses reStructuredText, so ensure that the docutils get
     # installed or upgraded on the target machine
     # install_requires=["docutils>=0.3"],
 
-    package_data={
-        # If any package contains *.txt or *.rst files, include them:
-        "": ["*.txt", "*.rst"],
-    },
-
+    
     # metadata to display on PyPI
     author = "Naim Goksel Karacayli",
     author_email = "naimgoksel.karacayli@yale.edu",
