@@ -4,3 +4,4 @@ matplotlib
 astropy
 ipython
 plotly
+setuptools
