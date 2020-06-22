@@ -1,9 +1,8 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.stats import binned_statistic
+from scipy.stats     import binned_statistic
 from scipy.integrate import quad as scipy_quad
-from scipy.stats import norm as scipy_normal_stat
-from scipy.special import lambertw as scipy_lambertw
+from scipy.stats     import norm as scipy_normal_stat
+from scipy.special   import lambertw as scipy_lambertw
 from scipy.interpolate import interp1d as scipy_interp1d
 
 from qsotools import specops
@@ -365,17 +364,6 @@ class LyaMocks():
             wave   = wave[(wave_min < wave) & (wave < wave_max)]
 
         return wave, fluxes, errors
-
-    def plot(self, ylbl, smlog):
-        for f in self.delta_F:
-            if smlog:
-                plt.semilogy(self.z_values, f)
-            else:
-                plt.plot(self.z_values, f)
-        plt.xlabel('z')
-        plt.ylabel(ylbl)
-
-        plt.show()
 
 
             
