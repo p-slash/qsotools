@@ -140,7 +140,8 @@ def genContinuumError(wave, se0, se1):
 
 class LyaMocks():
     """
-    Generates lognormal mocks with a power spectrum similar to Lya 1D power spectrum up to small scales ~0.0003-0.2 s/km.
+    Generates lognormal mocks with a power spectrum similar to Lya 1D power spectrum 
+    up to small scales ~0.0003-0.2 s/km.
 
     Parameters
     ----------
@@ -153,10 +154,12 @@ class LyaMocks():
     REDSHIFT_ON : Bool
         Turn on redshift evolution. Default is True.
     GAUSSIAN_MOCKS : Bool
-        Generate Gaussian mocks instead of log-normal mocks. Default is False, i.e. generating log-normal mocks.
+        Generate Gaussian mocks instead of log-normal mocks. 
+        Default is False, i.e. generating log-normal mocks.
 
     __init__(SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, GAUSSIAN_MOCKS=False, USE_LOG_V=False)
-        Creates a grid, equal spacing in velocity DV_KMS. Computes redshift values, the power spectrum for this array.
+        Creates a grid, equal spacing in velocity DV_KMS. Computes redshift values, 
+        the power spectrum for this array.
 
     Attributes
     ----------
@@ -169,7 +172,8 @@ class LyaMocks():
     REDSHIFT_ON : Bool
         Turn on redshift evolution. Default is True.
     GAUSSIAN_MOCKS : Bool
-        Generate Gaussian mocks instead of log-normal mocks. Default is False, i.e. generating log-normal mocks.
+        Generate Gaussian mocks instead of log-normal mocks. Default is False, 
+        i.e. generating log-normal mocks.
     Z_CENTER : float
         Central redshift of the grid. Set by setCentralRedshift(Z_C).
 
@@ -195,7 +199,8 @@ class LyaMocks():
         lognGeneratingPower or fiducial.evaluatePD13W17Fit for Gaussian mocks.
         Stored in delta_F.
     setCentralRedshift(Z_C)
-        Set Z_C as central redshift for the long grid (Z_CENTER). Sets up z_values, redshifts, power_spectrum_array and init_variance.
+        Set Z_C as central redshift for the long grid (Z_CENTER). Sets up z_values, redshifts, 
+        power_spectrum_array and init_variance.
     lognTransform(R_tau=None)
         Multiply the Gaussian field g(z) by a(z)=z_evolution_of_power_spectrum_sqrt(z).
         Then transforms by 
@@ -205,7 +210,8 @@ class LyaMocks():
     smoothGaussian(R)
         Smooth delta_F with a Gaussian kernel using FFT.
     applySpectographResolution(self, spectrograph_resolution)
-        Applies spectrograph resolution as a Gaussian smoothing to delta_F. Takes integer FWHM resolution.
+        Applies spectrograph resolution as a Gaussian smoothing to delta_F. 
+        Takes integer FWHM resolution.
     transformTauField()
         Transforms by tau(z) = n(z) * z_evolution_of_tau(z)
         Stored in delta_F.
@@ -214,14 +220,17 @@ class LyaMocks():
         Stored in delta_F.
 
     generateMocks(NMocks=1, spectrograph_resolution=None, R_tau=None)
-        Generates NMocks mocks with R_tau in lognTransform and smoothes the flux with spectrograph resolution. 
+        Generates NMocks mocks with R_tau in lognTransform and smoothes the flux 
+        with spectrograph resolution. 
         Does not resample onto another grid.
     
-    resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, resample_dv=None, obs_wave_centers=None, delta_z=None)
+    resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
+        resample_dv=None, obs_wave_centers=None, delta_z=None)
         Generates howmany number of mocks.
         Resamples onto the observed grid if obs_wave_centers is given.
         Also resamples onto fixed resample_dv pixel sized grid if resample_dv is given. 
-        Adds gaussian noise using per kms estimate after resampling and smoothing so that s/n per pixel is known.
+        Adds gaussian noise using per kms estimate after resampling and smoothing 
+        so that s/n per pixel is known.
 
         Cuts delta_z chunks around central redshift.
         Returns wavelength array and list of fluxes: wave, fluxes, errors.
@@ -235,7 +244,8 @@ class LyaMocks():
         
         self.delta_F = np.fft.irfft(delta_k, axis=1) / self.DV_KMS
 
-    def __init__(self, SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, GAUSSIAN_MOCKS=False, USE_LOG_V=False):
+    def __init__(self, SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, \
+        GAUSSIAN_MOCKS=False, USE_LOG_V=False):
         self.RNST           = np.random.RandomState(SEED)
         self.N_CELLS        = N_CELLS
         self.DV_KMS         = DV_KMS
@@ -329,10 +339,11 @@ class LyaMocks():
     def generateGaussianNoise(self, std_err, arr):
         return self.RNST.normal(loc=0, scale=std_err, size=arr.shape)
 
-    def resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, resample_dv=None, obs_wave_centers=None, delta_z=None):
+    def resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
+        resample_dv=None, obs_wave_centers=None, delta_z=None):
         wave   = fid.LYA_WAVELENGTH * (1. + self.z_values)
 
-        self.generateMocks(howmany, spectrograph_resolution) #, add_err=err_per_kms/np.sqrt(self.DV_KMS))
+        self.generateMocks(howmany, spectrograph_resolution)
         fluxes = self.delta_F
 
         # Resample onto an observed grid if obs_wave_centers given
