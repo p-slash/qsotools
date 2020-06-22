@@ -73,7 +73,7 @@ class KODIAQFits(Spectrum):
     
     Methods
     -------
-    setWavelengthArray(hdr)
+    _setWavelengthArray(hdr)
         Set the wavelength array in logarithmic spacing.
     applyMask(good_pixels=None)
         Remove masked values from wave, flux and error. Keeps good_pixels and updates the length the arrays.
@@ -97,7 +97,7 @@ class KODIAQFits(Spectrum):
         Returns <1/e> in the Lya forest. -1 if no coverage.
 
     """
-    def setWavelengthArray(self, hdr):
+    def _setWavelengthArray(self, hdr):
         CRPIX1 = hdr["CRPIX1"]
         CDELT1 = hdr["CDELT1"]
         CRVAL1 = hdr["CRVAL1"]
@@ -129,7 +129,7 @@ class KODIAQFits(Spectrum):
 
         self.s2n_kodiaq = hdr["SIG2NOIS"]
 
-        self.setWavelengthArray(hdr)
+        self._setWavelengthArray(hdr)
 
         self.flux = np.array(hdul[0].data*1., dtype=np.double)
         hdul.close()
@@ -221,7 +221,7 @@ class KODIAQ_QSO_Iterator:
 
     """
     
-    def set_name_dir_table(self, t):
+    def _set_name_dir_table(self, t):
         self.qso_name = t['KODIAQ']
         self.z_qso    = t['zem']
 
@@ -241,14 +241,14 @@ class KODIAQ_QSO_Iterator:
         
         self.iter_asu_table = iter(self.asu_table)
         self.qso_number = 0
-        self.set_name_dir_table(self.asu_table[0])
+        self._set_name_dir_table(self.asu_table[0])
 
     def __iter__(self):
         return self
 
     def __next__(self):
         self.qso_number += 1
-        self.set_name_dir_table(next(self.iter_asu_table))
+        self._set_name_dir_table(next(self.iter_asu_table))
 
         return self
 
@@ -281,7 +281,7 @@ class KODIAQ_OBS_Iterator:
 
     Methods
     -------
-    set_pidate_specprefix(t)
+    _set_pidate_specprefix(t)
         Set pi_date, spec_prefix and dr from table element t.
     readSpectrum()
         Reads spectrum for the current pi_date and spec_prefix.
@@ -297,19 +297,19 @@ class KODIAQ_OBS_Iterator:
         self.kqso_iter = kqso_iter
         self.iter_obs = iter(self.kqso_iter.readme_table)
 
-        self.set_pidate_specprefix(self.kqso_iter.readme_table[0])
+        self._set_pidate_specprefix(self.kqso_iter.readme_table[0])
         self.readSpectrum()
 
     def __iter__(self):
         return self
         
     def __next__(self):
-        self.set_pidate_specprefix(next(self.iter_obs))
+        self._set_pidate_specprefix(next(self.iter_obs))
         self.readSpectrum()
 
         return self
 
-    def set_pidate_specprefix(self, t):
+    def _set_pidate_specprefix(self, t):
         self.pi_date     = t['pi_date']
         self.spec_prefix = t['spec_prefix']
         self.dr          = t['kodrelease']
@@ -339,7 +339,7 @@ class KODIAQ_OBS_Iterator:
 
             i += 1          
 
-        self.set_pidate_specprefix(self.kqso_iter.readme_table[max_i])
+        self._set_pidate_specprefix(self.kqso_iter.readme_table[max_i])
         self.readSpectrum()
 
         return self.spectrum, max_s2n_lya
