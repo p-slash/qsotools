@@ -15,17 +15,23 @@ ONE_SIGMA_2_FWHM = 2.35482004503
 # -----------------------------------------------------
 # Power spectrum begins
 # -----------------------------------------------------
-#                                 A               n                alpha            B               beta             lmd
-PD13_fiducial_parameters        = 6.62141965e-02, -2.68534876e+00, -2.23276251e-01, 3.59124427e+00, -1.76804541e-01, 3.59826056e+02
-PD13_fiducial_parameters_0beta  = 6.62141965e-02, -2.68534876e+00, -2.23276251e-01, 3.59124427e+00, 0,               3.59826056e+02
+PDW_FIT_AMP  = 6.62141965e-02
+PDW_FIT_N    = -2.68534876e+00
+PDW_FIT_APH  = -2.23276251e-01
+PDW_FIT_B    = 3.59124427e+00
+PDW_FIT_BETA = -1.76804541e-01
+PDW_FIT_LMD  = 3.59826056e+02
+
+PDW_FIT_PARAMETERS       = PDW_FIT_AMP, PDW_FIT_N, PDW_FIT_APH, PDW_FIT_B, PDW_FIT_BETA, PDW_FIT_LMD
+PDW_FIT_PARAMETERS_0BETA = PDW_FIT_AMP, PDW_FIT_N, PDW_FIT_APH, PDW_FIT_B, 0, PDW_FIT_LMD
 PD13_PIVOT_K = 0.009
 PD13_PIVOT_Z = 3.0
 
 def evaluatePD13Lorentz(X, A, n, alpha, B, beta, lmd):
     k, z = X
-    q0 = k / PD13_PIVOT_K + 1e-10
+    q0 = k/PD13_PIVOT_K + 1e-10
 
-    result = (A * np.pi / PD13_PIVOT_K) * np.power(q0, 2. + n + alpha * np.log(q0)) / (1. + lmd * k**2)
+    result = (A*np.pi/PD13_PIVOT_K) * np.power(q0, 2. + n + alpha*np.log(q0)) / (1. + lmd * k**2)
     
     if z is not None:
         x0 = (1. + z) / (1. + PD13_PIVOT_Z)
@@ -35,14 +41,14 @@ def evaluatePD13Lorentz(X, A, n, alpha, B, beta, lmd):
 
 def evaluatePD13W17Fit(k, z=None):
     if z is None:
-        p_noredshif     = list(PD13_fiducial_parameters)
+        p_noredshif     = list(PDW_FIT_PARAMETERS)
         p_noredshif[3]  = 0
         p_noredshif[4]  = 0
         
         pfid    = p_noredshif
         z       = 3.0
     else:
-        pfid    = list(PD13_fiducial_parameters_0beta)
+        pfid    = list(PDW_FIT_PARAMETERS_0BETA)
 
     return evaluatePD13Lorentz((k, z), *pfid)
 
@@ -71,7 +77,7 @@ def jacobianPD13Lorentz(X, A, n, alpha, B, beta, lmd):
 # All 1d arrays
 # Pass z=None to turn off B, beta parameters
 # initial_params always has 6 values: A, n, alpha, B, beta, lambda
-def fitPD13Lorentzian(k, z, power, error, initial_params=PD13_fiducial_parameters):
+def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS):
     fitted_power = np.zeros(len(power))
 
     mask     = np.logical_and(power > 0, error > 0)
@@ -98,8 +104,9 @@ def fitPD13Lorentzian(k, z, power, error, initial_params=PD13_fiducial_parameter
     X_masked = (k_masked, z_masked)
 
     try:
-        pnew, pcov = curve_fit(evaluatePD13Lorentz, X_masked, p_masked, initial_params, sigma=e_masked, \
-            absolute_sigma=True, bounds=(lb, ub), method='trf', jac=jacobianPD13Lorentz)
+        pnew, pcov = curve_fit(evaluatePD13Lorentz, X_masked, p_masked, initial_params, \
+            sigma=e_masked,  absolute_sigma=True, bounds=(lb, ub), method='trf', \
+            jac=jacobianPD13Lorentz)
     except ValueError:
         raise
         exit(1)
@@ -149,8 +156,8 @@ def fitBecker13MeanFlux(z, F, e):
     print("z0 is fixed to {:.1f}".format(BECKER13_parameters[-1]))
 
     try:
-        pnew, pcov = curve_fit(evaluateBecker13MeanFlux, z, F, BECKER13_parameters, sigma=e, \
-            absolute_sigma=True)
+        pnew, pcov = curve_fit(evaluateBecker13MeanFlux, z, F, BECKER13_parameters, \
+            sigma=e, absolute_sigma=True)
     except ValueError:
         raise
         exit(1)
