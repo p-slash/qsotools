@@ -11,8 +11,8 @@ from qsotools.io import Spectrum
 class KODIAQFits(Spectrum):
     """
     Defining parameters and useful methods for a KODIAQ FITS file. 
-    By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally update mask to
-    filter spikes using maskOutliers method.
+    By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
+    update mask to filter spikes using maskOutliers method.
 
     Parameters
     ----------
@@ -28,7 +28,8 @@ class KODIAQFits(Spectrum):
         Emission redshift of the quasar.
 
     __init__(self, kodiaq_dir, qso_name, pi_date, spec_prefix, z_qso)
-        Reads flux and error files. Constructs logarithmicly spaced wavelength array. Mask is error>0 by default.
+        Reads flux and error files. Constructs logarithmicly spaced wavelength array. 
+        Mask is error>0 by default.
 
     Attributes
     ----------
@@ -76,7 +77,8 @@ class KODIAQFits(Spectrum):
     _setWavelengthArray(hdr)
         Set the wavelength array in logarithmic spacing.
     applyMask(good_pixels=None)
-        Remove masked values from wave, flux and error. Keeps good_pixels and updates the length the arrays.
+        Remove masked values from wave, flux and error. 
+        Keeps good_pixels and updates the length the arrays.
     
     maskOutliers(MEAN_FLUX   = 0.7113803432881693, \
                     SIGMA_FLUX  = 0.37433547084407937, \
@@ -142,7 +144,8 @@ class KODIAQFits(Spectrum):
         self.error = np.array(hdul[0].data*1., dtype=np.double)
         hdul.close()
         
-        super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], self.dv, c.ra.radian, c.dec.radian)
+        super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
+            self.dv, c.ra.radian, c.dec.radian)
 
     def maskOutliers(self,   MEAN_FLUX   = 0.7113803432881693, SIGMA_FLUX  = 0.37433547084407937, \
         MEAN_ERROR  = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT   = 5.):
@@ -151,7 +154,8 @@ class KODIAQFits(Spectrum):
         HIGHEST_ALLOWED_ERROR = MEAN_ERROR + SIGMA_CUT * SIGMA_ERROR
         LOWEST_ALLOWED_FLUX   = MEAN_FLUX  - SIGMA_CUT * SIGMA_FLUX
         
-        flux_within_5sigma  = np.logical_and(self.flux > LOWEST_ALLOWED_FLUX, self.flux < HIGHEST_ALLOWED_FLUX)
+        flux_within_5sigma  = np.logical_and(self.flux > LOWEST_ALLOWED_FLUX, \
+            self.flux < HIGHEST_ALLOWED_FLUX)
         error_within_5sigma = self.error < HIGHEST_ALLOWED_ERROR
 
         good_pixels = np.logical_and(flux_within_5sigma, error_within_5sigma)
@@ -254,7 +258,8 @@ class KODIAQ_QSO_Iterator:
 
 class KODIAQ_OBS_Iterator:
     """
-    Iterates over observations in README.tbl for given QSO in KODIAQ. USe as `for obs in KODIAQ_OBS_Iterator`
+    Iterates over observations in README.tbl for given QSO in KODIAQ. 
+    Use as `for obs in KODIAQ_OBS_Iterator`
 
     Parameters
     ----------

@@ -21,7 +21,8 @@ def set_topax_makeup(top_ax, majorgrid=True, ymin=1e-4, ymax=0.5):
     plt.setp(top_ax.get_yticklabels(), fontsize = TICK_LBL_FONT_SIZE)
     top_ax.set_ylabel(r'$kP/\pi$', fontsize = AXIS_LBL_FONT_SIZE)
 
-def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", xlab = r'$k$ [km/s]$^{-1}$', colormap=plt.cm.jet):
+def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
+    xlab = r'$k$ [km/s]$^{-1}$', colormap=plt.cm.jet):
     # Set up plotting env
     fig = plt.figure(figsize=(5, nz))
     gs = gridspec.GridSpec(nz, 1, figure=fig, wspace=0.0, hspace=0.05)
@@ -39,8 +40,9 @@ def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", xlab = r'$k$ [
     for i, ax in enumerate(axs):
         if i == nz:
             break
-        ax.text(0.98, 0.94, "z=%.1f"%z_bins[i], transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE, \
-            verticalalignment='top', horizontalalignment='right', bbox={'facecolor':'white', 'pad':1})
+        ax.text(0.98, 0.94, "z=%.1f"%z_bins[i], transform=ax.transAxes, \
+            fontsize=TICK_LBL_FONT_SIZE, verticalalignment='top', horizontalalignment='right', \
+            bbox={'facecolor':'white', 'pad':1})
         ax.set_yscale(scale)
         ax.set_ylim(ymin=ymin, ymax=ymax)
         ax.set_xscale("log")
@@ -56,7 +58,8 @@ def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", xlab = r'$k$ [
 
     return axs, color_array
 
-def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", xlab = r'k [km/s]$^{-1}$', colormap=plt.cm.jet):
+def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
+    xlab = r'k [km/s]$^{-1}$', colormap=plt.cm.jet):
     # Set up plotting env
     fig = plt.figure(figsize=(10, nz/2))
     gs = gridspec.GridSpec(int((nz+1)/2), 2, figure=fig, wspace=0.01, hspace=0.05)
@@ -98,7 +101,8 @@ def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", xlab = r'k [km
 
     return axs, color_array
 
-def create_tworow_figure(plt, nz, ratio_up2down, majorgrid=True, hspace=0, colormap=plt.cm.jet, ylim=0.05):
+def create_tworow_figure(plt, nz, ratio_up2down, majorgrid=True, hspace=0, \
+    colormap=plt.cm.jet, ylim=0.05):
     fig = plt.figure()
     top_pos, bot_pos = gridspec.GridSpec(2, 1, height_ratios=[ratio_up2down, 1])
     top_ax = fig.add_subplot(top_pos)
@@ -212,12 +216,14 @@ class PowerPlotter(object):
             k_true           = np.unique(np.array(power_true_table['kc'], dtype=np.double))
             z_true           = np.unique(np.array(power_true_table['z'],  dtype=np.double))
             if 'P-FFT' in power_true_table.colnames:
-                p_true = np.array(power_true_table['P-FFT'], dtype=np.double).reshape(len(z_true), len(k_true))
+                p_true = np.array(power_true_table['P-FFT'], dtype=np.double).\
+                    reshape(len(z_true), len(k_true))
             elif 'P-ALN' in power_true_table.colnames:
-                p_true = np.array(power_true_table['P-ALN'], dtype=np.double).reshape(len(z_true), len(k_true))
+                p_true = np.array(power_true_table['P-ALN'], dtype=np.double).\
+                    reshape(len(z_true), len(k_true))
             elif 'Pfid' in power_true_table.colnames:
                 p_true = np.array(power_true_table['Pfid'], dtype=np.double) + \
-                np.array(power_true_table['ThetaP'], dtype=np.double)
+                    np.array(power_true_table['ThetaP'], dtype=np.double)
                 p_true = p_true.reshape(len(z_true), len(k_true))
             else:
                 print("True power estimates cannot be read!")
@@ -288,11 +294,13 @@ class PowerPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
 
-    def plotAll(self, outplot_fname=None, two_row=False, pk_ymax=0.5, pk_ymin=1e-4, rel_ylim=0.05, \
-        colormap=plt.cm.jet, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
+    def plotAll(self, outplot_fname=None, two_row=False, pk_ymax=0.5, \
+        pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
+        auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
         plt.clf()
         if two_row:
-            top_ax, bot_ax, color_array = create_tworow_figure(plt, self.nz, 3, ylim=rel_ylim, colormap=colormap)
+            top_ax, bot_ax, color_array = create_tworow_figure(plt, self.nz, 3, ylim=rel_ylim, \
+                colormap=colormap)
         else:
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
@@ -317,11 +325,10 @@ class PowerPlotter(object):
 
             chi_sq += np.sum(chi_sq_zb)
 
-            top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, xerr = 0, yerr = erz*self.k_bins/np.pi, \
+            top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, yerr=erz*self.k_bins/np.pi, \
                 fmt='o', label="z=%.2f"%z_val, capsize=2, color=ci)
             
-            top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, fmt=':', capsize=0, \
-                color=ci)
+            top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, fmt=':', capsize=0, color=ci)
 
             if two_row:
                 bot_ax.errorbar(self.k_bins, psz / ptz  - 1, xerr = 0, yerr = erz/ptz, fmt='s:', \
@@ -330,7 +337,8 @@ class PowerPlotter(object):
         if two_row:
             rel_err = np.array(self.power_sp) / np.array(self.power_true)  - 1
             rel_err = np.abs(rel_err) + np.array(self.error)/np.array(self.power_true)
-            rel_err = rel_err[:, np.logical_and(auto_ylim_xmin < self.k_bins, self.k_bins < auto_ylim_xmax)]
+            rel_err = rel_err[:, np.logical_and(auto_ylim_xmin < self.k_bins, \
+                self.k_bins < auto_ylim_xmax)]
             yy = np.max(rel_err)
             bot_ax.set_ylim(-yy, yy)
 
@@ -376,8 +384,9 @@ class PowerPlotter(object):
             axs[i].errorbar(self.k_bins, rel_err, xerr = 0, yerr = erz/ptz, \
                 fmt='o', color=ci, markersize=2)
             
-            axs[i].text(0.05, 0.15, "z=%.1f"%z_val, transform=axs[i].transAxes, fontsize=TICK_LBL_FONT_SIZE, \
-            verticalalignment='bottom', horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
+            axs[i].text(0.05, 0.15, "z=%.1f"%z_val, transform=axs[i].transAxes, \
+                fontsize=TICK_LBL_FONT_SIZE, verticalalignment='bottom', \
+                horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
 
             axs[i].axhline(color='k')
             

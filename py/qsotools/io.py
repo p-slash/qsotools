@@ -42,7 +42,8 @@ class Spectrum():
     Methods
     -------
     applyMask(good_pixels=None)
-        Remove masked values from wave, flux and error. Keeps good_pixels and updates the length the arrays.
+        Remove masked values from wave, flux and error. 
+        Keeps good_pixels and updates the length the arrays.
 
     getS2NLya(lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL)
         Computes the signal-to-noise in lyman alpha region as average(1/e)
@@ -132,7 +133,7 @@ class BinaryQSO:
         Saves the given parameters in binary format. Does not hold them as attributes.
 
     read()
-        Reads the file. Saves as attributes and returns.
+        Reads the file. Saves as attributes.
         N : int
             Number of pixels
         z_qso : double
@@ -196,8 +197,8 @@ class BinaryQSO:
         low_re_l = low_ob_l / (1. + self.z_qso)
         upp_re_l = upp_ob_l / (1. + self.z_qso)
 
-        hdr = struct.pack('idddidddddd', self.N, self.z_qso, self.dec, self.ra, self.specres, self.s2n, self.dv, \
-                          low_ob_l, upp_ob_l, low_re_l, upp_re_l)
+        hdr = struct.pack('idddidddddd', self.N, self.z_qso, self.dec, self.ra, self.specres, \
+            self.s2n, self.dv, low_ob_l, upp_ob_l, low_re_l, upp_re_l)
         wave_bin = struct.pack('d' * self.N, *self.wave)
         flux_bin = struct.pack('d' * self.N, *self.flux)
         nois_bin = struct.pack('d' * self.N, *self.error)
@@ -230,10 +231,6 @@ class BinaryQSO:
         self.error  = struct.unpack(array_fmt, d)
         
         self.file.close()
-
-        return  self.N, self.z_qso, self.dec, self.ra, self.specres, self.s2n, self.dv, \
-                low_ob_l, upp_ob_l, low_re_l, upp_re_l, \
-                self.wave, self.flux, self.error
 
 
 
