@@ -1,8 +1,10 @@
-import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import numpy as np
-from scipy.interpolate import RectBivariateSpline
-from astropy.io import ascii
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
+from   matplotlib        import gridspec
+from   scipy.interpolate import RectBivariateSpline
+from   astropy.io        import ascii
 
 TICK_LBL_FONT_SIZE = 18
 AXIS_LBL_FONT_SIZE = 20
@@ -127,11 +129,8 @@ def create_tworow_figure(plt, nz, ratio_up2down, majorgrid=True, hspace=0, color
 
     return top_ax, bot_ax, color_array
 
-def plot_kPpi_zi(axi, k, p, e, ci):
-    axi.errorbar(k, p*k/np.pi, xerr = 0, yerr = e*k/np.pi, fmt='o', color=ci, markersize=2)
-
-
-def add_legend_no_error_bars(ax, location, ncol=1, bbox_to_anchor=(1,0.5)):
+def add_legend_no_error_bars(ax, location="center left", ncol=1, bbox_to_anchor=(1.03,0.5), \
+    fontsize='large'):
     # Get handles
     handles, labels = ax.get_legend_handles_labels()
 
@@ -139,10 +138,11 @@ def add_legend_no_error_bars(ax, location, ncol=1, bbox_to_anchor=(1,0.5)):
     handles = [h[0] for h in handles]
 
     ax.legend(handles, labels, loc = location, bbox_to_anchor = bbox_to_anchor, \
-        fontsize='large', numpoints = 1, ncol=ncol, handletextpad=0.4)
+        fontsize = fontsize, numpoints = 1, ncol = ncol, handletextpad = 0.4)
 
 class PowerPlotter(object):
     """docstring for PowerPlotter
+
     Attributes
     ----------
     karray
@@ -160,6 +160,12 @@ class PowerPlotter(object):
     """
     By default true power is the fiducial, which can be zero.
     """
+    def _autoRelativeYLim(self, ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax):
+        rel_err = np.abs(rel_err) + erz/ptz
+        rel_err = rel_err[np.logical_and(auto_ylim_xmin < self.k_bins, self.k_bins < auto_ylim_xmax)]
+        yy = np.max(rel_err)
+        ax.set_ylim(-yy, yy)
+
     def _readDBTFile(self, filename):
         try:
             power_table = ascii.read(filename, format='fixed_width')
@@ -196,6 +202,7 @@ class PowerPlotter(object):
     def __init__(self, filename):
         # Reading file into an ascii table  
         self._readDBTFile(filename)
+        print("There are {:d} redshift bins and {:d} k bins.".format(self.nz, self.nk))
 
     def addTruePowerFile(self, filename):
         try:
@@ -274,10 +281,7 @@ class PowerPlotter(object):
             
             bot_ax.axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
 
-            rel_err = np.abs(rel_err) + erz/ptz
-            rel_err = rel_err[np.logical_and(auto_ylim_xmin < self.k_bins, self.k_bins < auto_ylim_xmax)]
-            yy = np.max(rel_err)
-            bot_ax.set_ylim(-yy, yy)
+            self._autoRelativeYLim(bot_ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
 
         print("z={:.1f} Chi-Square / dof: {:.2f} / {:d}.".format(z_val, chi_sq_zb, ddof))
 
@@ -346,8 +350,225 @@ class PowerPlotter(object):
 
         if outplot_fname:
             plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
+
+    def plotMultiDeviation(self, outplot_fname=None, rel_ylim=0.05, two_col=False, \
+        colormap=plt.cm.jet, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000):
+        plt.clf()
+    
+        # Plot one column
+        if two_col:
+            axs, color_array = two_col_n_row_grid(nz, z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
+                ymin=-rel_ylim, ymax=rel_ylim, scale='linear', colormap=colormap)
+        else:
+            axs, color_array = one_col_n_row_grid(nz, z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
+                ymin=-rel_ylim, ymax=rel_ylim, scale='linear', colormap=colormap)
+
+        # Plot for each redshift bin
+        for i in range(self.nz):
+            psz = self.power_sp[i]
+            erz = self.error[i]
+            ptz = self.power_true[i]
+            z_val = self.z_bins[i]
+            ci = color_array[i]
+
+            rel_err = psz / ptz  - 1
+
+            axs[i].errorbar(self.k_bins, rel_err, xerr = 0, yerr = erz/ptz, \
+                fmt='o', color=ci, markersize=2)
+            
+            axs[i].text(0.05, 0.15, "z=%.1f"%z_val, transform=axs[i].transAxes, fontsize=TICK_LBL_FONT_SIZE, \
+            verticalalignment='bottom', horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
+
+            axs[i].axhline(color='k')
+            
+            if noise_dom:
+                axs[i].axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
+
+            self._autoRelativeYLim(axs[i], rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
+
+        if outplot_fname:
+            plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
+
+class FisherPlotter(object):
+    """docstring for FisherPlotter
+
+    Attributes
+    ----------
+    fisher
+    invfisher
+    norm
+    nz
+    nk
+    zlabels
+
+    """
+    def __init__(self, filename, nz=None, dz=0.2, z1=1.8):
+        self.fisher = np.genfromtxt(filename, skip_header = 1, unpack = True)
         
+        try:
+            self.invfisher = np.linalg.inv(self.fisher)
+        except Exception as e:
+            self.invfisher = None
+            print("Cannot invert the Fisher matrix.")
+
+        fk_v = np.sqrt(self.fisher.diagonal())
+        self.norm = np.outer(fk_v, fk_v)
+
+        if nz:
+            self.nz = nz
+            self.nk = int(self.fisher.shape[0]/nz)
+            self.zlabels = ["%.1f" % z for z in z1 + np.arange(nz) * dz]
+        else:
+            self.nz = None
+            self.nk = None
+
+    def _setTicks(self, ax):
+        if self.nz:
+            ax.xaxis.set_major_locator(ticker.FixedLocator(self.nk*np.arange(self.nz)))
+            ax.xaxis.set_minor_locator(ticker.FixedLocator(self.nk*(np.arange(self.nz) +0.5)))
+
+            ax.xaxis.set_major_formatter(ticker.NullFormatter())
+            ax.xaxis.set_minor_formatter(ticker.FixedFormatter(self.zlabels))
+
+            for tick in ax.xaxis.get_minor_ticks():
+                tick.tick1line.set_markersize(0)
+                tick.tick2line.set_markersize(0)
+                tick.label1.set_horizontalalignment('center')
+
+            ax.yaxis.set_major_locator(ticker.FixedLocator(self.nk*np.arange(self.nz)))
+            ax.yaxis.set_minor_locator(ticker.FixedLocator(self.nk*(np.arange(self.nz) +0.5)))
+            ax.yaxis.set_major_formatter(ticker.NullFormatter())
+            ax.yaxis.set_minor_formatter(ticker.FixedFormatter(self.zlabels))
+
+            for tick in ax.yaxis.get_minor_ticks():
+                tick.tick1line.set_markersize(0)
+                tick.tick2line.set_markersize(0)
+                tick.label1.set_horizontalalignment('right')
+
+            ax.xaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
+            ax.yaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
+
+    def plotAll(self, scale="norm", outplot_fname=None, inv=False):
+        plt.clf()
+        fig, ax = plt.subplots()
+        Ftxt = "F" if not inv else "F^{-1}"
         
+        if self.invfisher is None and inv:
+            print("Fisher is not invertable.")
+            exit(1)
+        if inv:
+            tmp = self.invfisher
+        else:
+            tmp = self.fisher
+
+        cmap = plt.cm.BuGn
+        vmin = None
+        vmax = None
+        if scale == "norm":
+            cbarlbl = r"$%s_{\alpha \alpha'}/\sqrt{%s_{\alpha\alpha}%s_{\alpha'\alpha'}}$" \
+                % (Ftxt, Ftxt, Ftxt)
+            grid = tmp/self.norm
+            cmap = plt.cm.seismic
+            vmin = -1
+            vmax = 1
+        elif scale == "log":
+            cbarlbl = r"$\log %s_{\alpha \alpha'}$" % (Ftxt)
+
+            grid = np.log10(tmp)
+        else:
+            cbarlbl = r"$%s_{\alpha \alpha'}$" % (Ftxt)
+            grid = tmp
+        
+        im = ax.imshow(grid, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', \
+            extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0])
+
+        self._setTicks(ax)
+
+        ax.grid(color='k', alpha=0.3)
+
+        cbar = fig.colorbar(im)
+        cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
+
+        if outplot_fname:
+            plt.savefig(outplot_fname, bbox_inches='tight')
+
+    def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, vmin, vmax, nticks, tick_lbls):
+        plt.clf()
+        fig, ax = plt.subplots()
+        extent = np.array([0, nticks, nticks, 0]) - 0.5
+        im = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', extent=extent)
+
+        cbar = fig.colorbar(im)
+        cbar.set_label(cbarlbl, fontsize = 20)
+        cbar.ax.tick_params(labelsize = 16)
+
+        plt.xticks(fontsize = 16, rotation=60)
+        plt.yticks(fontsize = 16)
+        
+        ax.set_xticks(np.arange(nticks))
+        ax.set_yticks(np.arange(nticks))
+
+        if tick_lbls is not None:
+            ax.set_xticklabels(tick_lbls)
+            ax.set_yticklabels(tick_lbls)
+            plt.setp(ax.get_xticklabels(), visible = True)
+            plt.setp(ax.get_yticklabels(), visible = True)
+        else:
+            plt.setp(ax.get_xticklabels(), visible = False)
+            plt.setp(ax.get_yticklabels(), visible = False)
+
+        if outplot_fname:
+            plt.savefig(outplot_fname, bbox_inches='tight')
+
+    def plotZBin(self, kb, outplot_fname=None, cmap=plt.cm.seismic):
+        Ftxt = "F"
+        grid = self.fisher/self.norm
+        vmin = -1
+        vmax = 1
+
+        zbyz_corr = grid[kb::self.nk, :]
+        zbyz_corr = zbyz_corr[:, kb::self.nk]
+        cbarlbl = r"$%s_{zz'}/\sqrt{%s_{zz}%s_{z'z'}}$" \
+            % (Ftxt, Ftxt, Ftxt)
+        
+        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nz, self.zlabels)
+
+    def plotKBin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+        Ftxt = "F"
+        grid = self.fisher/self.norm
+        vmin = -1
+        vmax = 1
+
+        kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
+        kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
+
+        cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
+            % (Ftxt, Ftxt, Ftxt)
+
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nk, None)
+
+    def plotKCrossZbin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+        Ftxt = "F"
+        grid = self.fisher/self.norm
+        vmin = -1
+        vmax = 1
+
+        next_z_bin = zb+1
+        if next_z_bin >= self.nz:
+            return
+        
+        kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
+        kbyk_corr = kbyk_corr[:, self.nk*next_z_bin:self.nk*(next_z_bin+1)]
+        
+        cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
+            % (Ftxt, Ftxt, Ftxt)
+
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nk, None)
+
+
+
+
+
 
 
 
