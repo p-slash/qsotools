@@ -165,7 +165,11 @@ class PowerPlotter(object):
 
     def _autoRelativeYLim(self, ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax):
         rel_err = np.abs(rel_err) + erz/ptz
-        rel_err = rel_err[np.logical_and(auto_ylim_xmin < self.k_bins, self.k_bins < auto_ylim_xmax)]
+        autolimits = np.logical_and(auto_ylim_xmin < self.k_bins, self.k_bins < auto_ylim_xmax)
+        if rel_err.ndim == 1:
+            rel_err = rel_err[autolimits]
+        else:
+            rel_err = rel_err[:, autolimits]
         yy = np.max(rel_err)
         ax.set_ylim(-yy, yy)
 
@@ -290,7 +294,7 @@ class PowerPlotter(object):
 
         # Start plotting
         top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, xerr = 0, yerr = erz*self.k_bins/np.pi, \
-            fmt='o', label="z=%.1f"%z_val, capsize=2, color='k')
+            fmt='o', label="z=%.1f"%z_val, markersize=3, capsize=2, color='k')
         
         top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
             fmt=':', capsize=0, color='k')
@@ -367,7 +371,7 @@ class PowerPlotter(object):
             chi_sq += np.sum(chi_sq_zb)
 
             top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, yerr=erz*self.k_bins/np.pi, \
-                fmt='o', label="z=%.2f"%z_val, capsize=2, color=ci)
+                fmt='o', label="z=%.2f"%z_val, markersize=3, capsize=2, color=ci)
             
             top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, fmt=':', capsize=0, color=ci)
 
@@ -376,12 +380,9 @@ class PowerPlotter(object):
                     markersize=3, capsize=0, color=ci)
 
         if two_row:
-            rel_err = np.array(self.power_qmle) / np.array(self.power_true)  - 1
-            rel_err = np.abs(rel_err) + np.array(self.error)/np.array(self.power_true)
-            rel_err = rel_err[:, np.logical_and(auto_ylim_xmin < self.k_bins, \
-                self.k_bins < auto_ylim_xmax)]
-            yy = np.max(rel_err)
-            bot_ax.set_ylim(-yy, yy)
+            rel_err = self.power_qmle / self.power_true  - 1
+            self._autoRelativeYLim(bot_ax, rel_err, self.error, self.power_true, \
+                auto_ylim_xmin, auto_ylim_xmax)
 
         add_legend_no_error_bars(top_ax, "upper left", bbox_to_anchor=(1.03, 1))
 
@@ -421,10 +422,10 @@ class PowerPlotter(object):
         """
         # Plot one column
         if two_col:
-            axs, color_array = two_col_n_row_grid(nz, z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
+            axs, color_array = two_col_n_row_grid(self.nz, self.z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
                 ymin=-rel_ylim, ymax=rel_ylim, scale='linear', colormap=colormap)
         else:
-            axs, color_array = one_col_n_row_grid(nz, z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
+            axs, color_array = one_col_n_row_grid(self.nz, self.z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
                 ymin=-rel_ylim, ymax=rel_ylim, scale='linear', colormap=colormap)
 
         # Plot for each redshift bin
@@ -439,10 +440,6 @@ class PowerPlotter(object):
 
             axs[i].errorbar(self.k_bins, rel_err, xerr = 0, yerr = erz/ptz, \
                 fmt='o', color=ci, markersize=2)
-            
-            axs[i].text(0.05, 0.15, "z=%.1f"%z_val, transform=axs[i].transAxes, \
-                fontsize=TICK_LBL_FONT_SIZE, verticalalignment='bottom', \
-                horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
 
             axs[i].axhline(color='k')
             
