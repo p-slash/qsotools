@@ -145,7 +145,8 @@ def add_legend_no_error_bars(ax, location="center left", ncol=1, bbox_to_anchor=
         fontsize = fontsize, numpoints = 1, ncol = ncol, handletextpad = 0.4)
 
 class PowerPlotter(object):
-    """docstring for PowerPlotter
+    """PowerPlotter is an object to plot QMLE power spectrum results by individual redshift bins or all in one.
+    Simply initialize with a filename.
 
     Attributes
     ----------
@@ -156,14 +157,12 @@ class PowerPlotter(object):
     nk
     nz
 
-    power_sp
-    fid_power
+    power_qmle
+    power_fid
+    power_true
     error
     """
 
-    """
-    By default true power is the fiducial, which can be zero.
-    """
     def _autoRelativeYLim(self, ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax):
         rel_err = np.abs(rel_err) + erz/ptz
         rel_err = rel_err[np.logical_and(auto_ylim_xmin < self.k_bins, self.k_bins < auto_ylim_xmax)]
@@ -171,6 +170,7 @@ class PowerPlotter(object):
         ax.set_ylim(-yy, yy)
 
     def _readDBTFile(self, filename):
+        """Set up attributes. By default true power is the fiducial, which can be zero."""
         try:
             power_table = ascii.read(filename, format='fixed_width')
             self.karray = np.array(power_table['kc'], dtype=np.double)
@@ -190,18 +190,18 @@ class PowerPlotter(object):
         # If it is QE result file
         if 'ThetaP' in power_table.colnames:
             thetap   = np.array(power_table['ThetaP'], dtype=np.double)
-            self.fid_power = np.array(power_table['Pfid'], dtype=np.double)
+            self.power_fid = np.array(power_table['Pfid'], dtype=np.double)
             
-            self.power_sp = np.split(self.fid_power + thetap, self.nz)
+            self.power_qmle = np.split(self.power_fid + thetap, self.nz)
             self.error    = np.split(np.array(power_table['ErrorP'], dtype=np.double), self.nz)
-            self.fid_power = np.split(self.fid_power, self.nz)
+            self.power_fid = np.split(self.power_fid, self.nz)
         # If it is FFT estimate file  
         elif 'P-FFT' in power_table.colnames:
-            self.power_sp = np.split(np.array(power_table['P-FFT'], dtype=np.double), self.nz)
+            self.power_qmle = np.split(np.array(power_table['P-FFT'], dtype=np.double), self.nz)
             self.error    = np.split(np.array(power_table['ErrorP-FFT'], dtype=np.double), self.nz)
-            self.fid_power = np.zeros_like(self.power_sp)
+            self.power_fid = np.zeros_like(self.power_qmle)
 
-        self.power_true = self.fid_power
+        self.power_true = self.power_fid
 
     def __init__(self, filename):
         # Reading file into an ascii table  
@@ -209,6 +209,7 @@ class PowerPlotter(object):
         print("There are {:d} redshift bins and {:d} k bins.".format(self.nz, self.nk))
 
     def addTruePowerFile(self, filename):
+        """Sets true power from given file. Saves it as .npy for future readings."""
         try:
             power_true = np.load(filename[:-3]+"npy")
         except Exception as e:
@@ -243,7 +244,27 @@ class PowerPlotter(object):
 
     def plotRedshiftBin(self, nz, outplot_fname=None, two_row=False, pk_ymax=0.5, pk_ymin=1e-4, \
         rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
-        plt.clf()
+        """Plot QMLE results for given redshift bin nz.
+
+        Parameters
+        ----------
+        nz : int
+            Redshift bin number ranges from 0 to self.nz-1.
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        two_row : bool, optional
+            When passed, add a lower panel for relative error computed by using the true power.
+        pk_ymax, pk_ymin : float, optional
+            Maximum and minimum y axis limits for kP/pi.
+        rel_ylim : float, optional
+            Y axis limits for the relative error on the lower panel.
+        noise_dom : float, optional
+            Adds a shade for k larger than this value.
+        auto_ylim_xmin, auto_ylim_xmax : float, optional
+            Automatically scales the relative error panel by limiting the axis range between these values.
+        ignore_last_k_bins : int, optional
+            When passed ignore that many last k bins from the chi square.
+        """
         if two_row:
             top_ax, bot_ax = create_tworow_figure(plt, 1, 3, ylim=rel_ylim)[:-1]
         else:
@@ -252,7 +273,7 @@ class PowerPlotter(object):
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
             top_ax.set_xlabel(r'$k$ [km/s]$^{-1}$', fontsize = AXIS_LBL_FONT_SIZE)
 
-        psz = self.power_sp[nz]
+        psz = self.power_qmle[nz]
         erz = self.error[nz]
         ptz = self.power_true[nz]
         z_val = self.z_bins[nz]
@@ -297,7 +318,27 @@ class PowerPlotter(object):
     def plotAll(self, outplot_fname=None, two_row=False, pk_ymax=0.5, \
         pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
         auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
-        plt.clf()
+        """Plot QMLE results for all redshifts in one figure.
+
+        Parameters
+        ----------
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        two_row : bool, optional
+            When passed, add a lower panel for relative error computed by using the true power.
+        pk_ymax, pk_ymin : float, optional
+            Maximum and minimum y axis limits for kP/pi.
+        rel_ylim : float, optional
+            Y axis limits for the relative error on the lower panel.
+        colormap : plt.cm, optional
+            Colormap to use for different redshift bins.
+        noise_dom : float, optional
+            Adds a shade for k larger than this value.
+        auto_ylim_xmin, auto_ylim_xmax : float, optional
+            Automatically scales the relative error panel by limiting the axis range between these values.
+        ignore_last_k_bins : int, optional
+            When passed ignore that many last k bins from the chi square.
+        """
         if two_row:
             top_ax, bot_ax, color_array = create_tworow_figure(plt, self.nz, 3, ylim=rel_ylim, \
                 colormap=colormap)
@@ -312,7 +353,7 @@ class PowerPlotter(object):
 
         # Plot for each redshift bin
         for i in range(self.nz):
-            psz = self.power_sp[i]
+            psz = self.power_qmle[i]
             erz = self.error[i]
             ptz = self.power_true[i]
             z_val = self.z_bins[i]
@@ -335,7 +376,7 @@ class PowerPlotter(object):
                     markersize=3, capsize=0, color=ci)
 
         if two_row:
-            rel_err = np.array(self.power_sp) / np.array(self.power_true)  - 1
+            rel_err = np.array(self.power_qmle) / np.array(self.power_true)  - 1
             rel_err = np.abs(rel_err) + np.array(self.error)/np.array(self.power_true)
             rel_err = rel_err[:, np.logical_and(auto_ylim_xmin < self.k_bins, \
                 self.k_bins < auto_ylim_xmax)]
@@ -359,10 +400,25 @@ class PowerPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
 
-    def plotMultiDeviation(self, outplot_fname=None, rel_ylim=0.05, two_col=False, \
+    def plotMultiDeviation(self, outplot_fname=None, two_col=False, rel_ylim=0.05, \
         colormap=plt.cm.jet, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000):
-        plt.clf()
-    
+        """Plot QMLE relative errors with each redshift bin having its own panel.
+
+        Parameters
+        ----------
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        two_col : bool, optional
+            When passed, creates a two-column plot.
+        rel_ylim : float, optional
+            Y axis limits for the relative error on the lower panel.
+        colormap : plt.cm, optional
+            Colormap to use for different redshift bins.
+        noise_dom : float, optional
+            Adds a shade for k larger than this value.
+        auto_ylim_xmin, auto_ylim_xmax : float, optional
+            Automatically scales the relative error panel by limiting the axis range between these values.
+        """
         # Plot one column
         if two_col:
             axs, color_array = two_col_n_row_grid(nz, z_bins, ylab=r'$\Delta P/P_{\mathrm{t}}$', \
@@ -373,7 +429,7 @@ class PowerPlotter(object):
 
         # Plot for each redshift bin
         for i in range(self.nz):
-            psz = self.power_sp[i]
+            psz = self.power_qmle[i]
             erz = self.error[i]
             ptz = self.power_true[i]
             z_val = self.z_bins[i]
@@ -399,7 +455,23 @@ class PowerPlotter(object):
             plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
 
 class FisherPlotter(object):
-    """docstring for FisherPlotter
+    """FisherPlotter is object to plot the Fisher matrix in its entirety or in individual k & z bins.
+    You need to initialize with number of redshift bins (nz), first redshift bin (z1) and bin width (dz).
+    
+    Parameters
+    ----------
+    filename : str
+        Filename for the Fisher matrix..
+    nz : int, optional
+        Number of redshift bins. Default is None.
+    dz : float, optional
+        Redshift bin width. Default is 0.2.
+    z1 : float, optional
+        First redshift bin. Default is 1.8.
+
+    __init__(filename, nz=None, dz=0.2, z1=1.8)
+        Reads the Fisher matrix into fisher and computes its normalization. If nz is passed, sets up 
+        nz, nk and zlabels.
 
     Attributes
     ----------
@@ -458,7 +530,17 @@ class FisherPlotter(object):
             ax.yaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
     def plotAll(self, scale="norm", outplot_fname=None, inv=False):
-        plt.clf()
+        """Plot the entire Fisher matrix or its inverse.
+
+        Parameters
+        ----------
+        scale : str, optional
+            To normalize with respect to the diagonal pass "norm". To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. Default is "norm".
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        inv : bool, optional
+            Plot the inverse instead.
+        """
         fig, ax = plt.subplots()
         Ftxt = "F" if not inv else "F^{-1}"
         
@@ -470,14 +552,14 @@ class FisherPlotter(object):
         else:
             tmp = self.fisher
 
-        cmap = plt.cm.BuGn
+        colormap = plt.cm.BuGn
         vmin = None
         vmax = None
         if scale == "norm":
             cbarlbl = r"$%s_{\alpha \alpha'}/\sqrt{%s_{\alpha\alpha}%s_{\alpha'\alpha'}}$" \
                 % (Ftxt, Ftxt, Ftxt)
             grid = tmp/self.norm
-            cmap = plt.cm.seismic
+            colormap = plt.cm.seismic
             vmin = -1
             vmax = 1
         elif scale == "log":
@@ -488,7 +570,7 @@ class FisherPlotter(object):
             cbarlbl = r"$%s_{\alpha \alpha'}$" % (Ftxt)
             grid = tmp
         
-        im = ax.imshow(grid, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', \
+        im = ax.imshow(grid, cmap=colormap, vmin=vmin, vmax=vmax, origin='upper', \
             extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0])
 
         self._setTicks(ax)
@@ -502,7 +584,6 @@ class FisherPlotter(object):
             plt.savefig(outplot_fname, bbox_inches='tight')
 
     def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, vmin, vmax, nticks, tick_lbls):
-        plt.clf()
         fig, ax = plt.subplots()
         extent = np.array([0, nticks, nticks, 0]) - 0.5
         im = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', extent=extent)
@@ -529,7 +610,18 @@ class FisherPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, bbox_inches='tight')
 
-    def plotZBin(self, kb, outplot_fname=None, cmap=plt.cm.seismic):
+    def plotKBin(self, kb, outplot_fname=None, colormap=plt.cm.seismic):
+        """Plot Fisher matrix for a given k bin, i.e. redshift correlations.
+
+        Parameters
+        ----------
+        kb : int
+            Bin number for k to plot.
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        colormap : plt.cm, optional
+            Colormap to use for scale. Default is seismic.
+        """
         Ftxt = "F"
         grid = self.fisher/self.norm
         vmin = -1
@@ -542,7 +634,18 @@ class FisherPlotter(object):
         
         self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nz, self.zlabels)
 
-    def plotKBin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+    def plotZBin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+        """Plot Fisher matrix for a given z bin, i.e. k correlations.
+
+        Parameters
+        ----------
+        zb : int
+            Bin number for redshift to plot.
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        colormap : plt.cm, optional
+            Colormap to use for scale. Default is seismic.
+        """
         Ftxt = "F"
         grid = self.fisher/self.norm
         vmin = -1
@@ -557,6 +660,17 @@ class FisherPlotter(object):
         self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nk, None)
 
     def plotKCrossZbin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+        """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations cross z bins.
+
+        Parameters
+        ----------
+        zb : int
+            Bin number for redshift to plot. The figure is zb, zb+1 correlations.
+        outplot_fname : str, optional
+            When passed, figure is saved with this filename.
+        colormap : plt.cm, optional
+            Colormap to use for scale. Default is seismic.
+        """
         Ftxt = "F"
         grid = self.fisher/self.norm
         vmin = -1
