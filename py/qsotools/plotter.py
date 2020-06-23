@@ -192,13 +192,13 @@ class PowerPlotter(object):
             thetap   = np.array(power_table['ThetaP'], dtype=np.double)
             self.power_fid = np.array(power_table['Pfid'], dtype=np.double)
             
-            self.power_qmle = np.split(self.power_fid + thetap, self.nz)
-            self.error    = np.split(np.array(power_table['ErrorP'], dtype=np.double), self.nz)
-            self.power_fid = np.split(self.power_fid, self.nz)
+            self.power_qmle = np.reshape(self.power_fid + thetap, (self.nz, self.nk))
+            self.error    = np.array(power_table['ErrorP'], dtype=np.double).reshape((self.nz, self.nk))
+            self.power_fid = self.power_fid.reshape((self.nz, self.nk))
         # If it is FFT estimate file  
         elif 'P-FFT' in power_table.colnames:
-            self.power_qmle = np.split(np.array(power_table['P-FFT'], dtype=np.double), self.nz)
-            self.error    = np.split(np.array(power_table['ErrorP-FFT'], dtype=np.double), self.nz)
+            self.power_qmle = np.array(power_table['P-FFT'], dtype=np.double).reshape((self.nz, self.nk))
+            self.error    = np.array(power_table['ErrorP-FFT'], dtype=np.double).reshape((self.nz, self.nk))
             self.power_fid = np.zeros_like(self.power_qmle)
 
         self.power_true = self.power_fid
@@ -632,9 +632,9 @@ class FisherPlotter(object):
         cbarlbl = r"$%s_{zz'}/\sqrt{%s_{zz}%s_{z'z'}}$" \
             % (Ftxt, Ftxt, Ftxt)
         
-        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nz, self.zlabels)
+        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, vmin, vmax, self.nz, self.zlabels)
 
-    def plotZBin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+    def plotZBin(self, zb, outplot_fname=None, colormap=plt.cm.seismic):
         """Plot Fisher matrix for a given z bin, i.e. k correlations.
 
         Parameters
@@ -657,9 +657,9 @@ class FisherPlotter(object):
         cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
             % (Ftxt, Ftxt, Ftxt)
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nk, None)
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, vmin, vmax, self.nk, None)
 
-    def plotKCrossZbin(self, zb, outplot_fname=None, cmap=plt.cm.seismic):
+    def plotKCrossZbin(self, zb, outplot_fname=None, colormap=plt.cm.seismic):
         """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations cross z bins.
 
         Parameters
@@ -686,7 +686,7 @@ class FisherPlotter(object):
         cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
             % (Ftxt, Ftxt, Ftxt)
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, cmap, vmin, vmax, self.nk, None)
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, vmin, vmax, self.nk, None)
 
 
 
