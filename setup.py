@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 import os
 binscripts = [os.path.join("bin", f) for f in os.listdir("bin") if f.endswith(".py")]
 
@@ -11,11 +11,8 @@ setup(
     include_package_data=True,
     scripts=binscripts,
 
-    # Project uses reStructuredText, so ensure that the docutils get
-    # installed or upgraded on the target machine
     # install_requires=["docutils>=0.3"],
 
-    
     # metadata to display on PyPI
     author = "Naim Goksel Karacayli",
     author_email = "naimgoksel.karacayli@yale.edu",
