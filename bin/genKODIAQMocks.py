@@ -4,23 +4,19 @@
 # Fix asu.tsv location
 # Add --continuum option for continuum errors.
 # Add --dla option to add DLAs
+from os.path import join as ospath_join
+from os import makedirs as os_makedirs
+import argparse
+
 import numpy as np
 import matplotlib.pyplot as plt
-from pkg_resources import resource_filename
-from astropy.table                      import Table
-
-from os.path     import join as ospath_join
-from os          import makedirs as os_makedirs
-
-import argparse
+from astropy.table import Table
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
 from qsotools.io import BinaryQSO
 import qsotools.kodiaqio as ki
 import qsotools.fiducial as fid
-
-PKG_ASU_TABLE = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 
 # Define Saving Functions
 # ------------------------------
@@ -91,7 +87,7 @@ if __name__ == '__main__':
     parser.add_argument("Outputdir", help="Output directory")
     parser.add_argument("Seed", help="Seed to generate random numbers.", type=int)
 
-    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=PKG_ASU_TABLE)
+    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=ki.TABLE_KODIAQ_ASU)
     parser.add_argument("--save_full_flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
