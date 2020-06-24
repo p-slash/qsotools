@@ -1,8 +1,10 @@
 import numpy as np
 import struct
-from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL
+from configparser import ConfigParser
+from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL, formBins
+from os.path import exists as os_exists
 
-class Spectrum():
+class Spectrum:
     """
     A generic spectrum object. Sets up a mask where error > 0.
 
@@ -224,14 +226,86 @@ class BinaryQSO:
         array_size = struct.calcsize(array_fmt)
 
         d           = self.file.read(array_size)
-        self.wave   = struct.unpack(array_fmt, d)
+        self.wave   = np.array(struct.unpack(array_fmt, d), dtype=np.double)
         d           = self.file.read(array_size)
-        self.flux   = struct.unpack(array_fmt, d)
+        self.flux   = np.array(struct.unpack(array_fmt, d), dtype=np.double)
         d           = self.file.read(array_size)
-        self.error  = struct.unpack(array_fmt, d)
+        self.error  = np.array(struct.unpack(array_fmt, d), dtype=np.double)
         
         self.file.close()
 
+class ConfigQMLE:
+    """ConfigQMLE reads config.param for the estimator and sets up k & z bins
+    
+    Attributes
+    ----------
+    parameters : ConfigParser section
+        You can directly access to variables using config.param keys. Note they are str.
+
+    k_0 : float
+    k_nlin : int
+    k_nlog : int
+    k_dlin : float
+    k_dlog : float
+    k_ledge : float
+    k_edges : np.array
+    k_bins : np.array
+
+    z_0 : float
+    z_n : int
+    z_d : float
+    z_bins : np.array
+    z_edges : np.array
+    
+    qso_list : str
+    qso_dir : str
+
+    sq_dvpixel  : float
+    sq_vlength : float
+    sq_dvgrid : float
+    """
+    def _getKBins(self):
+        self.k_0     = float(self.parameters['K0'])
+        self.k_nlin  = int(self.parameters['NumberOfLinearBins'])
+        self.k_nlog  = int(self.parameters['NumberOfLog10Bins'])
+        self.k_dlin  = float(self.parameters['LinearKBinWidth'])
+        self.k_dlog  = float(self.parameters['Log10KBinWidth'])
+        try:
+            self.k_ledge = float(self.parameters['LastKEdge'])
+        except Exception as e:
+            self.k_ledge = 0
+
+        self.k_edges, self.k_bins = formBins(self.k_nlin, self.k_nlog, self.k_dlin, \
+            self.k_dlog, self.k_0, self.k_ledge)
+
+    def _getZBins(self):
+        self.z_0  = float(self.parameters['FirstRedshiftBinCenter'])
+        self.z_n  = int(self.parameters['NumberOfRedshiftBins'])
+        self.z_d  = float(self.parameters['RedshiftBinWidth'])
+
+        self.z_bins  = self.z_0 + self.z_d * np.arange(self.z_n)
+        self.z_edges = self.z_0 + self.z_d * (np.arange(self.z_n+1)-0.5)
+
+    def __init__(self, filename):
+        f = open(filename)
+        fdata = "[CONFIG]\n" + f.read()
+        f.close()
+
+        cparser = ConfigParser(delimiters=' ')
+        cparser.read_string(fdata)
+        self.parameters = cparser['CONFIG']
+
+        self._getKBins()
+        self._getZBins()
+
+        self.qso_list = self.parameters['FileNameList']
+        self.qso_dir = self.parameters['FileInputDir']
+
+        self.sq_dvpixel = float(self.parameters['PixelWidth'])
+        self.sq_vlength = float(self.parameters['VelocityLength'])
+        self.sq_dvgrid  = self.sq_vlength / (int(self.parameters['NumberVPoints'])-1)
+
+        
 
 
 
