@@ -8,6 +8,10 @@ from os.path import join as ospath_join
 from qsotools.fiducial import LIGHT_SPEED
 from qsotools.io import Spectrum
 
+from pkg_resources import resource_filename
+TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
+TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
+
 class KODIAQFits(Spectrum):
     """
     Defining parameters and useful methods for a KODIAQ FITS file. 
@@ -436,7 +440,7 @@ class KODIAQMasterTable():
     def find_qso(self, qso_name):
         return np.where( np.array(self.master_table['QSO']) == qso_name )[0]
 
-def getKODIAQLyaMaxS2NObsList(KODIAQdir, asu_path):
+def getKODIAQLyaMaxS2NObsList(KODIAQdir, asu_path=TABLE_KODIAQ_ASU):
     qso_iter = KODIAQ_QSO_Iterator(KODIAQdir, asu_path, clean_pix=True)
     spec_list = []
 
