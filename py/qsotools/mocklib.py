@@ -35,17 +35,6 @@ def xi_g_v_fn(v):
     
     return result
 
-def formBins(nblin, nblog, dklin, dklog, k0):
-    lin_bin_edges = np.arange(nblin+1) * dklin + k0
-    log_bin_edges = lin_bin_edges[-1] * np.power(10., np.arange(1, nblog + 1) * dklog)
-    
-    # assert log_bin_edges[-1] < k_values[-1]
-
-    bin_edges   = np.concatenate((lin_bin_edges, log_bin_edges)) 
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
-
-    return bin_edges, bin_centers
-
 # ----------------------------
 
 # Variance of the Gaussian field
