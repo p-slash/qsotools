@@ -4,15 +4,15 @@
 # Creates mocks in log-space wave grid with 30 km/s size
 # Assumes a constant window function with R=3200 which corresponds to ~ 40 km/s
 # Adds gaussian noise with sigma=0.25 such that s/n is ~1 per pixel.
+from os.path import join as ospath_join
+from os      import makedirs as os_makedirs
+import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
-from pkg_resources import resource_filename, resource_exists
 
-from os.path import join as ospath_join
-from os      import makedirs as os_makedirs
-import argparse
+from pkg_resources import resource_filename
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
