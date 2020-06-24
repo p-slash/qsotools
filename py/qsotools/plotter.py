@@ -63,8 +63,6 @@ def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
     # Set up plotting env
     fig = plt.figure(figsize=(10, nz/2))
     gs = gridspec.GridSpec(int((nz+1)/2), 2, figure=fig, wspace=0.01, hspace=0.05)
-    # fig = plt.figure(figsize=(5, nz))
-    # gs = gridspec.GridSpec(nz, 1, figure=fig, wspace=0.0, hspace=0.05)
 
     axs = [fig.add_subplot(gi) for gi in gs]
 
