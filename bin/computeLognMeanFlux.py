@@ -2,7 +2,7 @@
 
 import numpy as np
 from astropy.table import Table
-from os.path     import join as ospath_join
+from os.path import join as ospath_join
 import argparse
 import struct
 
