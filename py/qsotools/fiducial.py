@@ -12,6 +12,19 @@ LYA_CENTER_WVL  = (LYA_LAST_WVL + LYA_LAST_WVL) / 2
 LIGHT_SPEED      = 299792.458
 ONE_SIGMA_2_FWHM = 2.35482004503
 
+def formBins(nblin, nblog, dklin, dklog, k0, klast=-1):
+    lin_bin_edges = np.arange(nblin+1) * dklin + k0
+    log_bin_edges = lin_bin_edges[-1] * np.power(10., np.arange(1, nblog + 1) * dklog)
+    
+    # assert log_bin_edges[-1] < k_values[-1]
+
+    bin_edges   = np.concatenate((lin_bin_edges, log_bin_edges))
+    if klast > bin_edges[-1]:
+        bin_edges.append(klast)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
+
+    return bin_edges, bin_centers
+
 # -----------------------------------------------------
 # Power spectrum begins
 # -----------------------------------------------------
