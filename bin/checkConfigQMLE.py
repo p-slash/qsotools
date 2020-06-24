@@ -30,14 +30,14 @@ if __name__ == '__main__':
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
     
-    hist_nz = config_qmle.z_n * args.increase_z_res
+    edge_nz = (config_qmle.z_n+1) * args.increase_z_res
     hist_dz = config_qmle.z_d / args.increase_z_res
-    z_edges = config_qmle.z_0 + hist_dz * (np.arange(hist_nz+1)-0.5)
+    z_edges = config_qmle.z_edges[0] + hist_dz * np.arange(edge_nz)
     # Add overflow bins
     z_edges = np.append(z_edges, 10)
     z_edges = np.insert(z_edges, 0, 0)
 
-    pixel_z_hist = np.zeros(hist_nz+2)
+    pixel_z_hist = np.zeros(edge_nz+1)
 
     min_dv = []
     max_dv = []
