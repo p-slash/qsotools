@@ -60,10 +60,10 @@ if __name__ == '__main__':
         pixel_z_hist += so.getStats(bq.wave, bq.flux, bq.error, z_edges)[1]
 
     if pixel_z_hist[0] > 0:
-        print("Warning: Some pixels are below the redshift range."\
+        print(f"{bcolors.BOLD}Error: Some pixels are below the redshift range.{bcolors.ENDC}"\
             " This can cause problems in the Fisher Matrix.")
     if pixel_z_hist[-1] > 0:
-        print("Warning: Some pixels are above the redshift range."\
+        print(f"{bcolors.BOLD}Error: Some pixels are above the redshift range.{bcolors.ENDC}"\
             " This can cause problems in the Fisher Matrix.")
 
     # Plot histogram of pixel redshifts
@@ -104,7 +104,7 @@ if __name__ == '__main__':
         else:
             print("But last bin is not empy.")
     else:
-        print(f"{bcolors.OKBLUE}{bcolors.BOLD}Passed: k bins end before Nyquist.{bcolors.ENDC}")
+        print(f"{bcolors.OKBLUE}{bcolors.BOLD}Passed: Ks end before the Nyquist frequency.{bcolors.ENDC}")
 
     # Check if config_qmle.sq_vlength > max dv
     if config_qmle.sq_vlength < maxmax_dv:
