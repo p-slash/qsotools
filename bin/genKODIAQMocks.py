@@ -20,7 +20,7 @@ import qsotools.fiducial as fid
 
 # Define Saving Functions
 # ------------------------------
-def save_parameters(txt_basefilename, args):
+def saveParameters(txt_basefilename, args):
     Parameters_txt = ("Parameters for these mocks\n"
                     "Type                 : %s\n"
                     "Velocity to Redshift : %s\n"
@@ -53,7 +53,7 @@ def save_parameters(txt_basefilename, args):
     toWrite.write(Parameters_txt)
     toWrite.close()
 
-def save_plots(wch, fch, ech, fnames, obs_fits):
+def savePlots(wch, fch, ech, fnames, obs_fits):
     fig_title = "%s/%s/%s at z=%.2f" \
     % (obs_fits.qso_name, obs_fits.pi_date, obs_fits.spec_prefix, obs_fits.z_qso)
 
@@ -66,13 +66,13 @@ def save_plots(wch, fch, ech, fnames, obs_fits):
         plt.grid(True, "major")
         plt.savefig(ospath_join(args.Outputdir, "plots", fname[:-3]+"png"), bbox_inches='tight')
 
-def save_data(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width):
+def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width):
     for (w, f, e, fname) in zip(waves, fluxes, errors, fnames):
         mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
         mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.DECL, obs_fits.RA, obs_fits.S2N, \
             spec_res, pixel_width)
 
-def save_list_byline(array, fname):
+def saveListByLine(array, fname):
     toWrite = open(fname, 'w')
     toWrite.write('%d\n'%len(array))
     for a in array:
@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
     txt_basefilename  = "%s/kodiaq%s" % (args.Outputdir, settings_txt)
 
-    save_parameters(txt_basefilename, args)
+    saveParameters(txt_basefilename, args)
     # ------------------------------
 
     # Set up initial objects and variables
@@ -250,6 +250,11 @@ if __name__ == '__main__':
             fluxes  = fluxes / true_mean_flux - 1
             errors /= true_mean_flux
 
+        # Skip short spectrum
+        if args.skip and len(wave) < MAX_NO_PIXELS * args.skip:
+            print("This spectrum has few points.")
+            continue
+
         # Save information about selected quasars
         selected_qso_list.append(qso.qso_name)
         selected_qso_observation_pi.append(max_obs_spectrum.pi_date)
@@ -259,11 +264,6 @@ if __name__ == '__main__':
         # selected_qso_DR.append(readme_table[IND_PICKED]['kodrelease'])
         selected_qso_s2n_lya.append(maxs2n)
         selected_qso_resampled_npixels.append(len(wave))
-        
-        # Skip short spectrum
-        if args.skip and len(wave) < MAX_NO_PIXELS * args.skip:
-            print("This spectrum has few points.")
-            continue
 
         print("Lowest Obs Wave, data-mock", max_obs_spectrum.wave[0], wave[0])
         print("Highest Obs Wave, data-mock", max_obs_spectrum.wave[-1], wave[-1])
@@ -282,21 +282,21 @@ if __name__ == '__main__':
         filename_list.extend(temp_fname) 
 
         # if args.plot:
-        #     save_plots(wch, fch, ech, temp_fname, max_obs_spectrum)
+        #     savePlots(wch, fch, ech, temp_fname, max_obs_spectrum)
 
         if not args.nosave:
-            save_data(wave, fluxes, errors, temp_fname, max_obs_spectrum, low_spec_res, pixel_width)
+            saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, low_spec_res, pixel_width)
     # ------------------------------
 
     temp_fname = ospath_join(args.Outputdir, "specres_list.txt" )
     print("Saving spectral resolution values as ", temp_fname)
-    save_list_byline(specres_list, temp_fname)
+    saveListByLine(specres_list, temp_fname)
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.Outputdir, "file_list_qso.txt")
     #temp_fname = "%s/_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname)
-    save_list_byline(filename_list, temp_fname)
+    saveListByLine(filename_list, temp_fname)
 
 
 
