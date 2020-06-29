@@ -145,11 +145,12 @@ if __name__ == '__main__':
         print("MOCK0 is real data!")
         REAL_DATA = True
         mean_flux_function = fid.meanFluxFG08
+        settings_txt  = ''
     else:
         REAL_DATA = False
+        settings_txt  = '_gaussian' if args.gauss else '_lognormal' 
 
     # Set settings text
-    settings_txt  = '_gaussian' if args.gauss else '_lognormal' 
     settings_txt += '_dv%.1f' % args.lowdv if args.lowdv else ''
     settings_txt += '_noz' if args.without_z_evo else ''
 
