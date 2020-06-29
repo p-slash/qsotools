@@ -44,7 +44,7 @@ class KODIAQFits(Spectrum):
     error : float
         Error on flux.
     mask : 
-        Mask on full spectrum.
+        Good pixels on full spectrum.
     N : int
         Length of these arrays.
     
