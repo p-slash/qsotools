@@ -10,10 +10,10 @@ TICK_LBL_FONT_SIZE = 18
 AXIS_LBL_FONT_SIZE = 20
 
 def set_topax_makeup(top_ax, majorgrid=True, ymin=1e-4, ymax=0.5):
-    top_ax.grid(majorgrid, which = 'major')
+    top_ax.grid(majorgrid, which='major')
     top_ax.set_yscale("log")
     top_ax.set_xscale("log")
-    top_ax.set_ylim(ymin=1e-4, ymax=0.5)
+    top_ax.set_ylim(ymin=ymin, ymax=ymax)
 
     top_ax.tick_params(which='major', direction='in', length=7, width=1)
     top_ax.tick_params(which='minor', direction='in', length=4, width=0.8)
@@ -22,7 +22,7 @@ def set_topax_makeup(top_ax, majorgrid=True, ymin=1e-4, ymax=0.5):
     top_ax.set_ylabel(r'$kP/\pi$', fontsize = AXIS_LBL_FONT_SIZE)
 
 def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
-    xlab = r'$k$ [km/s]$^{-1}$', colormap=plt.cm.jet):
+    xlab = r'$k$ [s km$^{-1}$]', colormap=plt.cm.jet):
     # Set up plotting env
     fig = plt.figure(figsize=(5, nz))
     gs = gridspec.GridSpec(nz, 1, figure=fig, wspace=0.0, hspace=0.05)
@@ -59,7 +59,7 @@ def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
     return axs, color_array
 
 def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
-    xlab = r'k [km/s]$^{-1}$', colormap=plt.cm.jet):
+    xlab = r'$k$ [s km$^{-1}$]', colormap=plt.cm.jet):
     # Set up plotting env
     fig = plt.figure(figsize=(10, nz/2))
     gs = gridspec.GridSpec(int((nz+1)/2), 2, figure=fig, wspace=0.01, hspace=0.05)
@@ -123,7 +123,7 @@ def create_tworow_figure(plt, nz, ratio_up2down, majorgrid=True, hspace=0, \
     bot_ax.tick_params(which='major', direction='in', length=7, width=1)
     bot_ax.tick_params(which='minor', direction='in', length=4, width=0.8)
 
-    bot_ax.set_xlabel(r'$k$ [km/s]$^{-1}$', fontsize = AXIS_LBL_FONT_SIZE)
+    bot_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
     bot_ax.set_ylabel(r'$\Delta P/P_{\mathrm{t}}$', fontsize = AXIS_LBL_FONT_SIZE)
 
     plt.setp(bot_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
@@ -244,8 +244,9 @@ class PowerPlotter(object):
             del k_true
             del z_true
 
-    def plotRedshiftBin(self, nz, outplot_fname=None, two_row=False, pk_ymax=0.5, pk_ymin=1e-4, \
-        rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
+    def plotRedshiftBin(self, nz, outplot_fname=None, two_row=False, plot_true=True, \
+        pk_ymax=0.5, pk_ymin=1e-4, rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, \
+        auto_ylim_xmax=1000, ignore_last_k_bins=-1):
         """Plot QMLE results for given redshift bin nz.
 
         Parameters
@@ -273,7 +274,7 @@ class PowerPlotter(object):
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
-            top_ax.set_xlabel(r'$k$ [km/s]$^{-1}$', fontsize = AXIS_LBL_FONT_SIZE)
+            top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
 
         psz = self.power_qmle[nz]
         erz = self.error[nz]
@@ -293,9 +294,9 @@ class PowerPlotter(object):
         # Start plotting
         top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, xerr = 0, yerr = erz*self.k_bins/np.pi, \
             fmt='o', label="z=%.1f"%z_val, markersize=3, capsize=2, color='k')
-        
-        top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
-            fmt=':', capsize=0, color='k')
+        if plot_true:
+            top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
+                fmt=':', capsize=0, color='k')
 
         top_ax.text(0.05, 0.15, "z=%.1f"%z_val, transform=top_ax.transAxes, fontsize=TICK_LBL_FONT_SIZE, \
             verticalalignment='bottom', horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
@@ -317,7 +318,7 @@ class PowerPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
 
-    def plotAll(self, outplot_fname=None, two_row=False, pk_ymax=0.5, \
+    def plotAll(self, outplot_fname=None, two_row=False, plot_true=True, pk_ymax=0.5, \
         pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
         auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
         """Plot QMLE results for all redshifts in one figure.
@@ -348,7 +349,7 @@ class PowerPlotter(object):
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
-            top_ax.set_xlabel(r'$k$ [km/s]$^{-1}$', fontsize = AXIS_LBL_FONT_SIZE)
+            top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
             color_array=[colormap(i) for i in np.linspace(0, 1, self.nz)]
         
         chi_sq = 0
@@ -371,7 +372,8 @@ class PowerPlotter(object):
             top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, yerr=erz*self.k_bins/np.pi, \
                 fmt='o', label="z=%.2f"%z_val, markersize=3, capsize=2, color=ci)
             
-            top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, fmt=':', capsize=0, color=ci)
+            if plot_true:
+                top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, fmt=':', capsize=0, color=ci)
 
             if two_row:
                 bot_ax.errorbar(self.k_bins, psz / ptz  - 1, xerr = 0, yerr = erz/ptz, fmt='s:', \
