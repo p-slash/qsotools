@@ -76,7 +76,10 @@ def saveListByLine(array, fname):
     toWrite = open(fname, 'w')
     toWrite.write('%d\n'%len(array))
     for a in array:
-        toWrite.write('%s\n'%str(a))
+        if len(a) == 2:
+            toWrite.write("%d %.1f\n"%(a[0], a[1]))
+        else:
+            toWrite.write('%s\n'%str(a))
     toWrite.close()
 # ------------------------------
 
@@ -201,7 +204,7 @@ if __name__ == '__main__':
         print("Spectral Res: from %d to %d." % (max_obs_spectrum.specres, low_spec_res))
         print("Pixel width: from %.2f to %.2f km/s" %(max_obs_spectrum.dv, pixel_width))
 
-        specres_list.add(low_spec_res)
+        specres_list.add((low_spec_res, pixel_width))
 
         if not REAL_DATA:
             lya_m.setCentralRedshift(z_center)
@@ -252,7 +255,7 @@ if __name__ == '__main__':
             errors /= true_mean_flux
 
         # Skip short spectrum
-        if args.skip and len(wave) < MAX_NO_PIXELS * args.skip:
+        if (args.skip and len(wave) < MAX_NO_PIXELS * args.skip) or len(wave)==0:
             print("This spectrum has few points.")
             continue
 
