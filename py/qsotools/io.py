@@ -33,7 +33,7 @@ class Spectrum:
     Attributes
     ----------
     mask : 
-        Mask on full spectrum, error>0 by default.
+        Good pixels on full spectrum, error>0 by default.
     size : int
         Length of arrays.
     s2n : float
