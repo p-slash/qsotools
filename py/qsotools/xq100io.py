@@ -97,7 +97,7 @@ class XQ100Fits(Spectrum):
             dv = 20. # km/s
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
-            z_qso, hdr0["SPEC_RES"], dv, c.ra.radian, c.dec.radian)
+            z_qso, int(hdr0["SPEC_RES"]), dv, c.ra.radian, c.dec.radian)
 
     def maskHardCut(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
