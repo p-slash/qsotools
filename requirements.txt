@@ -6,3 +6,4 @@ ipython
 plotly
 setuptools
 jupyter
+fitsio
