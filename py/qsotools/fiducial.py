@@ -152,6 +152,7 @@ def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS):
 # Mean flux begins
 # -----------------------------------------------------
 BECKER13_parameters = 0.751, 2.90, -0.132, 3.5
+XQ100_FIT_PARAMS = 0.89964795, 2.2378516, -0.34311581
 
 def meanFluxFG08(z):
     tau = 0.001845 * np.power(1. + z, 3.924)
@@ -169,8 +170,9 @@ def fitBecker13MeanFlux(z, F, e):
     print("z0 is fixed to {:.1f}".format(BECKER13_parameters[-1]))
 
     try:
-        pnew, pcov = curve_fit(evaluateBecker13MeanFlux, z, F, BECKER13_parameters, \
-            sigma=e, absolute_sigma=True)
+        # lambda z, tau0, beta, C: evaluateBecker13MeanFlux(z, tau0, beta, C)
+        pnew, pcov = curve_fit(evaluateBecker13MeanFlux, \
+            z, F, BECKER13_parameters[:-1], sigma=e, absolute_sigma=True)
     except ValueError:
         raise
         exit(1)
