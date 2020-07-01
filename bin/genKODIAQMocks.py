@@ -217,19 +217,19 @@ if __name__ == '__main__':
                 obs_wave_centers=max_obs_spectrum.wave)
         else:
             max_obs_spectrum.applyMask()
-            print("Number of pixel in original resolution for the entire spectrum is %d."%max_obs_spectrum.N)
+            print("Number of pixel in original resolution for the entire spectrum is %d."%max_obs_spectrum.size)
             
             # Re-sample real data onto lower resolution grid
             if args.lowdv:
                 wave, fluxes, errors = so.resample(max_obs_spectrum.wave, \
-                    max_obs_spectrum.flux.reshape(1,max_obs_spectrum.N), \
-                    max_obs_spectrum.error.reshape(1,max_obs_spectrum.N), pixel_width)
+                    max_obs_spectrum.flux.reshape(1,max_obs_spectrum.size), \
+                    max_obs_spectrum.error.reshape(1,max_obs_spectrum.size), pixel_width)
                 print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
                     %(pixel_width, len(wave)))
             else:
                 wave, fluxes, errors = max_obs_spectrum.wave, \
-                max_obs_spectrum.flux.reshape(1,max_obs_spectrum.N), \
-                max_obs_spectrum.error.reshape(1,max_obs_spectrum.N)
+                max_obs_spectrum.flux.reshape(1,max_obs_spectrum.size), \
+                max_obs_spectrum.error.reshape(1,max_obs_spectrum.size)
 
         # Cut Lyman-alpha forest region
         lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+qso.z_qso), \

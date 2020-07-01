@@ -31,7 +31,7 @@ class XQ100Fits(Spectrum):
         Error on flux.
     mask : 
         Good pixels on full spectrum.
-    N : int
+    size : int
         Length of these arrays.
     
     z_qso : float
