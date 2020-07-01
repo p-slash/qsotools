@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 import argparse
 from os          import makedirs as os_makedirs
 from os.path     import join as ospath_join

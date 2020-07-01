@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 from os.path import join as ospath_join
 from os import makedirs as os_makedirs
