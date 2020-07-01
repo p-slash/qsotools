@@ -105,7 +105,7 @@ if __name__ == '__main__':
     if "mock0/data" in args.OutputDir:
         print("MOCK0 is real data!")
         REAL_DATA = True
-        mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, fid.XQ100_FIT_PARAMS)
+        mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
         settings_txt  = ''
     else:
         REAL_DATA = False
