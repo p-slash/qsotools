@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # TODO
 # Fix asu.tsv location
@@ -69,7 +69,7 @@ def savePlots(wch, fch, ech, fnames, obs_fits):
 def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width):
     for (w, f, e, fname) in zip(waves, fluxes, errors, fnames):
         mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
-        mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.DECL, obs_fits.RA, obs_fits.S2N, \
+        mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.dec, obs_fits.ra, obs_fits.s2n, \
             spec_res, pixel_width)
 
 def saveListByLine(array, fname):
