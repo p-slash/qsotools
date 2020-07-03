@@ -526,13 +526,31 @@ class FisherPlotter(object):
             ax.xaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
             ax.yaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
+    def _setScale(self, matrix, scale, cbarlbl, Ftxt, colormap):
+        if scale == "norm":
+            cbarlbl = r"$%s_{\alpha \alpha'}/\sqrt{%s_{\alpha\alpha}%s_{\alpha'\alpha'}}$" \
+                % (Ftxt, Ftxt, Ftxt)
+            grid = matrix/self.norm
+            colormap = plt.cm.seismic
+        elif scale == "log":
+            cbarlbl = r"$\log %s_{\alpha \alpha'}$" % (Ftxt)
+
+            grid = np.log10(matrix)
+        else:
+            cbarlbl = r"$%s_{\alpha \alpha'}$" % (Ftxt)
+            grid = matrix
+
+        return grid
+
     def plotAll(self, scale="norm", outplot_fname=None, inv=False):
         """Plot the entire Fisher matrix or its inverse.
 
         Parameters
         ----------
         scale : str, optional
-            To normalize with respect to the diagonal pass "norm". To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. Default is "norm".
+            To normalize with respect to the diagonal pass "norm". 
+            To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
+            Default is "norm".
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         inv : bool, optional
@@ -550,24 +568,10 @@ class FisherPlotter(object):
             tmp = self.fisher
 
         colormap = plt.cm.BuGn
-        vmin = None
-        vmax = None
-        if scale == "norm":
-            cbarlbl = r"$%s_{\alpha \alpha'}/\sqrt{%s_{\alpha\alpha}%s_{\alpha'\alpha'}}$" \
-                % (Ftxt, Ftxt, Ftxt)
-            grid = tmp/self.norm
-            colormap = plt.cm.seismic
-            vmin = -1
-            vmax = 1
-        elif scale == "log":
-            cbarlbl = r"$\log %s_{\alpha \alpha'}$" % (Ftxt)
 
-            grid = np.log10(tmp)
-        else:
-            cbarlbl = r"$%s_{\alpha \alpha'}$" % (Ftxt)
-            grid = tmp
+        grid = self._setScale(tmp, scale, cbarlbl, Ftxt, colormap)
         
-        im = ax.imshow(grid, cmap=colormap, vmin=vmin, vmax=vmax, origin='upper', \
+        im = ax.imshow(grid, cmap=colormap, origin='upper', \
             extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0])
 
         self._setTicks(ax)
@@ -580,7 +584,7 @@ class FisherPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, bbox_inches='tight')
 
-    def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, vmin, vmax, nticks, tick_lbls):
+    def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, nticks, tick_lbls, vmin=-1, vmax=1):
         fig, ax = plt.subplots()
         extent = np.array([0, nticks, nticks, 0]) - 0.5
         im = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', extent=extent)
@@ -607,46 +611,51 @@ class FisherPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, bbox_inches='tight')
 
-    def plotKBin(self, kb, outplot_fname=None, colormap=plt.cm.seismic):
+    def plotKBin(self, kb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic):
         """Plot Fisher matrix for a given k bin, i.e. redshift correlations.
 
         Parameters
         ----------
         kb : int
             Bin number for k to plot.
+        scale : str, optional
+            To normalize with respect to the diagonal pass "norm". 
+            To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
+            Default is "norm".
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid = self.fisher/self.norm
-        vmin = -1
-        vmax = 1
+        
+        grid = self._setScale(self.fisher, scale, cbarlbl, Ftxt, colormap)
 
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
         cbarlbl = r"$%s_{zz'}/\sqrt{%s_{zz}%s_{z'z'}}$" \
             % (Ftxt, Ftxt, Ftxt)
         
-        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, vmin, vmax, self.nz, self.zlabels)
+        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, self.nz, self.zlabels)
 
-    def plotZBin(self, zb, outplot_fname=None, colormap=plt.cm.seismic):
+    def plotZBin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic):
         """Plot Fisher matrix for a given z bin, i.e. k correlations.
 
         Parameters
         ----------
         zb : int
             Bin number for redshift to plot.
+        scale : str, optional
+            To normalize with respect to the diagonal pass "norm". 
+            To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
+            Default is "norm".
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid = self.fisher/self.norm
-        vmin = -1
-        vmax = 1
+        grid = self._setScale(self.fisher, scale, cbarlbl, Ftxt, colormap)
 
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
@@ -654,24 +663,26 @@ class FisherPlotter(object):
         cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
             % (Ftxt, Ftxt, Ftxt)
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, vmin, vmax, self.nk, None)
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None)
 
-    def plotKCrossZbin(self, zb, outplot_fname=None, colormap=plt.cm.seismic):
+    def plotKCrossZbin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic):
         """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations cross z bins.
 
         Parameters
         ----------
         zb : int
             Bin number for redshift to plot. The figure is zb, zb+1 correlations.
+        scale : str, optional
+            To normalize with respect to the diagonal pass "norm". 
+            To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
+            Default is "norm".
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid = self.fisher/self.norm
-        vmin = -1
-        vmax = 1
+        grid = self._setScale(self.fisher, scale, cbarlbl, Ftxt, colormap)
 
         next_z_bin = zb+1
         if next_z_bin >= self.nz:
@@ -683,7 +694,7 @@ class FisherPlotter(object):
         cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
             % (Ftxt, Ftxt, Ftxt)
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, vmin, vmax, self.nk, None)
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None)
 
 
 
