@@ -260,7 +260,6 @@ class ConfigQMLE:
     qso_list : str
     qso_dir : str
 
-    sq_dvpixel  : float
     sq_vlength : float
     sq_dvgrid : float
     """
@@ -301,7 +300,6 @@ class ConfigQMLE:
         self.qso_list = self.parameters['FileNameList']
         self.qso_dir = self.parameters['FileInputDir']
 
-        self.sq_dvpixel = float(self.parameters['PixelWidth'])
         self.sq_vlength = float(self.parameters['VelocityLength'])
         self.sq_dvgrid  = self.sq_vlength / (int(self.parameters['NumberVPoints'])-1)
 
