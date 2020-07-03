@@ -167,6 +167,7 @@ if __name__ == '__main__':
                 spectrograph_resolution=low_spec_res, resample_dv=args.lowdv, \
                 obs_wave_centers=qso.wave)
         else:
+            qso.maskOutliers()
             qso.applyMask()
             print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
             
