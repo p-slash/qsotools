@@ -19,7 +19,6 @@ if __name__ == '__main__':
     parser.add_argument("--ngrid", help="Number of grid points. Default is 2^18", type=int, default=2**18)
     parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", type=float, default=3)
 
-    parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", type=int, default=12123)
     args = parser.parse_args()
 
     # Parameters
