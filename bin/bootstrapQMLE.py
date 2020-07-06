@@ -40,11 +40,11 @@ def qmleBootRun(qso_fname_list, N, inputdir):
     grouped_qso = list(groupby(qso_fname_list, key=getSno))
 
     for gr, sn_list in grouped_qso:
-        c = Counter(sn_list)
+        c = Counter(list(sn_list))
         print(c)
         print(gr)
 
-        fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%s_no, \
+        fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%gr, \
             "combined_Fp.fits"), 'r')
 
         for elem in c:
