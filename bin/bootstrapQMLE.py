@@ -4,14 +4,11 @@ from os.path import join as ospath_join
 
 import struct
 import numpy as np
-import matplotlib.pyplot as plt
 
 from astropy.utils import NumpyRNGContext
 from astropy.stats import bootstrap
 
 import qsotools.io as qio
-import qsotools.fiducial as fid
-import qsotools.specops as so
 
 def readFPBinFile(fname):
     fpbin = open(fname, "rb")
