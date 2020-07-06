@@ -61,8 +61,8 @@ if __name__ == '__main__':
     file_qsolist = open(config_qmle.qso_list, 'r')
     header = file_qsolist.readline()
     qso_filename_list = file_qsolist.readlines()
-    qso_filename_list = [ospath_join(config_qmle.qso_dir, x.rstrip()) \
-        for x in qso_filename_list]
+    qso_filename_list = np.array([ospath_join(config_qmle.qso_dir, x.rstrip()) \
+        for x in qso_filename_list])
 
     qmleBootRunN = lambda x: qmleBootRun(x, N)
 
