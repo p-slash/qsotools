@@ -34,7 +34,7 @@ def qmleBootRun(qso_fname_list, N, inputdir):
     total_power_b4 = np.zeros(N)
 
     qso_fname_list.sort()
-    getSno = lambda x: int(re.search('/s(\d+)/desilite', x).group(1))[0]
+    getSno = lambda x: int(re.search('/s(\d+)/desilite', x).group(1))
     getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
 
     grouped_qso = list(groupby(qso_fname_list, key=getSno))
