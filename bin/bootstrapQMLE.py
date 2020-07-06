@@ -39,7 +39,7 @@ def qmleBootRun(qso_fname_list, N, inputdir):
 
     for gr, sn_list in groupby(qso_fname_list, key=getSno):
         c = Counter(list(sn_list))
-        
+
         fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%gr, \
             "combined_Fp.fits"), 'r')
 
@@ -66,7 +66,7 @@ if __name__ == '__main__':
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
     parser.add_argument("--seed", default=3422, type=int)
-    parser.add_argument("--save-cov", default=False, type=bool)
+    parser.add_argument("--save-cov", action="store_true")
     args = parser.parse_args()
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     power_filename = ospath_join(output_dir, output_base \
         +"-bootstrap-power-n%d-s%d.txt" % (args.bootnum, args.seed))
     np.savetxt(power_filename, bootresult)
-    print("Saves as ", power_filename)
+    print("Power saved as ", power_filename)
 
     # If time allows, run many bootstraps and save its covariance
     # when save-cov passed
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         cov_filename = ospath_join(output_dir, output_base \
             +"-bootstrap-cov-n%d-s%d.txt" % (args.bootnum, args.seed))
         np.savetxt(cov_filename, bootstrap_cov)
-        print("Saves as ", cov_filename)
+        print("Covariance saved as ", cov_filename)
 
 
 
