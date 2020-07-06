@@ -38,6 +38,7 @@ def qmleBootRun(qso_fname_list, N, inputdir):
     getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
 
     for gr, sn_list in groupby(qso_fname_list, key=getSno):
+        sn_list.sort(key=getIDno)
         c = Counter(list(sn_list))
 
         fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%gr, \
