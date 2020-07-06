@@ -34,8 +34,8 @@ def qmleBootRun(qso_fname_list, N, inputdir):
     total_power_b4 = np.zeros(N)
 
     qso_fname_list.sort()
-    getSno = lambda x: int(re.search('*/s(\d+)/desilite*.dat', x).group(1))[0]
-    getIDno= lambda x: int(re.search('*_id(\d+)_*.dat', x).group(1))
+    getSno = lambda x: int(re.search('/s(\d+)/desilite', x).group(1))[0]
+    getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
 
     grouped_qso = list(groupby(qso_fname_list, key=getSno))
     print(grouped_qso)
@@ -52,7 +52,7 @@ def qmleBootRun(qso_fname_list, N, inputdir):
             this_id = getIDno(elem)
             count = c[elem]
             print("ID: %d | C: %d"%(this_id, count))
-            
+
             data = fitsfile[this_id+1].read()[0]
 
             total_fisher   += data['fisher']*count
