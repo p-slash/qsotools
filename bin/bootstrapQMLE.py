@@ -38,12 +38,11 @@ def qmleBootRun(qso_fname_list, N, inputdir):
     getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
 
     grouped_qso = list(groupby(qso_fname_list, key=getSno))
-    print(grouped_qso)
 
-    for sn_list in grouped_qso:
+    for gr, sn_list in grouped_qso:
         c = Counter(sn_list)
-        s_no = getSno(sn_list[0])
-        print(s_no)
+        print(c)
+        print(gr)
 
         fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%s_no, \
             "combined_Fp.fits"), 'r')
