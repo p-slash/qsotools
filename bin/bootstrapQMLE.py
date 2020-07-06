@@ -46,7 +46,7 @@ def qmleBootRun(qso_fname_list, N, inputdir):
         for elem in c:
             this_id = getIDno(elem)
             count = c[elem]
-
+            print("ID: %d | C: %d" %(this_id, count))
             data = fitsfile[this_id+1].read()[0]
 
             total_fisher   += data['fisher']*count
