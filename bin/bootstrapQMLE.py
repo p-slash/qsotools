@@ -38,7 +38,9 @@ def qmleBootRun(qso_fname_list, N, inputdir):
     getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
 
     for gr, sn_list in groupby(qso_fname_list, key=getSno):
-        c = Counter(list(sn_list))
+        new_list = list(sn_list)
+        new_list.sort(keyf=getIDno)
+        c = Counter(new_list)
 
         fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%gr, \
             "combined_Fp.fits"), 'r')
@@ -46,7 +48,7 @@ def qmleBootRun(qso_fname_list, N, inputdir):
         for elem in c:
             this_id = getIDno(elem)
             count = c[elem]
-            print("ID: %d | C: %d" %(this_id, count))
+
             data = fitsfile[this_id+1].read()[0]
 
             total_fisher   += data['fisher']*count
