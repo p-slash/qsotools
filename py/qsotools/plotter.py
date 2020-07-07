@@ -291,7 +291,7 @@ class PowerPlotter(object):
             pnz = self.power_qmle_noise[nz]
         else:
             psz = self.power_qmle[nz]
-            
+
         erz = self.error[nz]
         ptz = self.power_true[nz]
         z_val = self.z_bins[nz]
@@ -312,7 +312,7 @@ class PowerPlotter(object):
         
         if plot_dbt:
             top_ax.errorbar(self.k_bins, pnz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
-                fmt='s', label="Noise", markersize=3, capsize=2, color='r')
+                fmt='s', label="Noise", markersize=3, capsize=0, color='r')
         
         if plot_true:
             top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
@@ -546,21 +546,21 @@ class FisherPlotter(object):
             ax.xaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
             ax.yaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
-    def _setScale(self, matrix, scale, cbarlbl, Ftxt, colormap):
+    def _setScale(self, matrix, scale, colormap, Ftxt='F', Fsub='\alpha'):
         if scale == "norm":
-            cbarlbl = r"$%s_{\alpha \alpha'}/\sqrt{%s_{\alpha\alpha}%s_{\alpha'\alpha'}}$" \
-                % (Ftxt, Ftxt, Ftxt)
+            cbarlbl = r"$%s_{%s%s'}/\sqrt{%s_{%s%s}%s_{%s'%s'}}$" \
+                % (Ftxt, Fsub, Fsub, Ftxt,Fsub, Fsub, Ftxt, Fsub, Fsub)
             grid = matrix/self.norm
             colormap = plt.cm.seismic
         elif scale == "log":
-            cbarlbl = r"$\log %s_{\alpha \alpha'}$" % (Ftxt)
+            cbarlbl = r"$\log %s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
 
             grid = np.log10(matrix)
         else:
-            cbarlbl = r"$%s_{\alpha \alpha'}$" % (Ftxt)
+            cbarlbl = r"$%s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
             grid = matrix
 
-        return grid
+        return grid, cbarlbl
 
     def plotAll(self, scale="norm", outplot_fname=None, inv=False):
         """Plot the entire Fisher matrix or its inverse.
@@ -589,7 +589,7 @@ class FisherPlotter(object):
 
         colormap = plt.cm.BuGn
 
-        grid = self._setScale(tmp, scale, cbarlbl, Ftxt, colormap)
+        grid, cbarlbl = self._setScale(tmp, scale, colormap, Ftxt)
         
         im = ax.imshow(grid, cmap=colormap, origin='upper', \
             extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0])
@@ -649,12 +649,10 @@ class FisherPlotter(object):
         """
         Ftxt = "F"
         
-        grid = self._setScale(self.fisher, scale, cbarlbl, Ftxt, colormap)
+        grid, cbarlbl = self._setScale(self.fisher, scale, colormap, Ftxt, Fsub='z')
 
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
-        cbarlbl = r"$%s_{zz'}/\sqrt{%s_{zz}%s_{z'z'}}$" \
-            % (Ftxt, Ftxt, Ftxt)
         
         self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, self.nz, self.zlabels)
 
@@ -675,13 +673,10 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid = self._setScale(self.fisher, scale, cbarlbl, Ftxt, colormap)
+        grid, cbarlbl = self._setScale(self.fisher, scale, colormap, Ftxt, Fsub='k')
 
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
-
-        cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
-            % (Ftxt, Ftxt, Ftxt)
 
         self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None)
 
@@ -702,7 +697,7 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid = self._setScale(self.fisher, scale, cbarlbl, Ftxt, colormap)
+        grid, cbarlbl = self._setScale(self.fisher, scale, colormap, Ftxt, Fsub='k')
 
         next_z_bin = zb+1
         if next_z_bin >= self.nz:
@@ -710,9 +705,6 @@ class FisherPlotter(object):
         
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*next_z_bin:self.nk*(next_z_bin+1)]
-        
-        cbarlbl = r"$%s_{kk'}/\sqrt{%s_{kk}%s_{k'k'}}$" \
-            % (Ftxt, Ftxt, Ftxt)
 
         self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None)
 
