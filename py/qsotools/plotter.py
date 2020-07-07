@@ -485,8 +485,10 @@ class FisherPlotter(object):
         Redshift bin width. Default is 0.2.
     z1 : float, optional
         First redshift bin. Default is 1.8.
+    skiprows : int, optional
+        Number of rows to skip when reading fisher matrix file. Default is 1.
 
-    __init__(filename, nz=None, dz=0.2, z1=1.8)
+    __init__(filename, nz=None, dz=0.2, z1=1.8, skiprows=1)
         Reads the Fisher matrix into fisher and computes its normalization. If nz is passed, sets up 
         nz, nk and zlabels.
 
@@ -500,8 +502,8 @@ class FisherPlotter(object):
     zlabels
 
     """
-    def __init__(self, filename, nz=None, dz=0.2, z1=1.8):
-        self.fisher = np.genfromtxt(filename, skip_header = 1, unpack = True)
+    def __init__(self, filename, nz=None, dz=0.2, z1=1.8, skiprows=1):
+        self.fisher = np.loadtxt(filename, skiprows=skiprows)
         
         try:
             self.invfisher = np.linalg.inv(self.fisher)
@@ -546,21 +548,24 @@ class FisherPlotter(object):
             ax.xaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
             ax.yaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
-    def _setScale(self, matrix, scale, colormap, Ftxt='F', Fsub='\alpha'):
+    def _setScale(self, matrix, scale, Ftxt='F', Fsub='\\alpha'):
         if scale == "norm":
             cbarlbl = r"$%s_{%s%s'}/\sqrt{%s_{%s%s}%s_{%s'%s'}}$" \
                 % (Ftxt, Fsub, Fsub, Ftxt,Fsub, Fsub, Ftxt, Fsub, Fsub)
+            
             grid = matrix/self.norm
             colormap = plt.cm.seismic
         elif scale == "log":
             cbarlbl = r"$\log %s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
 
             grid = np.log10(matrix)
+            colormap = None
         else:
             cbarlbl = r"$%s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
             grid = matrix
+            colormap = None
 
-        return grid, cbarlbl
+        return grid, cbarlbl, colormap
 
     def plotAll(self, scale="norm", outplot_fname=None, inv=False):
         """Plot the entire Fisher matrix or its inverse.
@@ -587,10 +592,9 @@ class FisherPlotter(object):
         else:
             tmp = self.fisher
 
-        colormap = plt.cm.BuGn
+        grid, cbarlbl, colormap = self._setScale(tmp, scale, Ftxt)
+        colormap = plt.cm.BuGn if colormap is None
 
-        grid, cbarlbl = self._setScale(tmp, scale, colormap, Ftxt)
-        
         im = ax.imshow(grid, cmap=colormap, origin='upper', \
             extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0])
 
@@ -648,8 +652,8 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        
-        grid, cbarlbl = self._setScale(self.fisher, scale, colormap, Ftxt, Fsub='z')
+        grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='z')
+        colormap = plt.cm.BuGn if colormap is None
 
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
@@ -673,7 +677,8 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid, cbarlbl = self._setScale(self.fisher, scale, colormap, Ftxt, Fsub='k')
+        grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
+        colormap = plt.cm.BuGn if colormap is None
 
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
@@ -697,7 +702,8 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid, cbarlbl = self._setScale(self.fisher, scale, colormap, Ftxt, Fsub='k')
+        grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
+        colormap = plt.cm.BuGn if colormap is None
 
         next_z_bin = zb+1
         if next_z_bin >= self.nz:
