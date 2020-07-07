@@ -196,6 +196,11 @@ class PowerPlotter(object):
             
             self.power_qmle = np.reshape(self.power_fid + thetap, (self.nz, self.nk))
             self.error    = np.array(power_table['ErrorP'], dtype=np.double).reshape((self.nz, self.nk))
+            
+            self.power_qmle_full  = np.array(power_table['d'], dtype=np.double).reshape((self.nz, self.nk))
+            self.power_qmle_noise = np.array(power_table['b'], dtype=np.double).reshape((self.nz, self.nk))
+            self.power_qmle_fid   = np.array(power_table['t'], dtype=np.double).reshape((self.nz, self.nk))
+
             self.power_fid = self.power_fid.reshape((self.nz, self.nk))
         # If it is FFT estimate file  
         elif 'P-FFT' in power_table.colnames:
@@ -245,6 +250,7 @@ class PowerPlotter(object):
             del z_true
 
     def plotRedshiftBin(self, nz, outplot_fname=None, two_row=False, plot_true=True, \
+        plot_dbt=False, \
         pk_ymax=0.5, pk_ymin=1e-4, rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, \
         auto_ylim_xmax=1000, ignore_last_k_bins=-1):
         """Plot QMLE results for given redshift bin nz.
@@ -257,6 +263,10 @@ class PowerPlotter(object):
             When passed, figure is saved with this filename.
         two_row : bool, optional
             When passed, add a lower panel for relative error computed by using the true power.
+        plot_true : bool, optional
+            Plot true value if True.
+        plot_dbt : bool, optiona
+            Plot full power and noise estimate individually.
         pk_ymax, pk_ymin : float, optional
             Maximum and minimum y axis limits for kP/pi.
         rel_ylim : float, optional
@@ -276,7 +286,12 @@ class PowerPlotter(object):
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
             top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
 
-        psz = self.power_qmle[nz]
+        if plot_dbt:
+            psz = self.power_qmle_full[nz]
+            pnz = self.power_qmle_noise[nz]
+        else:
+            psz = self.power_qmle[nz]
+            
         erz = self.error[nz]
         ptz = self.power_true[nz]
         z_val = self.z_bins[nz]
@@ -294,6 +309,11 @@ class PowerPlotter(object):
         # Start plotting
         top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, xerr = 0, yerr = erz*self.k_bins/np.pi, \
             fmt='o', label="z=%.1f"%z_val, markersize=3, capsize=2, color='k')
+        
+        if plot_dbt:
+            top_ax.errorbar(self.k_bins, pnz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
+                fmt='s', label="Noise", markersize=3, capsize=2, color='r')
+        
         if plot_true:
             top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
                 fmt=':', capsize=0, color='k')
