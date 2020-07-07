@@ -29,6 +29,8 @@ def readFPBinFile(fname):
 
     return fisher, power
 
+# This function assumes spectra are organized s0/ s1/ .. folders
+# and individual results are saved under s0/combined_Fp.fits
 def qmleBootRun(qso_fname_list, N, inputdir):
     total_fisher   = np.zeros((N,N))
     total_power_b4 = np.zeros(N)
