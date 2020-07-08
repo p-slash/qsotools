@@ -90,7 +90,7 @@ if __name__ == '__main__':
     # numpy arrays of counts for bootstrap realizations.
     bootstrap_dict = dict()
     for ind in range(no_spectra):
-        bootstrap_dict[qso_filename_list[ind]]=np.array([l.count(ind) for l in booted_indices])
+        bootstrap_dict[qso_filename_list[ind]]=np.count_nonzero(booted_indices==ind, axis=1)
 
     bootresult=qmleBootRun(bootstrap_dict, qso_filename_list, N, config_qmle.qso_dir, args.bootnum)
 
