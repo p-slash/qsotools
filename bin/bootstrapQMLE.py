@@ -1,16 +1,12 @@
 #!/usr/bin/env python
 import argparse
 from os.path import join as ospath_join
-from collections import Counter
 from itertools import groupby
 
 import struct
 import numpy as np
 import fitsio
 import re
-
-from astropy.utils import NumpyRNGContext
-from astropy.stats import bootstrap
 
 import qsotools.io as qio
 
@@ -31,35 +27,35 @@ def readFPBinFile(fname):
 
 # This function assumes spectra are organized s0/ s1/ .. folders
 # and individual results are saved under s0/combined_Fp.fits
-def qmleBootRun(qso_fname_list, N, inputdir):
-    total_fisher   = np.zeros((N,N))
-    total_power_b4 = np.zeros(N)
+def qmleBootRun(bootstrap_dict, qso_fname_list, N, inputdir, bootnum):
+    total_fisher   = np.zeros((bootnum, N, N))
+    total_power_b4 = np.zeros((bootnum, N))
+    total_power    = np.zeros((bootnum, N))
 
-    qso_fname_list.sort()
     getSno = lambda x: int(re.search('/s(\d+)/desilite', x).group(1))
     getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
 
     for grno, sn_group in groupby(qso_fname_list, key=getSno):
         sn_list = list(sn_group)
         sn_list.sort(key=getIDno)
-        c = Counter(sn_list)
 
         fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%grno, \
             "combined_Fp.fits"), 'r')
 
-        for elem in c:
-            this_id = getIDno(elem)
-            count = c[elem]
-
+        for sp in sn_list:
+            this_id = getIDno(sp)
             data = fitsfile[this_id+1].read()[0]
+            
+            counts = bootstrap_dict[sp]
 
-            total_fisher   += data['fisher']*count
-            total_power_b4 += data['power']*count
+            total_fisher   += data['fisher'][None,...]*counts[:, None, None]
+            total_power_b4 += data['power'][None,:]*counts[:, None]
 
         fitsfile.close()
 
-    inv_total_fisher = np.linalg.inv(total_fisher) 
-    total_power = 0.5 * inv_total_fisher @ total_power_b4
+    for bi in range(bootnum):
+        inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
+        total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
     
     return total_power
 
@@ -85,13 +81,18 @@ if __name__ == '__main__':
         qso_filename_list = np.array([ospath_join(config_qmle.qso_dir, x.rstrip()) \
             for x in file_qsolist])
 
-    # Set up bootstrap statistics function defined above
-    qmleBootRunN = lambda x: qmleBootRun(x, N, config_qmle.qso_dir)
+    # Generate random indices as bootstrap
+    RND = np.random.RandomState(args.seed)
+    no_spectra = qso_filename_list.size
+    booted_indices = RND.randint(no_spectra, size=(args.bootnum, no_spectra))
+    
+    # Create a dictionary, where keys are filenames and values are 
+    # numpy arrays of counts for bootstrap realizations.
+    bootstrap_dict = dict()
+    for ind in range(no_spectra):
+        bootstrap_dict[qso_filename_list[ind]]=np.array([l.count(ind) for l in booted_indices])
 
-    # Bootstrap to get a new power estimate
-    with NumpyRNGContext(args.seed):
-        bootresult = bootstrap(qso_filename_list, bootnum=args.bootnum, \
-            bootfunc=qmleBootRunN)
+    bootresult=qmleBootRun(bootstrap_dict, qso_filename_list, N, config_qmle.qso_dir, args.bootnum)
 
     # Save power to a file
     power_filename = ospath_join(output_dir, output_base \
