@@ -85,10 +85,10 @@ if __name__ == '__main__':
     # Read qso filenames into a list, then convert to numpy array
     with open(config_qmle.qso_list, 'r') as file_qsolist:
         header = file_qsolist.readline()
-        qso_filename_list = np.array([ospath_join(config_qmle.qso_dir, x.rstrip()) \
-            for x in file_qsolist])
+        qso_filename_list = [ospath_join(config_qmle.qso_dir, x.rstrip()) \
+            for x in file_qsolist]
 
-    no_spectra = qso_filename_list.size
+    no_spectra = len(qso_filename_list)
     print("Filenames of {:d} spectra are stored.".format(no_spectra))
 
     # Generate random indices as bootstrap
@@ -97,8 +97,8 @@ if __name__ == '__main__':
     print("{:d} bootstrap realisations are generated.".format(args.bootnum))
     print("Here's the first realisation:", booted_indices[0], flush=True)
     print("Here's the repetitions for index 0:", \
-        np.count_nonzero(booted_indices==qind, axis=1), flush=True)
-    
+        np.count_nonzero(booted_indices==0, axis=1), flush=True)
+
     # # Create a dictionary, where keys are filenames and values are 
     # # numpy arrays of counts for bootstrap realizations.
     # bootstrap_counted_ind = np.array((no_spectra, args.bootnum))
