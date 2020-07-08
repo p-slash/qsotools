@@ -25,6 +25,15 @@ def readFPBinFile(fname):
 
     return fisher, power
 
+def getCounts(booted_indices, bootnum, no_spectra):
+    # Does sorting helps with add.at?
+    booted_indices.sort(axis=1)
+    counts = np.zeros((no_spectra, bootnum), dtype=np.int)
+    for i, btdi in enumerate(booted_indices):
+        np.add.at(counts[:, i], btdi, 1)
+
+    return counts
+
 # This function assumes spectra are organized s0/ s1/ .. folders
 # and individual results are saved under s0/combined_Fp.fits
 def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
@@ -39,6 +48,15 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
     
     qso_fname_list.sort(key=getSno) # Sort for groupby
     no_spectra = len(qso_filename_list)
+
+    # counts shape (no_spectra, bootnum)
+    print("Getting repetitions...", flush=True)
+    counts = getCounts(booted_indices, bootnum, no_spectra)
+    # Broadcast
+    print("Broadcasting repetitions array...", flush=True)
+    cfisher = counts[..., None, None]
+    cpower  = counts[..., None]
+
     qind = 0 # Stores the index in qso_fname_list for the loop
 
     for grno, sn_group in groupby(qso_fname_list, key=getSno):
@@ -48,12 +66,11 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
         with fitsio.FITS(fitspath) as fitsfile:
             for hdu in fitsfile[1:]:
                 data = hdu.read()
-                counts = np.count_nonzero(booted_indices==qind, axis=1)
-
-                total_fisher   += data['fisher']*counts[:, None, None]
-                total_power_b4 += data['power']*counts[:, None]
+                
+                total_fisher   += data['fisher']*cfisher[qind]
+                total_power_b4 += data['power']*cpower[qind]
+                
                 qind+=1
-
                 if qind%4000==0:
                     print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
 
