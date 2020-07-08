@@ -27,7 +27,7 @@ def readFPBinFile(fname):
 
 # This function assumes spectra are organized s0/ s1/ .. folders
 # and individual results are saved under s0/combined_Fp.fits
-def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
+def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
     total_fisher   = np.zeros((bootnum, N, N))
     total_power_b4 = np.zeros((bootnum, N))
     total_power    = np.zeros((bootnum, N))
@@ -42,7 +42,7 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
     qind = 0 # Stores the index in qso_fname_list for the loop
 
     for grno, sn_group in groupby(qso_fname_list, key=getSno):
-        fitspath = ospath_join(inputdir, "s%d"%grno, "combined_Fp.fits.gz")
+        fitspath = ospath_join(inputdir, "s%d"%grno, fp_file)
         print("Reading {:s}...".format(fitspath), flush=True)
 
         with fitsio.FITS(fitspath) as fitsfile:
@@ -55,7 +55,7 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
                 qind+=1
 
                 if qind%4000==0:
-                    print("Progress: {:4.1f}%".format(100*qind/no_spectra))
+                    print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
 
         print("Results from s{:d}/combined_Fp.fits.gz are read and added.".format(grno), flush=True)
 
@@ -72,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument("ConfigFile", help="Config file")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
+    parser.add_argument("--fp-file", default="combined_Fp.fits")
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
     args = parser.parse_args()
@@ -101,7 +102,8 @@ if __name__ == '__main__':
         np.count_nonzero(booted_indices==0, axis=1), flush=True)
 
     print("Running analysis...", flush=True)
-    bootresult=qmleBootRun(booted_indices, qso_filename_list, N, config_qmle.qso_dir, args.bootnum)
+    bootresult=qmleBootRun(booted_indices, qso_filename_list, N, config_qmle.qso_dir, \
+        args.bootnum, args.fp_file)
 
     # Save power to a file
     power_filename = ospath_join(output_dir, output_base \
