@@ -32,8 +32,10 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
     total_power_b4 = np.zeros((bootnum, N))
     total_power    = np.zeros((bootnum, N))
 
-    getSno = lambda x: int(re.search('/s(\d+)/desilite', x).group(1))
-    getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
+    sno_regex= re.compile('/s(\d+)/desilite')
+    id_regex = re.compile('_id(\d+)_')
+    getSno = lambda x: int(sno_regex.search(x).group(1))
+    getIDno= lambda x: int(id_regex.search(x).group(1))
     
     qso_fname_list.sort(key=getSno)
     qind = 0 # Stores the index in qso_fname_list for the loop
