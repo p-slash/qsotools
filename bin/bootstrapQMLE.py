@@ -33,31 +33,29 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
     total_power    = np.zeros((bootnum, N))
 
     sno_regex= re.compile('/s(\d+)/desilite')
-    id_regex = re.compile('_id(\d+)_')
     getSno = lambda x: int(sno_regex.search(x).group(1))
-    getIDno= lambda x: int(id_regex.search(x).group(1))
+    # id_regex = re.compile('_id(\d+)_')
+    # getIDno= lambda x: int(id_regex.search(x).group(1))
     
-    qso_fname_list.sort(key=getSno)
+    qso_fname_list.sort(key=getSno) # Sort for groupby
+    no_spectra = len(qso_filename_list)
     qind = 0 # Stores the index in qso_fname_list for the loop
 
     for grno, sn_group in groupby(qso_fname_list, key=getSno):
-        sn_list = list(sn_group)
-        sn_list.sort(key=getIDno)
+        fitspath = ospath_join(inputdir, "s%d"%grno, "combined_Fp.fits.gz")
+        print("Reading {:s}...".format(fitspath), flush=True)
 
-        fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%grno, \
-            "combined_Fp.fits.gz"), 'r')
+        with fitsio.FITS(fitspath) as fitsfile:
+            for hdu in fitsfile[1:]:
+                data = hdu.read()
+                counts = np.count_nonzero(booted_indices==qind, axis=1)
 
-        for sp in sn_list:
-            this_id = getIDno(sp)
-            data = fitsfile[this_id+1].read()[0]
-            
-            counts = np.count_nonzero(booted_indices==qind, axis=1)
+                total_fisher   += data['fisher']*counts[:, None, None]
+                total_power_b4 += data['power']*counts[:, None]
+                qind+=1
 
-            total_fisher   += data['fisher'][None,...]*counts[:, None, None]
-            total_power_b4 += data['power'][None,:]*counts[:, None]
-            qind+=1
-
-        fitsfile.close()
+                if qind%4000==0:
+                    print("Progress: {:4.1f}%".format(100*qind/no_spectra))
 
         print("Results from s{:d}/combined_Fp.fits.gz are read and added.".format(grno), flush=True)
 
