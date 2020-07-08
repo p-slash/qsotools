@@ -57,8 +57,9 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
 
         fitsfile.close()
 
-        print("Results from s{:d}/combined_Fp.fits.gz are read and added.".format(grno))
+        print("Results from s{:d}/combined_Fp.fits.gz are read and added.".format(grno), flush=True)
 
+    print("Calculating bootstrapped inverse Fisher and power...", flush=True)
     for bi in range(bootnum):
         inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
         total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
@@ -98,15 +99,6 @@ if __name__ == '__main__':
     print("Here's the first realisation:", booted_indices[0], flush=True)
     print("Here's the repetitions for index 0:", \
         np.count_nonzero(booted_indices==0, axis=1), flush=True)
-
-    # # Create a dictionary, where keys are filenames and values are 
-    # # numpy arrays of counts for bootstrap realizations.
-    # bootstrap_counted_ind = np.array((no_spectra, args.bootnum))
-    # for ind in range(no_spectra):
-    #     bootstrap_counted_ind[ind] = np.count_nonzero(booted_indices==ind, axis=1)
-    #     bootstrap_dict[qso_filename_list[ind]]=np.count_nonzero(booted_indices==ind, axis=1)
-    # print("Dictionary that stores repetitions is calculated.")
-    # print("Here's the first spectrum:", bootstrap_dict[qso_filename_list[0]])
 
     print("Running analysis...", flush=True)
     bootresult=qmleBootRun(booted_indices, qso_filename_list, N, config_qmle.qso_dir, args.bootnum)
