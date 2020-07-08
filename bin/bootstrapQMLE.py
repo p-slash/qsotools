@@ -64,8 +64,8 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
                 ci = counts[qind]
                 data = hdu.read()
                 
-                total_fisher   += data['fisher']*ci[: None, None]
-                total_power_b4 += data['power']*ci[: None]
+                total_fisher   += data['fisher']*ci[:, None, None]
+                total_power_b4 += data['power']*ci[:, None]
                 
                 qind+=1
                 if qind%4000==0:
