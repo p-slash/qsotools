@@ -40,7 +40,7 @@ def qmleBootRun(bootstrap_dict, qso_fname_list, N, inputdir, bootnum):
         sn_list.sort(key=getIDno)
 
         fitsfile = fitsio.FITS(ospath_join(inputdir, "s%d"%grno, \
-            "combined_Fp.fits"), 'r')
+            "combined_Fp.fits.gz"), 'r')
 
         for sp in sn_list:
             this_id = getIDno(sp)
