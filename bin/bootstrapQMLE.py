@@ -27,13 +27,16 @@ def readFPBinFile(fname):
 
 # This function assumes spectra are organized s0/ s1/ .. folders
 # and individual results are saved under s0/combined_Fp.fits
-def qmleBootRun(bootstrap_dict, qso_fname_list, N, inputdir, bootnum):
+def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum):
     total_fisher   = np.zeros((bootnum, N, N))
     total_power_b4 = np.zeros((bootnum, N))
     total_power    = np.zeros((bootnum, N))
 
     getSno = lambda x: int(re.search('/s(\d+)/desilite', x).group(1))
     getIDno= lambda x: int(re.search('_id(\d+)_', x).group(1))
+    
+    qso_fname_list.sort(key=getSno)
+    qind = 0 # Stores the index in qso_fname_list for the loop
 
     for grno, sn_group in groupby(qso_fname_list, key=getSno):
         sn_list = list(sn_group)
@@ -46,12 +49,15 @@ def qmleBootRun(bootstrap_dict, qso_fname_list, N, inputdir, bootnum):
             this_id = getIDno(sp)
             data = fitsfile[this_id+1].read()[0]
             
-            counts = bootstrap_dict[sp]
+            counts = np.count_nonzero(booted_indices==qind, axis=1)
 
             total_fisher   += data['fisher'][None,...]*counts[:, None, None]
             total_power_b4 += data['power'][None,:]*counts[:, None]
+            qind+=1
 
         fitsfile.close()
+
+        print("Results from s{:d}/combined_Fp.fits.gz are read and added.".format(grno))
 
     for bi in range(bootnum):
         inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
@@ -74,6 +80,7 @@ if __name__ == '__main__':
     output_base = config_qmle.parameters['OutputFileBase']
 
     N = (config_qmle.k_nlin + config_qmle.k_nlog) * config_qmle.z_n
+    print("Config file is read.")
 
     # Read qso filenames into a list, then convert to numpy array
     with open(config_qmle.qso_list, 'r') as file_qsolist:
@@ -81,18 +88,28 @@ if __name__ == '__main__':
         qso_filename_list = np.array([ospath_join(config_qmle.qso_dir, x.rstrip()) \
             for x in file_qsolist])
 
+    no_spectra = qso_filename_list.size
+    print("Filenames of {:d} spectra are stored.".format(no_spectra))
+
     # Generate random indices as bootstrap
     RND = np.random.RandomState(args.seed)
-    no_spectra = qso_filename_list.size
     booted_indices = RND.randint(no_spectra, size=(args.bootnum, no_spectra))
+    print("{:d} bootstrap realisations are generated.".format(args.bootnum))
+    print("Here's the first realisation:", booted_indices[0], flush=True)
+    print("Here's the repetitions for index 0:", \
+        np.count_nonzero(booted_indices==qind, axis=1), flush=True)
     
-    # Create a dictionary, where keys are filenames and values are 
-    # numpy arrays of counts for bootstrap realizations.
-    bootstrap_dict = dict()
-    for ind in range(no_spectra):
-        bootstrap_dict[qso_filename_list[ind]]=np.count_nonzero(booted_indices==ind, axis=1)
+    # # Create a dictionary, where keys are filenames and values are 
+    # # numpy arrays of counts for bootstrap realizations.
+    # bootstrap_counted_ind = np.array((no_spectra, args.bootnum))
+    # for ind in range(no_spectra):
+    #     bootstrap_counted_ind[ind] = np.count_nonzero(booted_indices==ind, axis=1)
+    #     bootstrap_dict[qso_filename_list[ind]]=np.count_nonzero(booted_indices==ind, axis=1)
+    # print("Dictionary that stores repetitions is calculated.")
+    # print("Here's the first spectrum:", bootstrap_dict[qso_filename_list[0]])
 
-    bootresult=qmleBootRun(bootstrap_dict, qso_filename_list, N, config_qmle.qso_dir, args.bootnum)
+    print("Running analysis...", flush=True)
+    bootresult=qmleBootRun(booted_indices, qso_filename_list, N, config_qmle.qso_dir, args.bootnum)
 
     # Save power to a file
     power_filename = ospath_join(output_dir, output_base \
