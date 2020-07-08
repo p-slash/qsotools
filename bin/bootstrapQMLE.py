@@ -57,7 +57,7 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
                 if qind%4000==0:
                     print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
 
-        print("Results from s{:d}/combined_Fp.fits.gz are read and added.".format(grno), flush=True)
+        print("Results from {:s} are read and added.".format(fitspath, grno), flush=True)
 
     print("Calculating bootstrapped inverse Fisher and power...", flush=True)
     for bi in range(bootnum):
