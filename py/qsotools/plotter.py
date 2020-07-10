@@ -559,15 +559,15 @@ class FisherPlotter(object):
             cbarlbl = r"$\log %s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
 
             grid = np.log10(matrix)
-            colormap = None
+            colormap = plt.cm.BuGn
         else:
             cbarlbl = r"$%s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
             grid = matrix
-            colormap = None
+            colormap = plt.cm.BuGn
 
         return grid, cbarlbl, colormap
 
-    def plotAll(self, scale="norm", outplot_fname=None, inv=False):
+    def plotAll(self, scale="norm", outplot_fname=None, inv=False, **kwargs):
         """Plot the entire Fisher matrix or its inverse.
 
         Parameters
@@ -580,6 +580,7 @@ class FisherPlotter(object):
             When passed, figure is saved with this filename.
         inv : bool, optional
             Plot the inverse instead.
+        kwargs: ** for imshow
         """
         fig, ax = plt.subplots()
         Ftxt = "F" if not inv else "F^{-1}"
@@ -593,10 +594,10 @@ class FisherPlotter(object):
             tmp = self.fisher
 
         grid, cbarlbl, colormap = self._setScale(tmp, scale, Ftxt)
-        colormap = plt.cm.BuGn if colormap is None
 
         im = ax.imshow(grid, cmap=colormap, origin='upper', \
-            extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0])
+            extent=[0, self.fisher.shape[0], self.fisher.shape[0], 0], \
+            **kwargs)
 
         self._setTicks(ax)
 
@@ -653,7 +654,6 @@ class FisherPlotter(object):
         """
         Ftxt = "F"
         grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='z')
-        colormap = plt.cm.BuGn if colormap is None
 
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
@@ -677,8 +677,7 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
-        colormap = plt.cm.BuGn if colormap is None
+        grid, cbarlbl, _ = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
 
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
@@ -702,8 +701,7 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is seismic.
         """
         Ftxt = "F"
-        grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
-        colormap = plt.cm.BuGn if colormap is None
+        grid, cbarlbl, _ = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
 
         next_z_bin = zb+1
         if next_z_bin >= self.nz:
