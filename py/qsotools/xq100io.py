@@ -73,7 +73,7 @@ class XQ100Fits(Spectrum):
 
     xq100_list_fits = fitsio.FITS(TABLE_XQ100_SUM)[1]
 
-    def __init__(self, filename):
+    def __init__(self, filename, overWriteR=True):
         with fitsio.FITS(filename) as xqf:
             hdr0 = xqf[0].read_header()
             data = xqf[1].read()[0]
@@ -93,11 +93,13 @@ class XQ100Fits(Spectrum):
 
         if self.arm == 'VIS':
             dv = 11. # km/s
+            specres = 8900 if overWriteR else int(hdr0["SPEC_RES"])
         elif self.arm == 'UVB':
             dv = 20. # km/s
+            specres = 5400 if overWriteR else int(hdr0["SPEC_RES"])
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
-            z_qso, int(hdr0["SPEC_RES"]), dv, c.ra.radian, c.dec.radian)
+            z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
     def maskHardCut(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
