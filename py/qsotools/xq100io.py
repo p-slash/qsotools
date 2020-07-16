@@ -2,6 +2,7 @@ import numpy as np
 import fitsio
 from astropy.coordinates import SkyCoord
 from astropy.units import deg as udeg
+from scipy.interpolate import interp1d
 
 from qsotools.fiducial import LIGHT_SPEED
 from qsotools.io import Spectrum
@@ -70,10 +71,13 @@ class XQ100Fits(Spectrum):
         Cut from Irsic et al 2016. Keeps F>r and f>fc.
     
     """
-
+    specres_interp_uvb = interp1d([0.5, 0.8, 1.0], [9700, 6700, 5400], \
+        bounds_error=False, fill_value=(9700, 5400))
+    specres_interp_vis = interp1d([0.4, 0.7, 0.9], [18400, 11400, 8900], \
+        bounds_error=False, fill_value=(18400, 8900))
     xq100_list_fits = fitsio.FITS(TABLE_XQ100_SUM)[1]
 
-    def __init__(self, filename, overWriteR=True):
+    def __init__(self, filename, correctSeeing=True):
         with fitsio.FITS(filename) as xqf:
             hdr0 = xqf[0].read_header()
             data = xqf[1].read()[0]
@@ -82,8 +86,11 @@ class XQ100Fits(Spectrum):
         self.arm    = hdr0['DISPELEM']
 
         i = XQ100Fits.xq100_list_fits.where("OBJECT == '%s'"%self.object)[0]
-        z_qso = XQ100Fits.xq100_list_fits[i]['Z_QSO']
-        
+        d = XQ100Fits.xq100_list_fits[i]
+        z_qso = d['Z_QSO']
+        seeing_ave = np.around((d['SEEING_MIN']+d['SEEING_MAX'])/2, decimals=1)
+        seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
+
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=udeg) 
 
         wave = data['WAVE'] * 10.
@@ -93,10 +100,12 @@ class XQ100Fits(Spectrum):
 
         if self.arm == 'VIS':
             dv = 11. # km/s
-            specres = 8900 if overWriteR else int(hdr0["SPEC_RES"])
+            specres = int(np.around(XQ100Fits.specres_interp_vis(seeing_ave), decimals=-2)) \
+                if correctSeeing else int(hdr0["SPEC_RES"])
         elif self.arm == 'UVB':
             dv = 20. # km/s
-            specres = 5400 if overWriteR else int(hdr0["SPEC_RES"])
+            specres = int(np.around(XQ100Fits.specres_interp_uvb(seeing_ave), decimals=-2)) \
+                if correctSeeing else int(hdr0["SPEC_RES"])
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
