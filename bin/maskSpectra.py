@@ -46,7 +46,7 @@ if __name__ == '__main__':
             continue
 
         try:
-            spectrum = bq.BinaryQSO(loc_fname, 'r')
+            spectrum = BinaryQSO(loc_fname, 'r')
             spectrum.read()
         except:
             print("Problem reading ", loc_fname, flush=True)
