@@ -99,7 +99,7 @@ def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
 
     return axs, color_array
 
-def create_tworow_figure(plt, nz, ratio_up2down, majorgrid=True, hspace=0, \
+def create_tworow_figure(nz, ratio_up2down, majorgrid=True, hspace=0, \
     colormap=plt.cm.jet, ylim=0.05):
     fig = plt.figure()
     top_pos, bot_pos = gridspec.GridSpec(2, 1, height_ratios=[ratio_up2down, 1])
@@ -279,7 +279,7 @@ class PowerPlotter(object):
             When passed ignore that many last k bins from the chi square.
         """
         if two_row:
-            top_ax, bot_ax = create_tworow_figure(plt, 1, 3, ylim=rel_ylim)[:-1]
+            top_ax, bot_ax = create_tworow_figure(1, 3, ylim=rel_ylim)[:-1]
         else:
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
@@ -363,7 +363,7 @@ class PowerPlotter(object):
             When passed ignore that many last k bins from the chi square.
         """
         if two_row:
-            top_ax, bot_ax, color_array = create_tworow_figure(plt, self.nz, 3, ylim=rel_ylim, \
+            top_ax, bot_ax, color_array = create_tworow_figure(self.nz, 3, ylim=rel_ylim, \
                 colormap=colormap)
         else:
             fig, top_ax = plt.subplots()
