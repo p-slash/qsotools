@@ -86,6 +86,8 @@ if __name__ == '__main__':
     parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=4.3)
     
+    parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
+
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
    
@@ -94,6 +96,19 @@ if __name__ == '__main__':
     parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
         type=float, default=1.)
     args = parser.parse_args()
+
+    # Initialize waverange
+    if args.side_band == 0:
+        forest_1 = fid.LYA_FIRST_WVL
+        forest_2 = fid.LYA_LAST_WVL
+    elif args.side_band == 1:
+        forest_1 = fid.Si4_FIRST_WVL
+        forest_2 = fid.Si4_LAST_WVL
+    elif args.side_band == 2:
+        forest_1 = fid.C4_FIRST_WVL
+        forest_2 = fid.C4_LAST_WVL
+    
+    forest_c = (forest_1+forest_2)/2
 
     # Pick mean flux function
     if args.gauss:
@@ -145,7 +160,7 @@ if __name__ == '__main__':
             no_lya_quasar_list.append(f)
             continue
 
-        z_center = (fid.LYA_CENTER_WVL / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
+        z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
         print("Ly-alpha forest central redshift is ", z_center)
 
         pixel_width  = args.lowdv if args.lowdv else qso.dv
@@ -181,8 +196,8 @@ if __name__ == '__main__':
                 wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
 
         # Cut Lyman-alpha forest region
-        lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+qso.z_qso), \
-            wave <= fid.LYA_LAST_WVL * (1+qso.z_qso))
+        lyman_alpha_ind = np.logical_and(wave >= forest_1 * (1+qso.z_qso), \
+            wave <= forest_2 * (1+qso.z_qso))
         # Cut analysis boundaries
         forest_boundary = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
             wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
