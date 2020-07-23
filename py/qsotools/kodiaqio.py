@@ -5,7 +5,7 @@ from astropy.units import hourangle, deg
 
 from os.path import join as ospath_join
 
-from qsotools.fiducial import LIGHT_SPEED
+from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL
 from qsotools.io import Spectrum
 
 from pkg_resources import resource_filename
@@ -334,13 +334,13 @@ class KODIAQ_OBS_Iterator:
         if self.kqso_iter.clean_pix:
             self.spectrum.applyMask()
 
-    def maxLyaObservation(self):
+    def maxLyaObservation(self, w1=LYA_FIRST_WVL, w2=LYA_LAST_WVL):
         max_s2n_lya = -1
         i     = 0
         max_i = 0
 
         for obs in self:
-            current_s2n_lya = obs.spectrum.getS2NLya()
+            current_s2n_lya = obs.spectrum.getS2NLya(w1, w2)
         
             if current_s2n_lya > max_s2n_lya:
                 max_s2n_lya = current_s2n_lya
