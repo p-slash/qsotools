@@ -30,7 +30,7 @@ def saveParameters(txt_basefilename, args):
                     "Redshift Evolution   : %s\n") % ( 
         "Gaussian Mocks" if args.gauss else "Lognormal Mocks", \
         "OFF" if args.noerrors else "ON", \
-        args.Seed, \
+        args.seed, \
         args.ngrid, \
         args.griddv, \
         args.lowdv if args.lowdv else 0., \
@@ -217,7 +217,7 @@ if __name__ == '__main__':
     specres_list  = set()
     
     if not isRealData:
-        lya_m = lm.LyaMocks(args.Seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
+        lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
             REDSHIFT_ON=not args.without_z_evo, GAUSSIAN_MOCKS=args.gauss)
 
     # ------------------------------    
