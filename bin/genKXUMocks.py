@@ -133,7 +133,7 @@ if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
     parser.add_argument("OutputDir", help="Output directory")
-    parser.add_argument("Seed", help="Seed to generate random numbers.", type=int)
+    parser.add_argument("--seed", help="Seed to generate random numbers.", type=int)
 
     parser.add_argument("--KODIAQdir", help="Directory of KODIAQ")
     parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=TABLE_KODIAQ_ASU)
@@ -222,7 +222,7 @@ if __name__ == '__main__':
 
     # ------------------------------    
     # Start with KODIAQ
-    if not args.KODIAQdir:
+    if args.KODIAQdir:
         print("RUNNING ON KODIAQ.........")
         qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
 
@@ -273,7 +273,7 @@ if __name__ == '__main__':
 
     # ------------------------------
     # XQ-100
-    if not args.XQ100Dir:
+    if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
         if isRealData:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
@@ -307,7 +307,7 @@ if __name__ == '__main__':
             if not args.nosave:
                 saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw)
 
-    if not args.UVESSQUADDir:
+    if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
 
         if isRealData:
