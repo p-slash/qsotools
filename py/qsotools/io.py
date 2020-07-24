@@ -944,7 +944,7 @@ class SQUADFits(Spectrum):
 
         self.object = hdr0['OBJECT']
 
-        i = SQUADFits.uves_squad_csv["Name_Adopt"] == self.object
+        i = np.nonzero(SQUADFits.uves_squad_csv["Name_Adopt"] == self.object)
         d = SQUADFits.uves_squad_csv[i]
         z_qso = d['zem_Adopt']
 
