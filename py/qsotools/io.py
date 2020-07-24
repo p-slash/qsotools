@@ -1,8 +1,23 @@
-import numpy as np
 import struct
 from configparser import ConfigParser
+from os.path import exists as os_exists, join as ospath_join
+
+import numpy as np
+from scipy.interpolate import interp1d
+
+import fitsio
+
+from astropy.io import ascii
+from astropy.coordinates import SkyCoord
+from astropy.units import hourangle, deg
+
 from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL, formBins
-from os.path import exists as os_exists
+
+from pkg_resources import resource_filename
+TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
+TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
+TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
+TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
 
 class Spectrum:
     """
@@ -303,7 +318,670 @@ class ConfigQMLE:
         self.sq_vlength = float(self.parameters['VelocityLength'])
         self.sq_dvgrid  = self.sq_vlength / (int(self.parameters['NumberVPoints'])-1)
 
+# ------------------------------------------
+# --------------- KODIAQ -------------------
+# ------------------------------------------
+
+class KODIAQFits(Spectrum):
+    """
+    Defining parameters and useful methods for a KODIAQ FITS file. 
+    By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
+    update mask to filter spikes using maskOutliers method.
+
+    Parameters
+    ----------
+    kodiaq_dir : str
+        Directory of KODIAQ data.
+    qso_name : str
+        Name of the quasar.
+    pi_date : str
+        Observation.
+    spec_prefix : str
+        Prefix for the spectrum file.
+    z_qso : float
+        Emission redshift of the quasar.
+
+    __init__(self, kodiaq_dir, qso_name, pi_date, spec_prefix, z_qso)
+        Reads flux and error files. Constructs logarithmicly spaced wavelength array. 
+        Mask is error>0 by default.
+
+    Attributes
+    ----------
+    wave : float
+        Wavelength array in Angstrom.
+    flux : float
+        Normalized flux.
+    error : float
+        Error on flux.
+    mask : 
+        Good pixels on full spectrum.
+    size : int
+        Length of these arrays.
+    
+    z_qso : float
+        Emission redshift of the quasar.
+    specres : int
+        Spectral resolution of the instrument.
+    dv : float
+        Pixel width.
+    s2n : float
+        Signal to noise ratio of the entire spectrum.
+    s2n_kodiaq : float
+        Signal to noise ratio of the entire spectrum given by KODIAQ.
+    s2n_lya : float
+        Signal to noise ratio of the Lya forest. 
+        Initial value is 0. Run getS2NLya to calculate this value.
+        -1 if there is no Lya coverage for a given spectrum.
+    ra : float
+        RA in radians
+    dec : float
+        DECL in radians
+
+    qso_name : str
+        Name of the quasar.
+    pi_date : str
+        Observation.
+    spec_prefix : str
+        Prefix for the spectrum file
+    subdir: str
+        Subdirectory that the spectrum lives.
+    
+    Methods
+    -------
+    _setWavelengthArray(hdr)
+        Set the wavelength array in logarithmic spacing.
+    applyMask(good_pixels=None)
+        Remove masked values from wave, flux and error. 
+        Keeps good_pixels and updates the length the arrays.
+    
+    maskOutliers(MEAN_FLUX   = 0.7113803432881693, \
+                    SIGMA_FLUX  = 0.37433547084407937, \
+                    MEAN_ERROR  = 0.09788299539216311, \
+                    SIGMA_ERROR = 0.08333137595138172, \
+                    SIGMA_CUT   = 5.)
+        Mask pixels outside of a given sigma confidence level.
+        Mainly use to remove spikes in the flux and error due to 
+        continuum normalization near an echelle order edge.
+    maskHardFlux(low_flux=-0.5, high_flux=1.5)
+        Less sophisticated cut to constrain flux values between two numbers.
+    
+    getWaveChunkIndices(rest_frame_edges)
+        For a given wevalength edges in A in the rest frame of the QSO, 
+        returns the indeces in the array.
+    
+    getS2NLya(lya_lower = 1050., lya_upper = 1180.)
+        Returns <1/e> in the Lya forest. -1 if no coverage.
+
+    """
+    def _setWavelengthArray(self, hdr):
+        CRPIX1 = hdr["CRPIX1"]
+        CDELT1 = hdr["CDELT1"]
+        CRVAL1 = hdr["CRVAL1"]
+
+        self.N    = hdr["NAXIS1"]
+        self.wave = (np.arange(self.N) + 1.0 - CRPIX1) * CDELT1 + CRVAL1
+        self.wave = np.power(10, self.wave)
         
+        self.dv = LIGHT_SPEED * CDELT1 * np.log(10)
+
+    def __init__(self, kodiaq_dir, qso_name, pi_date, spec_prefix, z_qso):
+
+        self.qso_name    = qso_name
+        self.pi_date     = pi_date
+        self.spec_prefix = spec_prefix
+
+        self.subdir = ospath_join(kodiaq_dir, qso_name, pi_date)
+        
+        flux_fname = ospath_join(self.subdir,"%s_f.fits" % self.spec_prefix)
+        erro_fname = ospath_join(self.subdir,"%s_e.fits" % self.spec_prefix)
+
+        with fitsio.FITS(flux_fname) as kf:
+            hdr = kf[0].read_header()
+            self.flux = np.array(kf[0].read()*1., dtype=np.double)
+
+        with fitsio.FITS(erro_fname) as ke:
+            self.error = np.array(ke[0].read()*1., dtype=np.double)
+
+        c = SkyCoord('%s %s'%(hdr["RA"], hdr["DEC"]), unit=(hourangle, deg)) 
+
+        self.s2n_kodiaq = hdr["SIG2NOIS"]
+
+        self._setWavelengthArray(hdr)
+
+       super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
+            self.dv, c.ra.radian, c.dec.radian)
+
+    def maskOutliers(self,   MEAN_FLUX   = 0.7113803432881693, SIGMA_FLUX  = 0.37433547084407937, \
+        MEAN_ERROR  = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT   = 5.):
+
+        HIGHEST_ALLOWED_FLUX  = MEAN_FLUX  + SIGMA_CUT * SIGMA_FLUX
+        HIGHEST_ALLOWED_ERROR = MEAN_ERROR + SIGMA_CUT * SIGMA_ERROR
+        LOWEST_ALLOWED_FLUX   = MEAN_FLUX  - SIGMA_CUT * SIGMA_FLUX
+        
+        flux_within_5sigma  = np.logical_and(self.flux > LOWEST_ALLOWED_FLUX, \
+            self.flux < HIGHEST_ALLOWED_FLUX)
+        error_within_5sigma = self.error < HIGHEST_ALLOWED_ERROR
+
+        good_pixels = np.logical_and(flux_within_5sigma, error_within_5sigma)
+        
+        self.mask = np.logical_and(good_pixels, self.mask)
+
+    def maskHardFlux(self, low_flux=-0.5, high_flux=1.5):
+        good_pixels = np.logical_and(self.flux > -0.5, self.flux < 1.5)
+
+        self.mask = np.logical_and(good_pixels, self.mask)
+
+    def getWaveChunkIndices(self, rest_frame_edges):
+        return np.searchsorted(self.wave/(1.+self.z_qso), rest_frame_edges)
+
+    def print_details(self):
+        print(self.qso_name, self.pi_date, self.spec_prefix, "at", self.z_qso)
+
+class KODIAQ_QSO_Iterator:
+    """
+    Iterates over QSOs in asu.tsv table for KODIAQ. USe as `for qso in KODIAQ_QSO_Iterator`
+
+    Parameters
+    ----------
+    kodiaq_dir : str
+        Directory of KODIAQ data.
+    asu_path : str
+        Path to asu.tsv table that contains list of quasars. Obtain from 
+        http://vizier.cfa.harvard.edu/viz-bin/VizieR?-source=J/AJ/154/114
+        table3
+    clean_pix : bool
+        Removes bad pixels (e<0) and outliers when True. Defualt is True.
+    
+    __init__(self, kodiaq_dir, asu_path, clean_pix=True)
+        Reads asu_table from asu_path. Creates an iterable object.
+
+    Attributes
+    ----------
+    kodiaq_dir : str
+        Directory of KODIAQ data.
+    asu_table : astropy.io.ascii
+        Stores QSO and properties (such as redshift) from asu.tsv table.
+    clean_pix : bool
+        Removes bad pixels (e<0) and outliers when True.
+    iter_asu_table : iterator
+        Itarates over asu table.
+    qso_number : int
+        Counter for the number of quasars.
+    qso_name : str
+        Name of the QSO.
+    z_qso : float
+        Emission redshift of the QSO.
+    Olam0, Olam1, Rlam0, Rlam1 : int
+        First and last wavelengths in observed and rest frame respectively.
+    qso_dir : str
+        Directory of the QSO.
+    readme_table : astropy.io.ascii
+        Stores observation and spec_prefix from a selected QSO's README.tbl.
+
+    Methods
+    -------
+    __iter__() 
+        Returns itself.
+    __next__()
+        Increase qso_number. Jump to next QSO on the table.
+
+    """
+    
+    def _set_name_dir_table(self, t):
+        self.qso_name = t['KODIAQ']
+        self.z_qso    = t['zem']
+
+        self.Olam0    = t['Olam0']
+        self.Olam1    = t['Olam1']
+        self.Rlam0    = t['Rlam0']
+        self.Rlam1    = t['Rlam1']
+
+        self.qso_dir  = ospath_join(self.kodiaq_dir, self.qso_name)
+
+        self.readme_table = ascii.read(ospath_join(self.qso_dir, "README.tbl"))
+
+    def __init__(self, kodiaq_dir, asu_path, clean_pix=True):
+        self.kodiaq_dir = kodiaq_dir
+        self.clean_pix  = clean_pix
+        self.asu_table  = ascii.read(asu_path, data_start=3)
+        
+        self.iter_asu_table = iter(self.asu_table)
+        self.qso_number = 0
+        self._set_name_dir_table(self.asu_table[0])
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        self.qso_number += 1
+        self._set_name_dir_table(next(self.iter_asu_table))
+
+        return self
+
+class KODIAQ_OBS_Iterator:
+    """
+    Iterates over observations in README.tbl for given QSO in KODIAQ. 
+    Use as `for obs in KODIAQ_OBS_Iterator`
+
+    Parameters
+    ----------
+    kqso_iter : KODIAQ_QSO_Iterator
+    
+    __init__(self, kqso_iter)
+        Creates iterable object from kqso_iter's readme_talbe. Reads the first spectrum.
+
+    Attributes
+    ----------
+    kqso_iter : KODIAQ_QSO_Iterator
+    iter_obs : iterator
+        Iterator over observations.
+    pi_date : str
+        Observation.
+    spec_prefix : str
+        Prefix for spectrum.
+    dr : str
+        Data release for KODIAQ.
+    kodw0, kodw1 : int
+        First and last wavelengths in observed frame for spectral chunk.
+    spectrum : KODIAQFits
+        Stores wave, flux, error and more.
+
+    Methods
+    -------
+    _set_pidate_specprefix(t)
+        Set pi_date, spec_prefix and dr from table element t.
+    readSpectrum()
+        Reads spectrum for the current pi_date and spec_prefix.
+        Removes bad pixels (e<0) and outliers.
+    __iter__() 
+        Returns itself.
+    __next__()
+        Jumps to next observation on the table and reads the spectrum.
+
+    """
+
+    def __init__(self, kqso_iter):
+        self.kqso_iter = kqso_iter
+        self.iter_obs = iter(self.kqso_iter.readme_table)
+
+        self._set_pidate_specprefix(self.kqso_iter.readme_table[0])
+        self.readSpectrum()
+
+    def __iter__(self):
+        return self
+        
+    def __next__(self):
+        self._set_pidate_specprefix(next(self.iter_obs))
+        self.readSpectrum()
+
+        return self
+
+    def _set_pidate_specprefix(self, t):
+        self.pi_date     = t['pi_date']
+        self.spec_prefix = t['spec_prefix']
+        self.dr          = t['kodrelease']
+        self.kodw0       = t['kodwblue']
+        self.kodw1       = t['kodwred']
+
+    def readSpectrum(self):
+        self.spectrum = KODIAQFits(self.kqso_iter.kodiaq_dir, \
+            self.kqso_iter.qso_name, self.pi_date, self.spec_prefix, \
+            self.kqso_iter.z_qso)
+        self.spectrum.maskOutliers()
+
+        if self.kqso_iter.clean_pix:
+            self.spectrum.applyMask()
+
+    def maxLyaObservation(self, w1=LYA_FIRST_WVL, w2=LYA_LAST_WVL):
+        max_s2n_lya = -1
+        i     = 0
+        max_i = 0
+
+        for obs in self:
+            current_s2n_lya = obs.spectrum.getS2NLya(w1, w2)
+        
+            if current_s2n_lya > max_s2n_lya:
+                max_s2n_lya = current_s2n_lya
+                max_i = i
+
+            i += 1          
+
+        self._set_pidate_specprefix(self.kqso_iter.readme_table[max_i])
+        self.readSpectrum()
+
+        return self.spectrum, max_s2n_lya
+
+class KODIAQMasterTable():
+    """
+    This class generates a master table for the KODIAQ sample.
+    You can read the master table simply by astropy.io.ascii
+
+    """
+    def __init__(self, kodiaq_dir, fname, rw='r', asu_path='asu.tsv'):
+        self.kodiaq_dir = kodiaq_dir
+        self.fname = fname
+        if rw == 'r':
+            self.master_table = ascii.read(fname)
+        elif rw == 'w':
+            self.generate(asu_path)
+            ascii.write(self.master_table, OUTPUT_TABLE_FNAME, format='tab', fast_writer=False)
+
+    def generate(self, asu_path):
+        qso_iter = KODIAQ_QSO_Iterator(self.kodiaq_dir, asu_path)
+
+        qso_names     = []
+        observations  = []
+        spec_prefixes = []
+
+        emission_z = []
+        Olam0s     = []
+        Olam1s     = []
+        Rlam0s     = []
+        Rlam1s     = []
+        KODw0s     = []
+        KODw1s     = []
+
+        lya_s2ns = []
+
+        data_relases = []
+
+        entire_spec_s2ns    = []
+        dimless_specres     = []
+        pixel_widths        = []
+
+        right_ascensions    = []
+        declinations        = []
+
+        # Read or generate if dont exist
+        for qso in qso_iter:
+            obs_iter = KODIAQ_OBS_Iterator(qso)
+
+            for obs in obs_iter:
+                print(qso.qso_number, qso.qso_name, obs.pi_date, obs.spec_prefix)
+
+                qso_names.append(qso.qso_name)
+                observations.append(obs.pi_date)
+                spec_prefixes.append(obs.spec_prefix)
+
+                Olam0s.append(qso.Olam0)
+                Olam1s.append(qso.Olam1)
+                Rlam0s.append(qso.Rlam0)
+                Rlam1s.append(qso.Rlam1)
+                KODw0s.append(obs.kodw0)
+                KODw1s.append(obs.kodw1)
+
+                lya_s2ns.append("%.2f"%obs.spectrum.getS2NLya())
+
+                emission_z.append(qso.z_qso)
+
+                data_relases.append(obs.dr)
+
+                entire_spec_s2ns.append(obs.spectrum.s2n)
+                dimless_specres.append(obs.spectrum.specres)
+                pixel_widths.append("%.2f"%obs.spectrum.dv)
+
+                right_ascensions.append(obs.spectrum.ra)
+                declinations.append(obs.spectrum.dec)
+
+
+        self.master_table = Table([qso_names, observations, spec_prefixes, \
+                            emission_z, Olam0s, Olam1s, Rlam0s, Rlam1s, \
+                            KODw0s, KODw1s, \
+                            lya_s2ns, data_relases, \
+                            entire_spec_s2ns, dimless_specres, pixel_widths, \
+                            right_ascensions, declinations], \
+                            names=['QSO', 'PI_DATE', 'SPEC_PREFIX', \
+                            'Z_EM', 'QSO_Olam0', 'QSO_Olam1', 'QSO_Rlam0', 'QSO_Rlam1', \
+                            'OBS_Olam0', 'OBS_Olam1', \
+                            'LyaS2N', 'DR', 'S2N', 'SPECRES','dv','RA', 'DE']) 
+
+    def find_qso(self, qso_name):
+        return np.where( np.array(self.master_table['QSO']) == qso_name )[0]
+
+def getKODIAQLyaMaxS2NObsList(KODIAQdir, asu_path=TABLE_KODIAQ_ASU):
+    qso_iter = KODIAQ_QSO_Iterator(KODIAQdir, asu_path, clean_pix=True)
+    spec_list = []
+
+    # Start iterating quasars in KODIAQ sample
+    # Each quasar has multiple observations
+    # Pick the one with highest signal to noise in Ly-alpha region
+    for qso in qso_iter:
+        obs_iter = KODIAQ_OBS_Iterator(qso)
+
+        # Pick highest S2N obs
+        max_obs_spectrum, maxs2n = obs_iter.maxLyaObservation()
+
+        if maxs2n != -1:
+            spec_list.append(max_obs_spectrum)
+
+    return spec_list
+
+# ------------------------------------------
+# --------------- XQ-100 -------------------
+# ------------------------------------------
+
+class XQ100Fits(Spectrum):
+    """Reading class for XQ-100 FITS file. 
+    By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
+    update mask to filter spikes using maskOutliers method.
+
+    Parameters
+    ----------
+    filename : str
+
+    __init__(self, filename)
+        Reads the spectrum. Find z_qso from the table. Mask is error>0 by default.
+
+    Attributes
+    ----------
+    wave : float
+        Wavelength array in Angstrom.
+    flux : float
+        Normalized flux.
+    error : float
+        Error on flux.
+    mask : 
+        Good pixels on full spectrum.
+    size : int
+        Length of these arrays.
+    
+    z_qso : float
+        Emission redshift of the quasar.
+    specres : int
+        Spectral resolution of the instrument.
+    dv : float
+        Pixel width.
+    s2n : float
+        Signal to noise ratio of the entire spectrum.
+    s2n_lya : float
+        Signal to noise ratio of the Lya forest. 
+        Initial value is 0. Run getS2NLya to calculate this value.
+        -1 if there is no Lya coverage for a given spectrum.
+    ra : float
+        RA in radians
+    dec : float
+        DECL in radians
+
+    object : str
+        Name of the quasar.
+    arm : str
+        Spectrograph arm.
+    
+    Methods
+    -------
+    applyMask(good_pixels=None)
+        Remove masked values from wave, flux and error. 
+        Keeps good_pixels and updates the length the arrays.
+    
+    maskOutliers(mean_flux=0.6556496616, std_flux=0.4257079242, mean_error=0.0474591657, \
+    std_error=0.0732692789, nsigma_cut=5.)
+        Mask pixels outside of a given sigma confidence level.Mainly use to remove spikes in the \
+        flux and error due to continuum normalization near an echelle order edge.
+    maskHardCut(self, r=-100, fc=-1e-15)
+        Cut from Irsic et al 2016. Keeps F>r and f>fc.
+    
+    """
+    specres_interp_uvb = interp1d([0.5, 0.8, 1.0], [9700, 6700, 5400], \
+        bounds_error=False, fill_value=(9700, 5400))
+    specres_interp_vis = interp1d([0.4, 0.7, 0.9], [18400, 11400, 8900], \
+        bounds_error=False, fill_value=(18400, 8900))
+    xq100_list_fits = fitsio.FITS(TABLE_XQ100_SUM)[1]
+
+    def __init__(self, filename, correctSeeing=True):
+        with fitsio.FITS(filename) as xqf:
+            hdr0 = xqf[0].read_header()
+            data = xqf[1].read()[0]
+
+        self.object = hdr0['OBJECT']
+        self.arm    = hdr0['DISPELEM']
+
+        i = XQ100Fits.xq100_list_fits.where("OBJECT == '%s'"%self.object)[0]
+        d = XQ100Fits.xq100_list_fits[i]
+        z_qso = d['Z_QSO']
+        seeing_ave = np.around((d['SEEING_MIN']+d['SEEING_MAX'])/2, decimals=1)
+        seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
+
+        c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
+
+        wave = data['WAVE'] * 10.
+        flux = data['FLUX']
+        self.cont = data['CONTINUUM']
+        err_flux = data['ERR_FLUX']
+
+        if self.arm == 'VIS':
+            dv = 11. # km/s
+            specres = int(np.around(XQ100Fits.specres_interp_vis(seeing_ave), decimals=-2)) \
+                if correctSeeing else int(hdr0["SPEC_RES"])
+        elif self.arm == 'UVB':
+            dv = 20. # km/s
+            specres = int(np.around(XQ100Fits.specres_interp_uvb(seeing_ave), decimals=-2)) \
+                if correctSeeing else int(hdr0["SPEC_RES"])
+
+        super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
+            z_qso, specres, dv, c.ra.radian, c.dec.radian)
+
+    def maskHardCut(self, r=-100, fc=-1e-15):
+        good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
+        self.mask = np.logical_and(good_pixels, self.mask)
+
+    def maskOutliers(self, mean_flux=0.6556496616, std_flux=0.4257079242, \
+        mean_error=0.0474591657, std_error=0.0732692789, nsigma_cut=5.):
+
+        highest_allowed_flux  = mean_flux  + (nsigma_cut * std_flux)
+        highest_allowed_error = mean_error + (nsigma_cut * std_error)
+        lowest_allowed_flux   = mean_flux  - (nsigma_cut * std_flux)
+        
+        flux_within_5sigma  = np.logical_and(self.flux > lowest_allowed_flux, \
+            self.flux < highest_allowed_flux)
+        error_within_5sigma = self.error < highest_allowed_error
+
+        good_pixels = np.logical_and(flux_within_5sigma, error_within_5sigma)
+        
+        self.mask = np.logical_and(good_pixels, self.mask)
+
+# ------------------------------------------
+# --------------- UVES ---------------------
+# ------------------------------------------
+
+class SQUADFits(Spectrum):
+    """Reading class for SQUAD FITS file. 
+    By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
+    update mask to filter spikes using maskOutliers method.
+
+    Parameters
+    ----------
+    filename : str
+
+    __init__(self, filename)
+        Reads the spectrum. Find z_qso from the table. Mask is error>0 by default.
+
+    Attributes
+    ----------
+    wave : float
+        Wavelength array in Angstrom.
+    flux : float
+        Normalized flux.
+    error : float
+        Error on flux.
+    mask : 
+        Good pixels on full spectrum.
+    size : int
+        Length of these arrays.
+    
+    z_qso : float
+        Emission redshift of the quasar.
+    specres : int
+        Spectral resolution of the instrument.
+    dv : float
+        Pixel width.
+    s2n : float
+        Signal to noise ratio of the entire spectrum.
+    s2n_lya : float
+        Signal to noise ratio of the Lya forest. 
+        Initial value is 0. Run getS2NLya to calculate this value.
+        -1 if there is no Lya coverage for a given spectrum.
+    ra : float
+        RA in radians
+    dec : float
+        DECL in radians
+
+    object : str
+        Name of the quasar.
+    
+    Methods
+    -------
+    applyMask(good_pixels=None)
+        Remove masked values from wave, flux and error. 
+        Keeps good_pixels and updates the length the arrays.
+    
+    """
+
+    uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
+
+    def __init__(self, filename):
+        with fitsio.FITS(filename) as usf:
+            hdr0 = usf[0].read_header()
+            data = usf[1].read()[0]
+
+        self.object = hdr0['OBJECT']
+
+        i = uves_squad_csv["Name_Adopt"] == self.object
+        d = uves_squad_csv[i]
+        z_qso = d['zem_Adopt']
+
+        # seeing_med = np.around(d['Seeing'].split(",")[1], decimals=1)
+        # seeing_med = 1.0 if np.isnan(seeing_med) else seeing_med
+
+        c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
+
+        wave = data['WAVE']
+        flux = data['FLUX']
+        self.cont = data['CONTINUUM']
+        err_flux = data['ERR']
+        # dv = d['Dispersion']
+        dv = np.around(np.mean(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
+        specres = int(np.around(hdr0['SPEC_RES'], decimals=-2))
+
+        super(SQUADFits, self).__init__(wave, flux, err_flux, \
+            z_qso, specres, dv, c.ra.radian, c.dec.radian)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
