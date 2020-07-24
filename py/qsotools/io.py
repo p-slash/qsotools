@@ -964,7 +964,22 @@ class SQUADFits(Spectrum):
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
+    def maskHardCut(self):
+        pass
+    def maskOutliers(self, mean_flux=0.6556496616, std_flux=0.4257079242, \
+        mean_error=0.0474591657, std_error=0.0732692789, nsigma_cut=5.):
+        pass
+        # highest_allowed_flux  = mean_flux  + (nsigma_cut * std_flux)
+        # highest_allowed_error = mean_error + (nsigma_cut * std_error)
+        # lowest_allowed_flux   = mean_flux  - (nsigma_cut * std_flux)
+        
+        # flux_within_5sigma  = np.logical_and(self.flux > lowest_allowed_flux, \
+        #     self.flux < highest_allowed_flux)
+        # error_within_5sigma = self.error < highest_allowed_error
 
+        # good_pixels = np.logical_and(flux_within_5sigma, error_within_5sigma)
+        
+        # self.mask = np.logical_and(good_pixels, self.mask)
 
 
 
