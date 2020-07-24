@@ -944,9 +944,8 @@ class SQUADFits(Spectrum):
 
         self.object = hdr0['OBJECT']
 
-        i = np.nonzero(SQUADFits.uves_squad_csv["Name_Adopt"] == self.object)
-        d = SQUADFits.uves_squad_csv[i]
-        z_qso = d['zem_Adopt']
+        d = SQUADFits.uves_squad_csv[SQUADFits.uves_squad_csv["Name_Adopt"] == self.object]
+        z_qso = float(d["zem_Adopt"])
 
         # seeing_med = np.around(d['Seeing'].split(",")[1], decimals=1)
         # seeing_med = 1.0 if np.isnan(seeing_med) else seeing_med
