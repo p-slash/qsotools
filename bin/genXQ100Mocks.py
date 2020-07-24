@@ -9,8 +9,7 @@ import numpy as np
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-from qsotools.io import BinaryQSO
-from qsotools.xq100io import XQ100Fits
+from qsotools.io import BinaryQSO, XQ100Fits
 import qsotools.fiducial as fid
 
 # Define Saving Functions

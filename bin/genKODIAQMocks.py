@@ -14,8 +14,7 @@ from astropy.table import Table
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-from qsotools.io import BinaryQSO
-import qsotools.kodiaqio as ki
+from qsotools.io import BinaryQSO, TABLE_KODIAQ_ASU, KODIAQ_QSO_Iterator, KODIAQ_OBS_Iterator
 import qsotools.fiducial as fid
 
 # Define Saving Functions
@@ -90,7 +89,7 @@ if __name__ == '__main__':
     parser.add_argument("Outputdir", help="Output directory")
     parser.add_argument("Seed", help="Seed to generate random numbers.", type=int)
 
-    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=ki.TABLE_KODIAQ_ASU)
+    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=TABLE_KODIAQ_ASU)
     parser.add_argument("--save_full_flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
@@ -180,7 +179,7 @@ if __name__ == '__main__':
     filename_list = []
     specres_list  = set()
 
-    qso_iter = ki.KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
+    qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
     
     if not REAL_DATA:
         lya_m = lm.LyaMocks(args.Seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
@@ -197,7 +196,7 @@ if __name__ == '__main__':
     # Pick the one with highest signal to noise in Ly-alpha region
     for qso in qso_iter:
         print("********************************************", flush=True)
-        obs_iter = ki.KODIAQ_OBS_Iterator(qso)
+        obs_iter = KODIAQ_OBS_Iterator(qso)
 
         # Pick highest S2N obs
         max_obs_spectrum, maxs2n = obs_iter.maxLyaObservation()
