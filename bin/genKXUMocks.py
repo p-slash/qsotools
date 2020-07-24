@@ -133,7 +133,7 @@ if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
     parser.add_argument("OutputDir", help="Output directory")
-    parser.add_argument("--seed", help="Seed to generate random numbers.", type=int)
+    parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
 
     parser.add_argument("--KODIAQdir", help="Directory of KODIAQ")
     parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=TABLE_KODIAQ_ASU)
