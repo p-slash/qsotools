@@ -2,16 +2,15 @@
 
 from os.path import join as ospath_join
 from os import makedirs as os_makedirs
-from os import listdir as os_listdir
+import glob
 import argparse
 
 import numpy as np
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-from qsotools.io import BinaryQSO
-import qsotools.kodiaqio as ki
-from qsotools.xq100io import XQ100Fits
+from qsotools.io import BinaryQSO, XQ100Fits, SQUADFits, \
+    TABLE_KODIAQ_ASU, KODIAQ_QSO_Iterator, KODIAQ_OBS_Iterator
 import qsotools.fiducial as fid
 
 # Define Saving Functions
@@ -127,7 +126,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
     print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(max_obs_spectrum.wave[0], wave[0]))
     print("Highest Obs Wave, data: %.3f - mock: %.3f"%(max_obs_spectrum.wave[-1], wave[-1]))
 
-    return wave, fluxes, errors, MAX_NO_PIXELS
+    return wave, fluxes, errors, low_spec_res, MAX_NO_PIXELS
 
 
 if __name__ == '__main__':
@@ -137,9 +136,10 @@ if __name__ == '__main__':
     parser.add_argument("Seed", help="Seed to generate random numbers.", type=int)
 
     parser.add_argument("--KODIAQdir", help="Directory of KODIAQ")
-    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=ki.TABLE_KODIAQ_ASU)
+    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=TABLE_KODIAQ_ASU)
     
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
+    parser.add_argument("--UVESSQUADDir", help="Directory of SQUAD/UVES")
 
     parser.add_argument("--save_full_flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
@@ -224,7 +224,7 @@ if __name__ == '__main__':
     # Start with KODIAQ
     if not args.KODIAQdir:
         print("RUNNING ON KODIAQ.........")
-        qso_iter = ki.KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
+        qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
 
         if isRealData:
             mean_flux_function = fid.meanFluxFG08
@@ -237,7 +237,7 @@ if __name__ == '__main__':
         # Pick the one with highest signal to noise in Ly-alpha region
         for qso in qso_iter:
             print("********************************************", flush=True)
-            obs_iter = ki.KODIAQ_OBS_Iterator(qso)
+            obs_iter = KODIAQ_OBS_Iterator(qso)
 
             # Pick highest S2N obs
             max_obs_spectrum, maxs2n = obs_iter.maxLyaObservation(forest_1, forest_2)
@@ -249,8 +249,8 @@ if __name__ == '__main__':
                 continue
 
             try:
-                wave, fluxes, errors, MAX_NO_PIXELS = genMocks(max_obs_spectrum, forest_1, forest_2, \
-                    final_error, mean_flux_function, specres_list, isRealData, args)
+                wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(max_obs_spectrum, \
+                    forest_1, forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
             except ValueError as ve:
                 print("This spectrum has few points.")
                 continue
@@ -258,7 +258,7 @@ if __name__ == '__main__':
             if args.chunk_dyn:
                 wave, fluxes, errors, nchunks = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
 
-                temp_fname = ["%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
+                temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
                     max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
                     for nc in range(nchunks)]
             else:
@@ -269,7 +269,7 @@ if __name__ == '__main__':
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, low_spec_res, pixel_width)
+                saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, lspecr, pixw)
 
     # ------------------------------
     # XQ-100
@@ -281,12 +281,10 @@ if __name__ == '__main__':
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.05
 
-        for f in os_listdir(args.XQ100Dir):
-            if not f.endswith(".fits"):
-                continue
+        for f in glob.glob(ospath_join(args.XQ100Dir, "*.fits")):
             print("********************************************", flush=True)
-            qso = XQ100Fits(ospath_join(args.XQ100Dir, f))
-            qso.getS2NLya(forest_1, forest_2);
+            qso = XQ100Fits(f)
+            qso.getS2NLya(forest_1, forest_2)
 
             if qso.s2n_lya == -1:
                 print("SKIP: No Lya or Side Band coverage!")
@@ -294,21 +292,61 @@ if __name__ == '__main__':
                 continue
 
             try:
-                wave, fluxes, errors, _ = genMocks(qso, forest_1, forest_2, final_error, \
-                    mean_flux_function, specres_list, isRealData, args)
+                wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
+                    forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
             except ValueError as ve:
                 print("This spectrum has few points.")
                 continue
             
             wave  = [wave]
-            temp_fname = ["%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
+            temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
                 wave[0][0], wave[0][-1], settings_txt)]
                 
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, qso, low_spec_res, pixel_width)
+                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw)
 
+    if not args.UVESSQUADDir:
+        print("RUNNING ON SQUAD/UVES.........")
+
+        if isRealData:
+            mean_flux_function = fid.meanFluxFG08
+
+        # Decide error on final pixels
+        final_error = 0 if args.noerrors or args.observed_errors else 0.1
+
+        for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
+            print("********************************************", flush=True)
+            qso = SQUADFits(f)
+            qso.getS2NLya(forest_1, forest_2)
+
+            if qso.s2n_lya == -1:
+                print("SKIP: No Lya or Side Band coverage!")
+                no_lya_quasar_list.append(f)
+                continue
+
+            try:
+                wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
+                    final_error, mean_flux_function, specres_list, isRealData, args)
+            except ValueError as ve:
+                print("This spectrum has few points.")
+                continue
+            
+            if args.chunk_dyn:
+                wave, fluxes, errors, nchunks = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
+
+                temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
+                    wave[0][0], wave[0][-1], settings_txt) for nc in range(nchunks)]
+            else:
+                wave  = [wave]
+                temp_fname = ["us%s_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), \
+                    wave[0][0], wave[0][-1], settings_txt)]
+                
+            filename_list.extend(temp_fname) 
+
+            if not args.nosave:
+                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw)
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt" )
     print("Saving spectral resolution values as ", temp_fname)
