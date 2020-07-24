@@ -425,7 +425,6 @@ class KODIAQFits(Spectrum):
         self.dv = LIGHT_SPEED * CDELT1 * np.log(10)
 
     def __init__(self, kodiaq_dir, qso_name, pi_date, spec_prefix, z_qso):
-
         self.qso_name    = qso_name
         self.pi_date     = pi_date
         self.spec_prefix = spec_prefix
@@ -448,7 +447,7 @@ class KODIAQFits(Spectrum):
 
         self._setWavelengthArray(hdr)
 
-       super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
+        super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
             self.dv, c.ra.radian, c.dec.radian)
 
     def maskOutliers(self,   MEAN_FLUX   = 0.7113803432881693, SIGMA_FLUX  = 0.37433547084407937, \
