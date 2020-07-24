@@ -17,7 +17,7 @@ Layout       as plyLayout, \
 FigureWidget as plyFigureWidget
 
 from qsotools.fiducial import LYA_WAVELENGTH
-from qsotools.kodiaqio import KODIAQFits
+from qsotools.io import KODIAQFits
 
 class KODIAQViewer:
     """
