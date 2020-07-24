@@ -944,8 +944,8 @@ class SQUADFits(Spectrum):
 
         self.object = hdr0['OBJECT']
 
-        i = uves_squad_csv["Name_Adopt"] == self.object
-        d = uves_squad_csv[i]
+        i = SQUADFits.uves_squad_csv["Name_Adopt"] == self.object
+        d = SQUADFits.uves_squad_csv[i]
         z_qso = d['zem_Adopt']
 
         # seeing_med = np.around(d['Seeing'].split(",")[1], decimals=1)
