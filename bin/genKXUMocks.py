@@ -123,8 +123,8 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
     if (args.skip and len(wave) < MAX_NO_PIXELS * args.skip) or len(wave)==0:
         raise ValueError
 
-    print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(max_obs_spectrum.wave[0], wave[0]))
-    print("Highest Obs Wave, data: %.3f - mock: %.3f"%(max_obs_spectrum.wave[-1], wave[-1]))
+    print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
+    print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
 
     return wave, fluxes, errors, low_spec_res, MAX_NO_PIXELS
 
