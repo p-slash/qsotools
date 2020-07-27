@@ -251,7 +251,7 @@ if __name__ == '__main__':
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(max_obs_spectrum, \
                     forest_1, forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
             except ValueError as ve:
-                print(ve)
+                # print(ve)
                 print(ve.args)
                 continue
             
@@ -295,7 +295,7 @@ if __name__ == '__main__':
                 wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
                     forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
             except ValueError as ve:
-                print(ve)
+                # print(ve)
                 print(ve.args)
                 continue
             
@@ -331,7 +331,7 @@ if __name__ == '__main__':
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
                     final_error, mean_flux_function, specres_list, isRealData, args)
             except ValueError as ve:
-                print(ve)
+                # print(ve)
                 print(ve.args)
                 continue
             
