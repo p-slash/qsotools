@@ -46,7 +46,7 @@ def saveParameters(txt_basefilename, args):
     toWrite.write(Parameters_txt)
     toWrite.close()
 
-def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width):
+def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width, args):
     for (w, f, e, fname) in zip(waves, fluxes, errors, fnames):
         mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
         mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.dec, obs_fits.ra, obs_fits.s2n, \
@@ -74,8 +74,6 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
 
     print("Spectral Res: from %d to %d." % (qso.specres, low_spec_res))
     print("Pixel width: from %.2f to %.2f km/s" %(qso.dv, pixel_width))
-
-    specres_list.add((low_spec_res, pixel_width))
 
     if not isRealData:
         lya_m.setCentralRedshift(z_center)
@@ -121,12 +119,13 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
 
     # Skip short spectrum
     if (args.skip and len(wave) < MAX_NO_PIXELS * args.skip) or len(wave)==0:
-        raise ValueError
+        raise Exception
+    else:
+        specres_list.add((low_spec_res, pixel_width))
+        print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
+        print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
 
-    print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
-    print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
-
-    return wave, fluxes, errors, low_spec_res, MAX_NO_PIXELS
+        return wave, fluxes, errors, low_spec_res, MAX_NO_PIXELS
 
 
 if __name__ == '__main__':
@@ -251,7 +250,8 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(max_obs_spectrum, \
                     forest_1, forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
-            except ValueError as ve:
+            except Exception as ve:
+                print(ve.what)
                 print("This spectrum has few points.")
                 continue
             
@@ -269,7 +269,7 @@ if __name__ == '__main__':
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, lspecr, pixw)
+                saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, lspecr, pixw, args)
 
     # ------------------------------
     # XQ-100
@@ -294,7 +294,8 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
                     forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
-            except ValueError as ve:
+            except Exception as ve:
+                print(ve.what)
                 print("This spectrum has few points.")
                 continue
             
@@ -305,7 +306,7 @@ if __name__ == '__main__':
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw)
+                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
 
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
@@ -329,7 +330,8 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
                     final_error, mean_flux_function, specres_list, isRealData, args)
-            except ValueError as ve:
+            except Exception as ve:
+                print(len(wave), MAX_NO_PIXELS)
                 print("This spectrum has few points.")
                 continue
             
@@ -346,7 +348,7 @@ if __name__ == '__main__':
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw)
+                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt" )
     print("Saving spectral resolution values as ", temp_fname)
