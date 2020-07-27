@@ -953,10 +953,11 @@ class SQUADFits(Spectrum):
 
     def _getDLAMask(self, d):
         self.mask_dla = np.ones_like(self.wave, dtype=bool)
-        self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
-        self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
+        
+        if d['DLAzabs']:
+            self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
+            self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
 
-        if z_dlas:
             for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
                 lobs = (1+zd) * LYA_WAVELENGTH
                 wi = equivalentWidthDLA(nhi, zd)
