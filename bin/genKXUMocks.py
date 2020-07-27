@@ -84,6 +84,9 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
     else:
         qso.maskOutliers()
         qso.applyMask()
+        if args.mask_dlas:
+            qso.applyMaskDLAs()
+
         print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
         
         # Re-sample real data onto lower resolution grid
@@ -155,14 +158,14 @@ if __name__ == '__main__':
     parser.add_argument("--without_z_evo", help="Turn of redshift evolution", action="store_true")
     parser.add_argument("--lowdv", help="Resamples grid to this pixel size (km/s) when passed", \
         type=float)
-    
+    parser.add_argument("--mask-dlas", action="store_true")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
     parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=4.3)
     
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
-    parser.add_argument("--real-data",  action="store_true" )
+    parser.add_argument("--real-data", action="store_true")
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
     
