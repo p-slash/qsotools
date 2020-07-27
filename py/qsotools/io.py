@@ -11,7 +11,8 @@ from astropy.io import ascii
 from astropy.coordinates import SkyCoord
 from astropy.units import hourangle, deg
 
-from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL, formBins
+from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
+    LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA
 
 from pkg_resources import resource_filename
 TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
@@ -944,6 +945,18 @@ class SQUADFits(Spectrum):
 
     uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
 
+    def _getDLAMask(self, d):
+        self.mask_dla = np.ones_like(self.wave, dtype=bool)
+        self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(,)]
+        self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(,)]
+
+        if z_dlas:
+            for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
+                lobs = (1+zd) * LYA_WAVELENGTH
+                wi = equivalentWidthDLA(nhi, zd)
+                dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
+                self.mask_dla[dla_ind] = 0
+
     def __init__(self, filename):
         with fitsio.FITS(filename) as usf:
             hdr0 = usf[0].read_header()
@@ -953,7 +966,7 @@ class SQUADFits(Spectrum):
 
         d = SQUADFits.uves_squad_csv[SQUADFits.uves_squad_csv["Name_Adopt"] == self.object]
         z_qso = float(d["zem_Adopt"])
-
+        
         # seeing_med = np.around(d['Seeing'].split(",")[1], decimals=1)
         # seeing_med = 1.0 if np.isnan(seeing_med) else seeing_med
 
@@ -969,9 +982,13 @@ class SQUADFits(Spectrum):
 
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
+        self._getDLAMask(d)
 
     def maskHardCut(self):
         pass
+
+    def applyMaskDLAs(self):
+        self.applyMask(self.mask_dla)
 
     # These are 3 sigma percentile given there are about 54m pixels in all quasars
     def maskOutliers(self, lower_perc_flux=-0.9336882812, higher_perc_flux=2.4265680231, \
