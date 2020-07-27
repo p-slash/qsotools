@@ -466,6 +466,9 @@ class KODIAQFits(Spectrum):
         
     #     self.mask = np.logical_and(good_pixels, self.mask)
 
+    def applyMaskDLAs(self):
+        pass
+
     # These are 3 sigma percentile given there are about 20m pixels in all quasars
     def maskOutliers(self, lower_perc_flux=-0.5014714665, higher_perc_flux=1.4976650673, \
         higher_perc_error=0.4795617122):
@@ -870,6 +873,9 @@ class XQ100Fits(Spectrum):
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
+
+    def applyMaskDLAs(self):
+        pass
 
     def maskHardCut(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
