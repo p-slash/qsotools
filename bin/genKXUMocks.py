@@ -119,6 +119,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
 
     # Skip short spectrum
     if (args.skip and len(wave) < MAX_NO_PIXELS * args.skip) or len(wave)==0:
+        print(len(wave), MAX_NO_PIXELS)
         raise Exception
     else:
         specres_list.add((low_spec_res, pixel_width))
@@ -331,7 +332,6 @@ if __name__ == '__main__':
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
                     final_error, mean_flux_function, specres_list, isRealData, args)
             except Exception as ve:
-                print(len(wave), MAX_NO_PIXELS)
                 print("This spectrum has few points.")
                 continue
             
