@@ -119,8 +119,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
 
     # Skip short spectrum
     if (args.skip and len(wave) < MAX_NO_PIXELS * args.skip) or len(wave)==0:
-        print(len(wave), MAX_NO_PIXELS)
-        raise Exception
+        raise ValueError("Short spectrum", wave, MAX_NO_PIXELS)
     else:
         specres_list.add((low_spec_res, pixel_width))
         print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
@@ -251,9 +250,9 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(max_obs_spectrum, \
                     forest_1, forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
-            except Exception as ve:
-                print(ve.what)
-                print("This spectrum has few points.")
+            except ValueError as ve:
+                print(ve)
+                print(ve.args)
                 continue
             
             if args.chunk_dyn:
@@ -295,9 +294,9 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
                     forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
-            except Exception as ve:
-                print(ve.what)
-                print("This spectrum has few points.")
+            except ValueError as ve:
+                print(ve)
+                print(ve.args)
                 continue
             
             wave  = [wave]
@@ -331,8 +330,9 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
                     final_error, mean_flux_function, specres_list, isRealData, args)
-            except Exception as ve:
-                print("This spectrum has few points.")
+            except ValueError as ve:
+                print(ve)
+                print(ve.args)
                 continue
             
             if args.chunk_dyn:
