@@ -994,7 +994,7 @@ class SQUADFits(Spectrum):
         if self.z_dlas:
             for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
                 lobs = (1+zd) * LYA_WAVELENGTH
-                wi = equivalentWidthDLA(nhi, zd)
+                wi = equivalentWidthDLA(10**nhi, zd)
                 dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
                 self.mask_dla[dla_ind] = 0
 
