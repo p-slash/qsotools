@@ -238,7 +238,7 @@ if __name__ == '__main__':
         if isRealData:
             mean_flux_function = fid.meanFluxFG08
 
-        kod_mf_hist = fid.MeanFluxHist(args.z_forest_min, z_forest_max)
+        kod_mf_hist = fid.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.1
@@ -295,7 +295,7 @@ if __name__ == '__main__':
         if isRealData:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
 
-        xq_mf_hist = fid.MeanFluxHist(args.z_forest_min, z_forest_max)
+        xq_mf_hist = fid.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.05
@@ -338,7 +338,7 @@ if __name__ == '__main__':
         if isRealData:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS)
 
-        us_mf_hist = fid.MeanFluxHist(args.z_forest_min, z_forest_max)
+        us_mf_hist = fid.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.1
