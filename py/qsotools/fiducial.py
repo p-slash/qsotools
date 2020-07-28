@@ -1,7 +1,7 @@
 import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
-from qsotools.specops import getStats
+import qsotools.specops as so
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -226,7 +226,7 @@ class MeanFluxHist():
     def addSpectrum(self, qso, f1=fid.LYA_FIRST_WVL, f2=fid.LYA_LAST_WVL):
         lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
 
-        ci, zi, fi, ei, e2i = getStats(qso.wave[lya_ind], qso.flux[lya_ind], \
+        ci, zi, fi, ei, e2i = so.getStats(qso.wave[lya_ind], qso.flux[lya_ind], \
             qso.error[lya_ind], redshift_edges)
 
         self.z_hist += zi
