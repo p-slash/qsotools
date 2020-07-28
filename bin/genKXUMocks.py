@@ -315,7 +315,7 @@ if __name__ == '__main__':
         print("RUNNING ON SQUAD/UVES.........")
 
         if isRealData:
-            mean_flux_function = fid.meanFluxFG08
+            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS)
 
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.1
