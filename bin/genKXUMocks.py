@@ -63,7 +63,8 @@ def saveListByLine(array, fname):
     toWrite.close()
 # ------------------------------
 
-def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealData, args):
+def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
+    isRealData, mean_flux_hist, args):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
     print("Ly-alpha forest central redshift is ", z_center)
@@ -86,6 +87,9 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, isRealD
         qso.applyMask()
         if args.mask_dlas:
             qso.applyMaskDLAs()
+
+        if args.compute_mean_flux:
+            mean_flux_hist.addSpectrum(qso, f1, f2)
 
         print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
         
@@ -166,6 +170,7 @@ if __name__ == '__main__':
     
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
     parser.add_argument("--real-data", action="store_true")
+    parser.add_argument("--compute-mean-flux", action="store_true")
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
     
@@ -207,7 +212,9 @@ if __name__ == '__main__':
     # Set settings text
     settings_txt += '_dv%.1f' % args.lowdv if args.lowdv else ''
     settings_txt += '_noz' if args.without_z_evo else ''
-
+    settings_txt += '_sb%d'%args.side_band if args.side_band else ''
+    settings_txt += '_masked-dlas' if args.mask_dlas else ''
+    
     txt_basefilename  = "%s/highres%s" % (args.OutputDir, settings_txt)
 
     saveParameters(txt_basefilename, args)
@@ -231,6 +238,9 @@ if __name__ == '__main__':
         if isRealData:
             mean_flux_function = fid.meanFluxFG08
 
+        if args.compute_mean_flux:
+            kod_mf_hist = fid.MeanFluxHist(args.z_forest_min, z_forest_max)
+
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.1
 
@@ -252,7 +262,8 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(max_obs_spectrum, \
-                    forest_1, forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
+                    forest_1, forest_2, final_error, mean_flux_function, specres_list, \
+                    isRealData, kod_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
@@ -274,13 +285,20 @@ if __name__ == '__main__':
             if not args.nosave:
                 saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, lspecr, pixw, args)
 
+        if args.compute_mean_flux:
+            kod_mf_hist.getMeanFlux()
+            kod_mf_hist.saveHistograms(ospath_join(args.OutputDir, "kod-stats%s"%settings_txt))
+
     # ------------------------------
     # XQ-100
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
         if isRealData:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
-        
+
+        if args.compute_mean_flux:
+            xq_mf_hist = fid.MeanFluxHist(args.z_forest_min, z_forest_max)
+
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.05
 
@@ -296,7 +314,8 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
-                    forest_2, final_error, mean_flux_function, specres_list, isRealData, args)
+                    forest_2, final_error, mean_flux_function, specres_list, \
+                    isRealData, xq_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
@@ -311,11 +330,18 @@ if __name__ == '__main__':
             if not args.nosave:
                 saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
 
+        if args.compute_mean_flux:
+            xq_mf_hist.getMeanFlux()
+            xq_mf_hist.saveHistograms(ospath_join(args.OutputDir, "xq-stats%s"%settings_txt))
+
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
 
         if isRealData:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS)
+
+        if args.compute_mean_flux:
+            us_mf_hist = fid.MeanFluxHist(args.z_forest_min, z_forest_max)
 
         # Decide error on final pixels
         final_error = 0 if args.noerrors or args.observed_errors else 0.1
@@ -332,7 +358,7 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
-                    final_error, mean_flux_function, specres_list, isRealData, args)
+                    final_error, mean_flux_function, specres_list, isRealData, us_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
@@ -352,6 +378,10 @@ if __name__ == '__main__':
 
             if not args.nosave:
                 saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
+
+        if args.compute_mean_flux:
+            us_mf_hist.getMeanFlux()
+            us_mf_hist.saveHistograms(ospath_join(args.OutputDir, "us-stats%s"%settings_txt))
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt" )
     print("Saving spectral resolution values as ", temp_fname)
