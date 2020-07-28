@@ -1,7 +1,6 @@
 import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
-import qsotools.specops as so
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -203,49 +202,6 @@ def fitBecker13MeanFlux(z, F, e):
     print("chisq = %.2f,"%chisq, "dof = ", df)
 
     return pnew, pcov
-
-class MeanFluxHist():
-    """Object that wraps up binning for mean flux calculation as well as pixel redshift
-    histogram.
-    """
-
-    def __init__(self, z1, z2, dz=0.1):
-        self.z1 = z1
-        self.z2 = z2
-        self.dz = dz
-        self.nz = int(np.round((z2-z1)/dz+1))
-        self.hist_redshifts = z1 + dz * np.arange(self.nz)
-        self.hist_redshift_edges = z1 + dz * (np.arange(self.nz+1)-0.5)
-
-        self.total_flux = np.zeros(self.nz)
-        self.total_error = np.zeros(self.nz)
-        self.total_error2 = np.zeros(self.nz)
-        self.counts = np.zeros(self.nz+2)
-        self.z_hist = np.zeros(self.nz)
-
-    def addSpectrum(self, qso, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL):
-        lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
-
-        ci, zi, fi, ei, e2i = so.getStats(qso.wave[lya_ind], qso.flux[lya_ind], \
-            qso.error[lya_ind], redshift_edges)
-
-        self.z_hist += zi
-        self.total_flux += fi
-        self.total_error += ei
-        self.total_error2 += e2i
-        self.counts += ci
-
-    def getMeanFlux(self):
-        self.mean_flux = self.total_flux / self.counts[1:-1]
-        self.mean_error = self.total_error / self.counts[1:-1]
-        self.mean_error2 = np.sqrt(self.total_error2 / self.counts[1:-1])
-    
-    def saveHistograms(self, fname_base):
-        np.savetxt("%s-redshift_center.txt"%fname_base, self.redshifts)
-        np.savetxt("%s-pixel_hist_redshift.txt"%fname_base, self.z_hist)
-        np.savetxt("%s-mean_flux.txt"%fname_base, self.mean_flux)
-        np.savetxt("%s-mean_error.txt"%fname_base, self.mean_error)
-        np.savetxt("%s-mean_error2.txt"%fname_base, self.mean_error2)
 
 # -----------------------------------------------------
 # Mean flux ends
