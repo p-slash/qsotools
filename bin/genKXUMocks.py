@@ -84,6 +84,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
             obs_wave_centers=qso.wave)
     else:
         qso.maskOutliers()
+        qso.maskZScore()
         qso.applyMask()
         if args.mask_dlas:
             qso.applyMaskDLAs()
@@ -336,7 +337,7 @@ if __name__ == '__main__':
         print("RUNNING ON SQUAD/UVES.........")
 
         if isRealData:
-            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS)
+            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS_NODLA)
 
         us_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
