@@ -159,7 +159,8 @@ def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS):
 # -----------------------------------------------------
 BECKER13_parameters = 0.751, 2.90, -0.132, 3.5
 XQ100_FIT_PARAMS = 0.89964795, 2.2378516, -0.34311581
-UVES_FIT_PARAMS = 0.4496332, 4.55802838, 0.23162296
+UVES_FIT_PARAMS_WDLA = 0.4496332, 4.55802838, 0.23162296
+UVES_FIT_PARAMS_NODLA = 0.41846804, 5.06996177, 0.21479074
 
 def meanFluxFG08(z):
     tau = 0.001845 * np.power(1. + z, 3.924)
