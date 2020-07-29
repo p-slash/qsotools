@@ -57,6 +57,10 @@ class Spectrum:
         Signal to noise ratio of the entire spectrum as ave(1/error).
     s2n_lya : float
         Signal to noise ratio of the Lya forest. -1 if there is no Lya coverage for a given spectrum.
+    z_dlas : list, float
+        Redshift of DLAs. Needs to be set by hand. None as default
+    nhi_dlas : list, float
+        Column density of DLAs. Needs to be set by hand. None as default
 
     Methods
     -------
@@ -65,7 +69,7 @@ class Spectrum:
         Keeps good_pixels and updates the length the arrays.
 
     maskZScore(thres=3.5)
-        Mask pixels by their zscore, z=|x-mean|/std.
+        Mask pixels (flux and error) by their zscore, z=|x-mean|/std.
 
     getS2NLya(lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL)
         Computes the signal-to-noise in lyman alpha region as average(1/e)
@@ -86,6 +90,9 @@ class Spectrum:
         self.s2n = np.mean(1./error[self.mask])
         self.s2n_lya = self.getS2NLya()
 
+        self.z_dlas = None
+        self.nhi_dlas = None
+
     def applyMask(self, good_pixels=None):
         if good_pixels is None:
             good_pixels = self.mask
@@ -96,9 +103,22 @@ class Spectrum:
         self.mask  = np.ones_like(self.flux, dtype=np.bool)
 
         self.size = len(self.wave)
+    
+    def applyMaskDLAs(self, scale=1.0):
+        if self.z_dlas:
+            self.mask_dla = np.ones_like(self.wave, dtype=bool)
+
+            for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
+                lobs = (1+zd) * LYA_WAVELENGTH
+                wi = equivalentWidthDLA(10**nhi, zd)*scale
+                dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
+                self.mask_dla[dla_ind] = 0
+
+            self.applyMask(self.mask_dla)
 
     def maskZScore(self, thres=3.5):
         zsc_mask = np.abs(scipy_zscore(self.flux))<thres
+        zsc_mask = np.logical_and(zsc_mask, np.abs(scipy_zscore(self.error))<thres)
         self.mask = np.logical_and(zsc_mask, self.mask)
 
     def getS2NLya(self, lya_lower=LYA_FIRST_WVL, lya_upper=LYA_LAST_WVL):            
@@ -111,6 +131,12 @@ class Spectrum:
             return -1
         else:
             return np.mean(temp)
+
+    def saveAsBQ(self, fname):
+        tbq = BinaryQSO(fname, 'w')
+        tbq.save(self.wave, self.flux, self.error, self.size, self.z_qso, \
+            self.dec, self.ra, self.s2n, self.specres, self.dv)
+        tbq.close()
 
 class BinaryQSO:
     """
@@ -473,9 +499,6 @@ class KODIAQFits(Spectrum):
     #     good_pixels = np.logical_and(flux_within_5sigma, error_within_5sigma)
         
     #     self.mask = np.logical_and(good_pixels, self.mask)
-
-    def applyMaskDLAs(self):
-        pass
 
     # These are 3 sigma percentile given there are about 20m pixels in all quasars
     def maskOutliers(self, lower_perc_flux=-0.5014714665, higher_perc_flux=1.4976650673, \
@@ -882,9 +905,6 @@ class XQ100Fits(Spectrum):
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
-    def applyMaskDLAs(self):
-        pass
-
     def maskHardCut(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
         self.mask = np.logical_and(good_pixels, self.mask)
@@ -970,13 +990,6 @@ class SQUADFits(Spectrum):
         d = np.array(d)[0]
         z_qso = float(d["zem_Adopt"])
 
-        if d['DLAzabs']:
-            self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
-            self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
-        else:
-            self.z_dlas = None
-            self.nhi_dlas = None
-
         # seeing_med = np.around(d['Seeing'].split(",")[1], decimals=1)
         # seeing_med = 1.0 if np.isnan(seeing_med) else seeing_med
 
@@ -993,20 +1006,12 @@ class SQUADFits(Spectrum):
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
+        if d['DLAzabs']:
+            self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
+            self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
+
     def maskHardCut(self):
         pass
-
-    def applyMaskDLAs(self):
-        self.mask_dla = np.ones_like(self.wave, dtype=bool)
-        
-        if self.z_dlas:
-            for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
-                lobs = (1+zd) * LYA_WAVELENGTH
-                wi = equivalentWidthDLA(10**nhi, zd)
-                dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
-                self.mask_dla[dla_ind] = 0
-
-        self.applyMask(self.mask_dla)
 
     # These are 3 sigma percentile given there are about 54m pixels in all quasars
     def maskOutliers(self, lower_perc_flux=-0.9336882812, higher_perc_flux=2.4265680231, \
