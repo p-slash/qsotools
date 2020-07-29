@@ -84,6 +84,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
             obs_wave_centers=qso.wave)
     else:
         qso.maskOutliers()
+        qso.applyMask()
         qso.maskZScore()
         qso.applyMask()
         if args.mask_dlas:
