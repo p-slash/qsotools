@@ -64,6 +64,9 @@ class Spectrum:
         Remove masked values from wave, flux and error. 
         Keeps good_pixels and updates the length the arrays.
 
+    maskZScore(thres=3.5)
+        Mask pixels by their zscore, z=|x-mean|/std.
+
     getS2NLya(lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL)
         Computes the signal-to-noise in lyman alpha region as average(1/e)
 
