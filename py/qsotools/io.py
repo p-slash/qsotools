@@ -980,7 +980,7 @@ class SQUADFits(Spectrum):
 
     uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
 
-    def __init__(self, filename):
+    def __init__(self, filename, correctSeeing=True):
         with fitsio.FITS(filename) as usf:
             hdr0 = usf[0].read_header()
             data = usf[1].read()[0]
@@ -990,9 +990,19 @@ class SQUADFits(Spectrum):
         d = SQUADFits.uves_squad_csv[SQUADFits.uves_squad_csv["Name_Adopt"] == self.object]
         d = np.array(d)[0]
         z_qso = float(d["zem_Adopt"])
+        
+        slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
+        seeing_med = slit_width
 
-        # seeing_med = np.around(d['Seeing'].split(",")[1], decimals=1)
-        # seeing_med = 1.0 if np.isnan(seeing_med) else seeing_med
+        if d['Seeing']:
+            seeing_med = d['Seeing'].split(",")[1]
+            if seeing_med!='NA':
+                seeing_med = np.around(float(seeing_med), decimals=1)
+        
+        specres = hdr0['SPEC_RES']
+        if correctSeeing and seeing_med < slit_width:
+            specres *= slit_width/seeing_med
+        specres = int(np.around(specres, decimals=-2))
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
 
@@ -1002,7 +1012,7 @@ class SQUADFits(Spectrum):
         err_flux = data['ERR']
         # dv = d['Dispersion']
         dv = np.around(np.mean(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
-        specres = int(np.around(hdr0['SPEC_RES'], decimals=-2))
+        
 
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
