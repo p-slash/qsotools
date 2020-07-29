@@ -4,6 +4,7 @@ from os.path import exists as os_exists, join as ospath_join
 
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy.stats import zscore as scipy_zscore
 
 import fitsio
 
@@ -92,6 +93,10 @@ class Spectrum:
         self.mask  = np.ones_like(self.flux, dtype=np.bool)
 
         self.size = len(self.wave)
+
+    def maskZScore(self, thres=3.5):
+        zsc_mask = np.abs(scipy_zscore(self.flux))<thres
+        self.mask = np.logical_and(zsc_mask, self.mask)
 
     def getS2NLya(self, lya_lower=LYA_FIRST_WVL, lya_upper=LYA_LAST_WVL):            
         lyman_alpha_ind = np.logical_and(self.wave >= LYA_FIRST_WVL*(1+self.z_qso), \
