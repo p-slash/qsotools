@@ -107,8 +107,8 @@ class Spectrum:
     
     def setOutliersMask(self, sigma=3):
         sigma = np.abs(sigma)
-        high_perc = scipy_norm.cdf(sigma)
-        low_perc  = scipy_norm.cdf(-sigma)
+        high_perc = scipy_norm.cdf(sigma)*100
+        low_perc  = scipy_norm.cdf(-sigma)*100
 
         lp_flux, hp_flux = np.percentile(self.flux, [low_perc, high_perc])
         hp_error = np.percentile(self.error, high_perc)
@@ -1008,11 +1008,13 @@ class SQUADFits(Spectrum):
         
         slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
         seeing_med = slit_width
+        print("Slit width: ", slit_width)
 
         if d['Seeing']:
             tmp = d['Seeing'].split(",")[1]
             if tmp!='NA':
                 seeing_med = np.around(float(tmp), decimals=1)
+        print("Median seeing: ", seeing_med)
         
         specres = hdr0['SPEC_RES']
         if correctSeeing and seeing_med < slit_width:
@@ -1028,7 +1030,6 @@ class SQUADFits(Spectrum):
         # dv = d['Dispersion']
         dv = np.around(np.mean(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
         
-
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
