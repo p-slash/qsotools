@@ -4,7 +4,7 @@ from os.path import exists as os_exists, join as ospath_join
 
 import numpy as np
 from scipy.interpolate import interp1d
-from scipy.stats import zscore as scipy_zscore
+from scipy.stats import zscore as scipy_zscore, norm as scipy_norm
 
 import fitsio
 
@@ -105,6 +105,21 @@ class Spectrum:
 
         self.size = len(self.wave)
     
+    def maskOutliers(self, sigma=3):
+        sigma = np.abs(sigma)
+        high_perc = scipy_norm.cdf(sigma)
+        low_perc  = scipy_norm.cdf(-sigma)
+
+        lp_flux, hp_flux = np.percentile(self.flux, [low_perc, high_perc])
+        hp_error = np.percentile(self.error, high_perc)
+
+        flux_within_perc  = np.logical_and(self.flux > lp_flux, self.flux < hp_flux)
+        error_within_perc = self.error < hp_error
+
+        good_pixels = np.logical_and(flux_within_perc, error_within_perc)
+
+        self.mask = np.logical_and(good_pixels, self.mask)
+
     def applyMaskDLAs(self, scale=1.0):
         if self.z_dlas:
             self.mask_dla = np.ones_like(self.wave, dtype=bool)
@@ -486,8 +501,8 @@ class KODIAQFits(Spectrum):
         super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
             self.dv, c.ra.radian, c.dec.radian)
 
-    # def maskOutliers(self,   MEAN_FLUX   = 0.7113803432881693, SIGMA_FLUX  = 0.37433547084407937, \
-    #     MEAN_ERROR  = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT   = 5.):
+    # def maskOutliers(self, MEAN_FLUX = 0.7113803432881693, SIGMA_FLUX = 0.37433547084407937, \
+    #     MEAN_ERROR = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT = 5.):
 
     #     HIGHEST_ALLOWED_FLUX  = MEAN_FLUX  + SIGMA_CUT * SIGMA_FLUX
     #     HIGHEST_ALLOWED_ERROR = MEAN_ERROR + SIGMA_CUT * SIGMA_ERROR
@@ -502,7 +517,7 @@ class KODIAQFits(Spectrum):
     #     self.mask = np.logical_and(good_pixels, self.mask)
 
     # These are 3 sigma percentile given there are about 20m pixels in all quasars
-    def maskOutliers(self, lower_perc_flux=-0.5014714665, higher_perc_flux=1.4976650673, \
+    def maskOutliersGlobal(self, lower_perc_flux=-0.5014714665, higher_perc_flux=1.4976650673, \
         higher_perc_error=0.4795617122):
         flux_within_perc  = np.logical_and(self.flux > lower_perc_flux, \
             self.flux < higher_perc_flux)
@@ -911,7 +926,7 @@ class XQ100Fits(Spectrum):
         self.mask = np.logical_and(good_pixels, self.mask)
     
     # These are 3 sigma percentile given there are only 2.5m pixels in all quasars
-    def maskOutliers(self, lower_perc_flux=-0.5062193526, higher_perc_flux=1.4352282962, \
+    def maskOutliersGlobal(self, lower_perc_flux=-0.5062193526, higher_perc_flux=1.4352282962, \
         higher_perc_error=0.6368227610):
         flux_within_perc  = np.logical_and(self.flux > lower_perc_flux, \
             self.flux < higher_perc_flux)
@@ -1025,7 +1040,7 @@ class SQUADFits(Spectrum):
         pass
 
     # These are 3 sigma percentile given there are about 54m pixels in all quasars
-    def maskOutliers(self, lower_perc_flux=-0.9336882812, higher_perc_flux=2.4265680231, \
+    def maskOutliersGlobal(self, lower_perc_flux=-0.9336882812, higher_perc_flux=2.4265680231, \
         higher_perc_error=2.0480231349):
         flux_within_perc  = np.logical_and(self.flux > lower_perc_flux, \
             self.flux < higher_perc_flux)
