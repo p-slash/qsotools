@@ -105,7 +105,7 @@ class Spectrum:
 
         self.size = len(self.wave)
     
-    def maskOutliers(self, sigma=3):
+    def setOutliersMask(self, sigma=3):
         sigma = np.abs(sigma)
         high_perc = scipy_norm.cdf(sigma)
         low_perc  = scipy_norm.cdf(-sigma)
@@ -132,7 +132,7 @@ class Spectrum:
 
             self.applyMask(self.mask_dla)
 
-    def maskZScore(self, thres=3.5):
+    def setZScoreMask(self, thres=3.5):
         zsc_mask = np.abs(scipy_zscore(self.flux))<thres
         zsc_mask = np.logical_and(zsc_mask, np.abs(scipy_zscore(self.error))<thres)
         self.mask = np.logical_and(zsc_mask, self.mask)
@@ -377,7 +377,7 @@ class KODIAQFits(Spectrum):
     """
     Defining parameters and useful methods for a KODIAQ FITS file. 
     By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
-    update mask to filter spikes using maskOutliers method.
+    update mask to filter spikes using setOutliersMask method.
 
     Parameters
     ----------
@@ -445,7 +445,7 @@ class KODIAQFits(Spectrum):
         Remove masked values from wave, flux and error. 
         Keeps good_pixels and updates the length the arrays.
     
-    maskOutliers(MEAN_FLUX   = 0.7113803432881693, \
+    setOutliersMask(MEAN_FLUX   = 0.7113803432881693, \
                     SIGMA_FLUX  = 0.37433547084407937, \
                     MEAN_ERROR  = 0.09788299539216311, \
                     SIGMA_ERROR = 0.08333137595138172, \
@@ -453,7 +453,7 @@ class KODIAQFits(Spectrum):
         Mask pixels outside of a given sigma confidence level.
         Mainly use to remove spikes in the flux and error due to 
         continuum normalization near an echelle order edge.
-    maskHardFlux(low_flux=-0.5, high_flux=1.5)
+    setHardFluxMask(low_flux=-0.5, high_flux=1.5)
         Less sophisticated cut to constrain flux values between two numbers.
     
     getWaveChunkIndices(rest_frame_edges)
@@ -501,7 +501,7 @@ class KODIAQFits(Spectrum):
         super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
             self.dv, c.ra.radian, c.dec.radian)
 
-    # def maskOutliers(self, MEAN_FLUX = 0.7113803432881693, SIGMA_FLUX = 0.37433547084407937, \
+    # def setOutliersMask(self, MEAN_FLUX = 0.7113803432881693, SIGMA_FLUX = 0.37433547084407937, \
     #     MEAN_ERROR = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT = 5.):
 
     #     HIGHEST_ALLOWED_FLUX  = MEAN_FLUX  + SIGMA_CUT * SIGMA_FLUX
@@ -517,7 +517,7 @@ class KODIAQFits(Spectrum):
     #     self.mask = np.logical_and(good_pixels, self.mask)
 
     # These are 3 sigma percentile given there are about 20m pixels in all quasars
-    def maskOutliersGlobal(self, lower_perc_flux=-0.5014714665, higher_perc_flux=1.4976650673, \
+    def setGlobalOutliersMask(self, lower_perc_flux=-0.5014714665, higher_perc_flux=1.4976650673, \
         higher_perc_error=0.4795617122):
         flux_within_perc  = np.logical_and(self.flux > lower_perc_flux, \
             self.flux < higher_perc_flux)
@@ -527,7 +527,7 @@ class KODIAQFits(Spectrum):
         
         self.mask = np.logical_and(good_pixels, self.mask)
 
-    def maskHardFlux(self, low_flux=-0.5, high_flux=1.5):
+    def setHardFluxMask(self, low_flux=-0.5, high_flux=1.5):
         good_pixels = np.logical_and(self.flux > -0.5, self.flux < 1.5)
 
         self.mask = np.logical_and(good_pixels, self.mask)
@@ -688,7 +688,7 @@ class KODIAQ_OBS_Iterator:
         self.spectrum = KODIAQFits(self.kqso_iter.kodiaq_dir, \
             self.kqso_iter.qso_name, self.pi_date, self.spec_prefix, \
             self.kqso_iter.z_qso)
-        self.spectrum.maskOutliers()
+        self.spectrum.setOutliersMask()
 
         if self.kqso_iter.clean_pix:
             self.spectrum.applyMask()
@@ -824,7 +824,7 @@ def getKODIAQLyaMaxS2NObsList(KODIAQdir, asu_path=TABLE_KODIAQ_ASU):
 class XQ100Fits(Spectrum):
     """Reading class for XQ-100 FITS file. 
     By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
-    update mask to filter spikes using maskOutliers method.
+    update mask to filter spikes using setOutliersMask method.
 
     Parameters
     ----------
@@ -874,11 +874,11 @@ class XQ100Fits(Spectrum):
         Remove masked values from wave, flux and error. 
         Keeps good_pixels and updates the length the arrays.
     
-    maskOutliers(mean_flux=0.6556496616, std_flux=0.4257079242, mean_error=0.0474591657, \
+    setOutliersMask(mean_flux=0.6556496616, std_flux=0.4257079242, mean_error=0.0474591657, \
     std_error=0.0732692789, nsigma_cut=5.)
         Mask pixels outside of a given sigma confidence level.Mainly use to remove spikes in the \
         flux and error due to continuum normalization near an echelle order edge.
-    maskHardCut(self, r=-100, fc=-1e-15)
+    setHardCutMask(self, r=-100, fc=-1e-15)
         Cut from Irsic et al 2016. Keeps F>r and f>fc.
     
     """
@@ -921,12 +921,12 @@ class XQ100Fits(Spectrum):
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
-    def maskHardCut(self, r=-100, fc=-1e-15):
+    def setHardCutMask(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
         self.mask = np.logical_and(good_pixels, self.mask)
     
     # These are 3 sigma percentile given there are only 2.5m pixels in all quasars
-    def maskOutliersGlobal(self, lower_perc_flux=-0.5062193526, higher_perc_flux=1.4352282962, \
+    def setGlobalOutliersMask(self, lower_perc_flux=-0.5062193526, higher_perc_flux=1.4352282962, \
         higher_perc_error=0.6368227610):
         flux_within_perc  = np.logical_and(self.flux > lower_perc_flux, \
             self.flux < higher_perc_flux)
@@ -943,7 +943,7 @@ class XQ100Fits(Spectrum):
 class SQUADFits(Spectrum):
     """Reading class for SQUAD FITS file. 
     By default it keeps the full spectrum and sets up a mask where error > 0. You can additionally 
-    update mask to filter spikes using maskOutliers method.
+    update mask to filter spikes using setOutliersMask method.
 
     Parameters
     ----------
@@ -1036,11 +1036,11 @@ class SQUADFits(Spectrum):
             self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
             self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
 
-    def maskHardCut(self):
+    def setHardCutMask(self):
         pass
 
     # These are 3 sigma percentile given there are about 54m pixels in all quasars
-    def maskOutliersGlobal(self, lower_perc_flux=-0.9336882812, higher_perc_flux=2.4265680231, \
+    def setGlobalOutliersMask(self, lower_perc_flux=-0.9336882812, higher_perc_flux=2.4265680231, \
         higher_perc_error=2.0480231349):
         flux_within_perc  = np.logical_and(self.flux > lower_perc_flux, \
             self.flux < higher_perc_flux)
