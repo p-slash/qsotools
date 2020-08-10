@@ -1010,9 +1010,9 @@ class SQUADFits(Spectrum):
         seeing_med = slit_width
 
         if d['Seeing']:
-            seeing_med = d['Seeing'].split(",")[1]
-            if seeing_med!='NA':
-                seeing_med = np.around(float(seeing_med), decimals=1)
+            tmp = d['Seeing'].split(",")[1]
+            if tmp!='NA':
+                seeing_med = np.around(float(tmp), decimals=1)
         
         specres = hdr0['SPEC_RES']
         if correctSeeing and seeing_med < slit_width:
