@@ -83,10 +83,10 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
             spectrograph_resolution=low_spec_res, resample_dv=args.lowdv, \
             obs_wave_centers=qso.wave)
     else:
-        qso.maskOutliers()
+        qso.setOutliersMask()
         qso.applyMask()
         if args.mask_spikes_zscore:
-            qso.maskZScore()
+            qso.setZScoreMask()
             qso.applyMask()
         if args.mask_dlas:
             qso.applyMaskDLAs()
