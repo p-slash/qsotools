@@ -105,7 +105,7 @@ class Spectrum:
 
         self.size = len(self.wave)
     
-    def setOutliersMask(self, sigma=3):
+    def setOutliersMask(self, sigma=2.5):
         sigma = np.abs(sigma)
         high_perc = scipy_norm.cdf(sigma)*100
         low_perc  = scipy_norm.cdf(-sigma)*100
@@ -899,7 +899,7 @@ class XQ100Fits(Spectrum):
         i = XQ100Fits.xq100_list_fits.where("OBJECT == '%s'"%self.object)[0]
         d = XQ100Fits.xq100_list_fits[i]
         z_qso = d['Z_QSO']
-        seeing_ave = np.around((d['SEEING_MIN']+d['SEEING_MAX'])/2, decimals=1)
+        seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
         seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
@@ -1013,7 +1013,7 @@ class SQUADFits(Spectrum):
         if d['Seeing']:
             tmp = d['Seeing'].split(",")[1]
             if tmp!='NA':
-                seeing_med = np.around(float(tmp), decimals=1)
+                seeing_med = float(tmp)
         print("Median seeing: ", seeing_med)
         
         specres = hdr0['SPEC_RES']
