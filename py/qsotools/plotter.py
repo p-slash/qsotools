@@ -609,10 +609,10 @@ class FisherPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, bbox_inches='tight')
 
-    def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, nticks, tick_lbls, vmin=-1, vmax=1):
+    def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, nticks, tick_lbls, **kwargs):
         fig, ax = plt.subplots()
         extent = np.array([0, nticks, nticks, 0]) - 0.5
-        im = ax.imshow(data, cmap=cmap, vmin=vmin, vmax=vmax, origin='upper', extent=extent)
+        im = ax.imshow(data, cmap=cmap, origin='upper', extent=extent, **kwargs)
 
         cbar = fig.colorbar(im)
         cbar.set_label(cbarlbl, fontsize = 20)
@@ -636,7 +636,7 @@ class FisherPlotter(object):
         if outplot_fname:
             plt.savefig(outplot_fname, bbox_inches='tight')
 
-    def plotKBin(self, kb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic):
+    def plotKBin(self, kb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic, **kwargs):
         """Plot Fisher matrix for a given k bin, i.e. redshift correlations.
 
         Parameters
@@ -651,6 +651,7 @@ class FisherPlotter(object):
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
             Colormap to use for scale. Default is seismic.
+        kwargs: ** for imshow
         """
         Ftxt = "F"
         grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='z')
@@ -658,9 +659,9 @@ class FisherPlotter(object):
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
         
-        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, self.nz, self.zlabels)
+        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, self.nz, self.zlabels, **kwargs)
 
-    def plotZBin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic):
+    def plotZBin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic, **kwargs):
         """Plot Fisher matrix for a given z bin, i.e. k correlations.
 
         Parameters
@@ -682,9 +683,9 @@ class FisherPlotter(object):
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None)
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None, **kwargs)
 
-    def plotKCrossZbin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic):
+    def plotKCrossZbin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic, **kwargs):
         """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations cross z bins.
 
         Parameters
@@ -699,6 +700,7 @@ class FisherPlotter(object):
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
             Colormap to use for scale. Default is seismic.
+        kwargs: ** for imshow
         """
         Ftxt = "F"
         grid, cbarlbl, _ = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
@@ -710,7 +712,7 @@ class FisherPlotter(object):
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*next_z_bin:self.nk*(next_z_bin+1)]
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None)
+        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None, **kwargs)
 
 
 
