@@ -86,7 +86,7 @@ def divideIntoChunks(wave, flux, error, z_qso, restwave_chunk_edges):
 def chunkDynamic(wave, flux, error, no_forest_pixels):
     no_pixels = len(wave)
             
-    if no_pixels > 0.5*no_forest_pixels:
+    if no_pixels > 0.66*no_forest_pixels:
         nchunks = 3
     elif no_pixels > 0.33*no_forest_pixels:
         nchunks = 2
@@ -97,7 +97,7 @@ def chunkDynamic(wave, flux, error, no_forest_pixels):
     flux  = np.array_split(flux,  nchunks)
     error = np.array_split(error, nchunks)
 
-    return wave, flux, error, nchunks
+    return wave, flux, error
 
 def getStats(wave, flux, error, z_edges):
     z = wave / LYA_WAVELENGTH - 1.
