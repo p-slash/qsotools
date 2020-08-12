@@ -1032,7 +1032,8 @@ class SQUADFits(Spectrum):
         dv = np.around(np.mean(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
         
         if corrError:
-            chi_sq_clip = scipy_median_filter(data['CHACLIP']/data['NPACLIP'], size=5, mode='reflect')
+            chi_sq_clip = data['CHACLIP']/(data['NPACLIP']-1+1e-8)
+            chi_sq_clip = scipy_median_filter(chi_sq_clip, size=5, mode='reflect')
             chi_sq_clip[chi_sq_clip<1] = 1
             err_flux *= np.sqrt(chi_sq_clip)
            
