@@ -64,7 +64,7 @@ def saveListByLine(array, fname):
 # ------------------------------
 
 def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
-    isRealData, mean_flux_hist, args):
+    isRealData, mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
     print("Ly-alpha forest central redshift is ", z_center)
@@ -128,15 +128,29 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
         errors /= true_mean_flux
 
     # Skip short spectrum
-    if (args.skip and len(wave) < MAX_NO_PIXELS * args.skip) or len(wave)==0:
+    isShort = lambda x: (args.skip and len(x) < MAX_NO_PIXELS * args.skip) or len(x)==0
+    if isShort(wave):
         raise ValueError("Short spectrum", len(wave), MAX_NO_PIXELS)
+
+    specres_list.add((low_spec_res, pixel_width))
+    print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
+    print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
+
+    if not disableChunk and args.chunk_dyn:
+        wave, fluxes, errors = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
+    elif not disableChunk and args.chunk_fixed:
+        NUMBER_OF_CHUNKS = 3
+        FIXED_CHUNK_EDGES = np.linspace(forest_1, forest_2, num=NUMBER_OF_CHUNKS+1)
+        wave, fluxes, errors = so.divideIntoChunks(wave, fluxes[0], errors[0], \
+            qso.z_qso, FIXED_CHUNK_EDGES)
     else:
-        specres_list.add((low_spec_res, pixel_width))
-        print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
-        print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
+        wave = [wave]
 
-        return wave, fluxes, errors, low_spec_res, pixel_width, MAX_NO_PIXELS
+    wave   = [x for x in wave   if not isShort(x)]
+    fluxes = [x for x in fluxes if not isShort(x)]
+    errors = [x for x in errors if not isShort(x)]
 
+    return wave, fluxes, errors, low_spec_res, pixel_width, MAX_NO_PIXELS
 
 if __name__ == '__main__':
     # Arguments passed to run the script
@@ -152,15 +166,18 @@ if __name__ == '__main__':
 
     parser.add_argument("--save_full_flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
-    
+
+    parser.add_argument("--chunk-dyn",  action="store_true", \
+        help="Splits spectrum into three chunks if n>2N/3 or into two chunks if n>N/3.")
+    parser.add_argument("--chunk-fixed",  action="store_true", \
+        help="Splits spectrum into 3 chunks at fixed rest frame wavelengths")
+
+    parser.add_argument("--skip", help="Skip short chunks lower than given ratio", type=float)
+
+    parser.add_argument("--noerrors", help="Generate error free mocks", action="store_true")
     parser.add_argument("--observed-errors", help=("Add exact KODIAQ/XQ-100 errors onto final grid. "\
         "Beware of resampling."), action="store_true")
 
-    parser.add_argument("--chunk-dyn",  action="store_true", \
-        help="Dynamic chunking splits a spectrum into three chunks if l>L/2 or into two chunks if l>L/3.")
-    parser.add_argument("--noerrors", help="Generate error free mocks", action="store_true")
-
-    parser.add_argument("--skip", help="Skip short chunks lower than given ratio", type=float)
     parser.add_argument("--gauss", help="Generate Gaussian mocks", action="store_true")
     parser.add_argument("--without_z_evo", help="Turn of redshift evolution", action="store_true")
     parser.add_argument("--lowdv", help="Resamples grid to this pixel size (km/s) when passed", \
@@ -272,16 +289,10 @@ if __name__ == '__main__':
                 print(ve.args)
                 continue
             
-            if args.chunk_dyn:
-                wave, fluxes, errors, nchunks = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
-
-                temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
-                    max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
-                    for nc in range(nchunks)]
-            else:
-                wave  = [wave]
-                temp_fname = ["%s_%s_%s_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
-                    max_obs_spectrum.spec_prefix, wave[0][0], wave[0][-1], settings_txt)]
+            nchunks = len(wave)
+            temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
+                max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
+                for nc in range(nchunks)]
                 
             filename_list.extend(temp_fname) 
 
@@ -317,13 +328,12 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
                     forest_2, final_error, mean_flux_function, specres_list, \
-                    isRealData, xq_mf_hist, args)
+                    isRealData, xq_mf_hist, args, disableChunk=True)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
                 continue
             
-            wave  = [wave]
             temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
                 wave[0][0], wave[0][-1], settings_txt)]
                 
@@ -365,15 +375,10 @@ if __name__ == '__main__':
                 print(ve.args)
                 continue
             
-            if args.chunk_dyn:
-                wave, fluxes, errors, nchunks = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
-
-                temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
-                    wave[0][0], wave[0][-1], settings_txt) for nc in range(nchunks)]
-            else:
-                wave  = [wave]
-                temp_fname = ["us%s_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), \
-                    wave[0][0], wave[0][-1], settings_txt)]
+            nchunks = len(wave)
+            temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
+                max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
+                for nc in range(nchunks)]
                 
             filename_list.extend(temp_fname) 
 
