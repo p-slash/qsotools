@@ -5,6 +5,7 @@ from os.path import exists as os_exists, join as ospath_join
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy.stats import zscore as scipy_zscore, norm as scipy_norm
+from scipy.ndimage import median_filter as scipy_median_filter
 
 import fitsio
 
@@ -995,7 +996,7 @@ class SQUADFits(Spectrum):
 
     uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
 
-    def __init__(self, filename, correctSeeing=True):
+    def __init__(self, filename, correctSeeing=True, corrError=True):
         with fitsio.FITS(filename) as usf:
             hdr0 = usf[0].read_header()
             data = usf[1].read()[0]
@@ -1030,6 +1031,11 @@ class SQUADFits(Spectrum):
         # dv = d['Dispersion']
         dv = np.around(np.mean(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
         
+        if corrError:
+            chi_sq_clip = scipy_median_filter(data['CHACLIP']/data['NPACLIP'], size=5, mode='reflect')
+            chi_sq_clip[chi_sq_clip<1] = 1
+            err_flux *= np.sqrt(chi_sq_clip)
+           
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
