@@ -20,7 +20,7 @@ from pkg_resources import resource_filename
 TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
 TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
-TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.dat')
+TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
 TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
 
 class Spectrum:
@@ -888,6 +888,7 @@ class XQ100Fits(Spectrum):
     specres_interp_vis = interp1d([0.4, 0.7, 0.9], [18400, 11400, 8900], \
         bounds_error=False, fill_value=(18400, 8900))
     xq100_list_fits = fitsio.FITS(TABLE_XQ100_SUM)[1]
+    xq100_dla_csv = ascii.read(TABLE_XQ100_DLA, fill_values="")
 
     def __init__(self, filename, correctSeeing=True):
         with fitsio.FITS(filename) as xqf:
@@ -921,6 +922,13 @@ class XQ100Fits(Spectrum):
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
+        
+        d = XQ100Fits.xq100_dla_csv[XQ100Fits.xq100_dla_csv["QSO"] == self.object]
+        d = np.array(d)[0]
+
+        if d['zabs']!='nan':
+            self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
+            self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
 
     def setHardCutMask(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
