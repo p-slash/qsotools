@@ -83,10 +83,10 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
             spectrograph_resolution=low_spec_res, resample_dv=args.lowdv, \
             obs_wave_centers=qso.wave)
     else:
-        qso.setOutliersMask()
+        qso.setOutliersMask(sigma=2.5)
         qso.applyMask()
         if args.mask_spikes_zscore:
-            qso.setZScoreMask()
+            qso.setZScoreMask(args.mask_spikes_zscore)
             qso.applyMask()
         if args.mask_dlas:
             qso.applyMaskDLAs()
@@ -166,7 +166,7 @@ if __name__ == '__main__':
     parser.add_argument("--lowdv", help="Resamples grid to this pixel size (km/s) when passed", \
         type=float)
     parser.add_argument("--mask-dlas", action="store_true")
-    parser.add_argument("--mask-spikes-zscore", help="Mask spikes by zscore>3.5", action="store_true")
+    parser.add_argument("--mask-spikes-zscore", help="Mask spikes by given zscore.", type=float)
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
     parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
@@ -306,7 +306,7 @@ if __name__ == '__main__':
 
         for f in glob.glob(ospath_join(args.XQ100Dir, "*.fits")):
             print("********************************************", flush=True)
-            qso = XQ100Fits(f)
+            qso = XQ100Fits(f, correctSeeing=True)
             qso.getS2NLya(forest_1, forest_2)
 
             if qso.s2n_lya == -1:
@@ -349,7 +349,7 @@ if __name__ == '__main__':
 
         for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
             print("********************************************", flush=True)
-            qso = SQUADFits(f)
+            qso = SQUADFits(f, correctSeeing=True, corrError=True)
             qso.getS2NLya(forest_1, forest_2)
 
             if qso.s2n_lya == -1:
