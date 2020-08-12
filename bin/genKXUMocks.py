@@ -150,7 +150,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
     fluxes = [x for x in fluxes if not isShort(x)]
     errors = [x for x in errors if not isShort(x)]
 
-    return wave, fluxes, errors, low_spec_res, pixel_width, MAX_NO_PIXELS
+    return wave, fluxes, errors, low_spec_res, pixel_width
 
 if __name__ == '__main__':
     # Arguments passed to run the script
@@ -281,7 +281,7 @@ if __name__ == '__main__':
                 continue
 
             try:
-                wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(max_obs_spectrum, \
+                wave, fluxes, errors, lspecr, pixw = genMocks(max_obs_spectrum, \
                     forest_1, forest_2, final_error, mean_flux_function, specres_list, \
                     isRealData, kod_mf_hist, args)
             except ValueError as ve:
@@ -326,7 +326,7 @@ if __name__ == '__main__':
                 continue
 
             try:
-                wave, fluxes, errors, lspecr, pixw, _ = genMocks(qso, forest_1, \
+                wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, \
                     forest_2, final_error, mean_flux_function, specres_list, \
                     isRealData, xq_mf_hist, args, disableChunk=True)
             except ValueError as ve:
@@ -368,7 +368,7 @@ if __name__ == '__main__':
                 continue
 
             try:
-                wave, fluxes, errors, lspecr, pixw, MAX_NO_PIXELS = genMocks(qso, forest_1, forest_2, \
+                wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, forest_2, \
                     final_error, mean_flux_function, specres_list, isRealData, us_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
@@ -376,9 +376,8 @@ if __name__ == '__main__':
                 continue
             
             nchunks = len(wave)
-            temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
-                max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
-                for nc in range(nchunks)]
+            temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
+                    wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
                 
             filename_list.extend(temp_fname) 
 
