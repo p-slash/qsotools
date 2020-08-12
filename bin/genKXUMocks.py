@@ -159,7 +159,6 @@ if __name__ == '__main__':
     parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
 
     parser.add_argument("--KODIAQdir", help="Directory of KODIAQ")
-    parser.add_argument("--asu-path", help="Table containing KODIAQ qso list.", default=TABLE_KODIAQ_ASU)
     
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
     parser.add_argument("--UVESSQUADDir", help="Directory of SQUAD/UVES")
@@ -254,7 +253,7 @@ if __name__ == '__main__':
     # Start with KODIAQ
     if args.KODIAQdir:
         print("RUNNING ON KODIAQ.........")
-        qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, args.asu_path, clean_pix=False)
+        qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, clean_pix=False)
 
         if isRealData:
             mean_flux_function = fid.meanFluxFG08
