@@ -602,7 +602,7 @@ class KODIAQ_QSO_Iterator:
 
         self.readme_table = ascii.read(ospath_join(self.qso_dir, "README.tbl"))
 
-    def __init__(self, kodiaq_dir, asu_path, clean_pix=True):
+    def __init__(self, kodiaq_dir, asu_path=TABLE_KODIAQ_ASU, clean_pix=True):
         self.kodiaq_dir = kodiaq_dir
         self.clean_pix  = clean_pix
         self.asu_table  = ascii.read(asu_path, data_start=3)
@@ -923,12 +923,12 @@ class XQ100Fits(Spectrum):
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
         
-        d = XQ100Fits.xq100_dla_csv[XQ100Fits.xq100_dla_csv["QSO"] == self.object]
-        d = np.array(d)[0]
+        # d = XQ100Fits.xq100_dla_csv[XQ100Fits.xq100_dla_csv["QSO"] == self.object]
+        # d = np.array(d)[0]
 
-        if d['zabs']!='nan':
-            self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
-            self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
+        # if d['zabs']!='nan':
+        #     self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
+        #     self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
 
     def setHardCutMask(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
