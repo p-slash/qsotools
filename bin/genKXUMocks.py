@@ -63,6 +63,18 @@ def saveListByLine(array, fname):
     toWrite.close()
 # ------------------------------
 
+def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
+    if args.without_z_evo:
+        spectrum_z = z_center * np.ones_like(wave)
+    else:
+        spectrum_z = np.array(wave, dtype=np.double)  / fid.LYA_WAVELENGTH - 1
+
+    if not args.save_full_flux:
+        true_mean_flux = mean_flux_function(spectrum_z)
+
+        fluxes  = fluxes / true_mean_flux - 1
+        errors /= true_mean_flux
+
 def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
     isRealData, mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
@@ -84,12 +96,11 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
             obs_wave_centers=qso.wave)
     else:
         qso.setOutliersMask(sigma=2.5)
-        qso.applyMask()
         if args.mask_spikes_zscore:
             qso.setZScoreMask(args.mask_spikes_zscore)
-            qso.applyMask()
+        qso.applyMask(removePixels=args.remove_masked_pix)
         if args.mask_dlas:
-            qso.applyMaskDLAs()
+            qso.applyMaskDLAs(removePixels=args.remove_masked_pix)
 
         if args.compute_mean_flux:
             mean_flux_hist.addSpectrum(qso, f1, f2)
@@ -116,16 +127,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
     fluxes = np.array([f[lyman_alpha_ind] for f in fluxes])
     errors = np.array([e[lyman_alpha_ind] for e in errors])
 
-    if args.without_z_evo:
-        spectrum_z = z_center * np.ones_like(wave)
-    else:
-        spectrum_z = np.array(wave, dtype=np.double)  / fid.LYA_WAVELENGTH - 1
-
-    if not args.save_full_flux:
-        true_mean_flux = mean_flux_function(spectrum_z)
-
-        fluxes  = fluxes / true_mean_flux - 1
-        errors /= true_mean_flux
+    convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args)
 
     # Skip short spectrum
     isShort = lambda x: (args.skip and len(x) < MAX_NO_PIXELS * args.skip) or len(x)==0
@@ -183,6 +185,7 @@ if __name__ == '__main__':
         type=float)
     parser.add_argument("--mask-dlas", action="store_true")
     parser.add_argument("--mask-spikes-zscore", help="Mask spikes by given zscore.", type=float)
+    parser.add_argument("--remove-masked-pix", help="Or just assign large errors.", action="store_true")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
     parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
