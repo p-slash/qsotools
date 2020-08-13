@@ -75,6 +75,8 @@ def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
         fluxes  = fluxes / true_mean_flux - 1
         errors /= true_mean_flux
 
+    return fluxes, errors
+
 def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
     isRealData, mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
@@ -127,7 +129,7 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
     fluxes = np.array([f[lyman_alpha_ind] for f in fluxes])
     errors = np.array([e[lyman_alpha_ind] for e in errors])
 
-    convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args)
+    fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args)
 
     # Skip short spectrum
     isShort = lambda x: (args.skip and len(x) < MAX_NO_PIXELS * args.skip) or len(x)==0
