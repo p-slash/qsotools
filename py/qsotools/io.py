@@ -95,16 +95,20 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
 
-    def applyMask(self, good_pixels=None):
+    def applyMask(self, good_pixels=None, removePixels=True):
         if good_pixels is None:
             good_pixels = self.mask
 
-        self.wave  = self.wave[good_pixels]
-        self.flux  = self.flux[good_pixels]
-        self.error = self.error[good_pixels]
-        self.mask  = np.ones_like(self.flux, dtype=np.bool)
+        if removePixels:
+            self.wave  = self.wave[good_pixels]
+            self.flux  = self.flux[good_pixels]
+            self.error = self.error[good_pixels]
+            self.mask  = np.ones_like(self.flux, dtype=np.bool)
 
-        self.size = len(self.wave)
+            self.size = len(self.wave)
+        else:
+            self.flux[~good_pixels]  = 0
+            self.error[~good_pixels] = 1e10
     
     def setOutliersMask(self, sigma=2.5):
         sigma = np.abs(sigma)
@@ -121,7 +125,7 @@ class Spectrum:
 
         self.mask = np.logical_and(good_pixels, self.mask)
 
-    def applyMaskDLAs(self, scale=1.0):
+    def applyMaskDLAs(self, scale=1.0, removePixels=True):
         if self.z_dlas:
             self.mask_dla = np.ones_like(self.wave, dtype=bool)
 
@@ -131,7 +135,7 @@ class Spectrum:
                 dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
                 self.mask_dla[dla_ind] = 0
 
-            self.applyMask(self.mask_dla)
+            self.applyMask(self.mask_dla, removePixels)
 
     def setZScoreMask(self, thres=3.5):
         zsc_mask = np.abs(scipy_zscore(self.flux))<thres
