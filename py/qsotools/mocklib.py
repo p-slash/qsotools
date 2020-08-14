@@ -328,6 +328,34 @@ class LyaMocks():
     def generateGaussianNoise(self, std_err, arr):
         return self.RNST.normal(loc=0, scale=std_err, size=arr.shape)
 
+    def qsoMock(self, qso, spectrograph_resolution=None, const_error=None):
+        wave = fid.LYA_WAVELENGTH * (1. + self.z_values)
+
+        self.generateMocks(spectrograph_resolution=spectrograph_resolution)
+        qso.error = qso.error.reshape(1, qso.error.size)
+        
+        # Resample everything back to observed grid 
+        # Create wavelength edges for logarithmicly spaced array from obs_wave_centers
+        obs_wave_edges = specops.createEdgesFromCenters(qso.wave)
+        wave, qso.flux = specops.resample(wave, self.delta_F, None, obs_wave_edges)
+        obs_wave_edges = specops.createEdgesFromCenters(wave)
+        qso.wave, qso.error = specops.resample(qso.wave, qso.error, None, obs_wave_edges)
+        qso.size = len(qso.wave)
+
+        if const_error:
+            qso.error = const_error * np.ones_like(qso.flux)
+
+        qso.flux += self.generateGaussianNoise(qso.error, qso.flux)
+        
+        # Break if observed grid does not include the wavelength range
+        if qso.size == 0:
+            raise ValueError("Empty grid")
+        
+        qso.flux = qso.flux.ravel()
+        qso.error = qso.error.ravel()
+
+        return qso
+
     def resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
         resample_dv=None, obs_wave_centers=None, delta_z=None):
         wave   = fid.LYA_WAVELENGTH * (1. + self.z_values)
