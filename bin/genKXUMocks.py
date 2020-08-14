@@ -86,48 +86,43 @@ def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
     pixel_width  = args.lowdv if args.lowdv else qso.dv
     low_spec_res = qso.specres
     MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / pixel_width)
+    
+    print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
 
-    print("Spectral Res: from %d to %d." % (qso.specres, low_spec_res))
-    print("Pixel width: from %.2f to %.2f km/s" %(qso.dv, pixel_width))
+    qso.setOutliersMask(sigma=2.5)
+    if args.mask_spikes_zscore:
+        qso.setZScoreMask(args.mask_spikes_zscore)
+    
+    # This sets err=1e10 and flux=0
+    qso.applyMask(removePixels=False)
 
     if not isRealData:
         lya_m.setCentralRedshift(z_center)
+        if args.const_resolution:
+            low_spec_res = args.const_resolution
 
-        wave, fluxes, errors = lya_m.resampledMocks(1, err_per_final_pixel=final_error, \
-            spectrograph_resolution=low_spec_res, resample_dv=args.lowdv, \
-            obs_wave_centers=qso.wave)
+        qso = lya_m.qsoMock(qso, low_spec_res, args.const_error)
+
+    print("Spectral Res: from %d to %d." % (qso.specres, low_spec_res))
+    print("Pixel width: from %.2f to %.2f km/s" %(qso.dv, pixel_width))
+    
+    qso.applyMask(good_pixels=qso.error<1e6, removePixels=not args.keep_masked_pix)
+    if args.mask_dlas:
+        qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
+
+    if args.compute_mean_flux:
+        mean_flux_hist.addSpectrum(qso, f1, f2)
+
+    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
+
+    # Re-sample real data onto lower resolution grid
+    if args.lowdv:
+        wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
+            qso.error.reshape(1,qso.size), pixel_width)
+        print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
+            %(pixel_width, len(wave)))
     else:
-        qso.setOutliersMask(sigma=2.5)
-        if args.mask_spikes_zscore:
-            qso.setZScoreMask(args.mask_spikes_zscore)
-        qso.applyMask(removePixels=args.remove_masked_pix)
-        if args.mask_dlas:
-            qso.applyMaskDLAs(removePixels=args.remove_masked_pix)
-
-        if args.compute_mean_flux:
-            mean_flux_hist.addSpectrum(qso, f1, f2)
-
-        print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
-        
-        # Re-sample real data onto lower resolution grid
-        if args.lowdv:
-            wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
-                qso.error.reshape(1,qso.size), pixel_width)
-            print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
-                %(pixel_width, len(wave)))
-        else:
-            wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
-
-    # Cut Lyman-alpha forest region
-    lyman_alpha_ind = np.logical_and(wave >= f1 * (1+qso.z_qso), wave <= f2 * (1+qso.z_qso))
-    # Cut analysis boundaries
-    forest_boundary = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
-        wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
-    lyman_alpha_ind = np.logical_and(lyman_alpha_ind, forest_boundary)
-
-    wave   = wave[lyman_alpha_ind]
-    fluxes = np.array([f[lyman_alpha_ind] for f in fluxes])
-    errors = np.array([e[lyman_alpha_ind] for e in errors])
+        wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
 
     fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args)
 
@@ -177,7 +172,10 @@ if __name__ == '__main__':
 
     parser.add_argument("--skip", help="Skip short chunks lower than given ratio", type=float)
 
-    parser.add_argument("--noerrors", help="Generate error free mocks", action="store_true")
+    parser.add_argument("--const-resolution", type=int, \
+        help="Use this resolution for mocks when passed instead.")
+    parser.add_argument("--const-error", type=float, \
+        help="Use this constant error for mocks when passed instead.")
     parser.add_argument("--observed-errors", help=("Add exact KODIAQ/XQ-100 errors onto final grid. "\
         "Beware of resampling."), action="store_true")
 
@@ -187,7 +185,7 @@ if __name__ == '__main__':
         type=float)
     parser.add_argument("--mask-dlas", action="store_true")
     parser.add_argument("--mask-spikes-zscore", help="Mask spikes by given zscore.", type=float)
-    parser.add_argument("--remove-masked-pix", help="Or just assign large errors.", action="store_true")
+    parser.add_argument("--keep-masked-pix", help="Assign large errors.", action="store_true")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
     parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
@@ -265,9 +263,6 @@ if __name__ == '__main__':
 
         kod_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
-        # Decide error on final pixels
-        final_error = 0 if args.noerrors or args.observed_errors else 0.1
-
         # Start iterating quasars in KODIAQ sample
         # Each quasar has multiple observations
         # Pick the one with highest signal to noise in Ly-alpha region
@@ -286,7 +281,7 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(max_obs_spectrum, \
-                    forest_1, forest_2, final_error, mean_flux_function, specres_list, \
+                    forest_1, forest_2, mean_flux_function, specres_list, \
                     isRealData, kod_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
@@ -316,9 +311,6 @@ if __name__ == '__main__':
 
         xq_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
-        # Decide error on final pixels
-        final_error = 0 if args.noerrors or args.observed_errors else 0.05
-
         for f in glob.glob(ospath_join(args.XQ100Dir, "*.fits")):
             print("********************************************", flush=True)
             qso = XQ100Fits(f, correctSeeing=True)
@@ -331,7 +323,7 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, \
-                    forest_2, final_error, mean_flux_function, specres_list, \
+                    forest_2, mean_flux_function, specres_list, \
                     isRealData, xq_mf_hist, args, disableChunk=True)
             except ValueError as ve:
                 # print(ve)
@@ -358,9 +350,6 @@ if __name__ == '__main__':
 
         us_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
-        # Decide error on final pixels
-        final_error = 0 if args.noerrors or args.observed_errors else 0.1
-
         for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
             print("********************************************", flush=True)
             qso = SQUADFits(f, correctSeeing=True, corrError=True)
@@ -373,7 +362,7 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, forest_2, \
-                    final_error, mean_flux_function, specres_list, isRealData, us_mf_hist, args)
+                    mean_flux_function, specres_list, isRealData, us_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
