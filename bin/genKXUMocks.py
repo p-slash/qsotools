@@ -360,6 +360,11 @@ if __name__ == '__main__':
                 no_lya_quasar_list.append(f)
                 continue
 
+            if qso.flag != 0:
+                print("SKIP: Spec. status is not 0.")
+                no_lya_quasar_list.append(f)
+                continue
+                
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, forest_2, \
                     mean_flux_function, specres_list, isRealData, us_mf_hist, args)

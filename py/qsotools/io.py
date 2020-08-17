@@ -1033,6 +1033,7 @@ class SQUADFits(Spectrum):
         d = SQUADFits.uves_squad_csv[SQUADFits.uves_squad_csv["Name_Adopt"] == self.object]
         d = np.array(d)[0]
         z_qso = float(d["zem_Adopt"])
+        self.flag = int(d["Spec_status"])
         
         slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
         seeing_med = slit_width
