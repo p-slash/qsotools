@@ -77,7 +77,7 @@ def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
 
     return fluxes, errors
 
-def genMocks(qso, f1, f2, final_error, mean_flux_function, specres_list, \
+def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     isRealData, mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
