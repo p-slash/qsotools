@@ -992,6 +992,8 @@ class SQUADFits(Spectrum):
         Good pixels on full spectrum.
     size : int
         Length of these arrays.
+    flag: str
+        Should be "0" for good spectrum.
     
     z_qso : float
         Emission redshift of the quasar.
@@ -1023,7 +1025,7 @@ class SQUADFits(Spectrum):
 
     uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
 
-    def _seeingCorrection(self, d, correctSeeing):
+    def _seeingCorrection(d, correctSeeing):
         slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
         seeing_med = slit_width
         print("Slit width: ", slit_width)
@@ -1039,7 +1041,7 @@ class SQUADFits(Spectrum):
         else:
             return 1
 
-    def _lowFluxErrorCorrection(self, data, corrError, filter_size=5):
+    def _lowFluxErrorCorrection(data, corrError, filter_size=5):
         if corrError:
             chi_sq_clip = data['CHACLIP']/(data['NPACLIP']-1+1e-8)
             chi_sq_clip = scipy_median_filter(chi_sq_clip, size=filter_size, mode='reflect')
@@ -1058,9 +1060,9 @@ class SQUADFits(Spectrum):
         d = SQUADFits.uves_squad_csv[SQUADFits.uves_squad_csv["Name_Adopt"] == self.object]
         d = np.array(d)[0]
         z_qso = float(d["zem_Adopt"])
-        self.flag = int(d["Spec_status"])
+        self.flag = str(d["Spec_status"])
         
-        specres = hdr0['SPEC_RES'] * self._seeingCorrection(d, correctSeeing)
+        specres = hdr0['SPEC_RES'] * _seeingCorrection(d, correctSeeing)
         specres = int(np.around(specres, decimals=-2))
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
@@ -1068,7 +1070,7 @@ class SQUADFits(Spectrum):
         wave = data['WAVE']
         flux = data['FLUX']
         self.cont = data['CONTINUUM']
-        err_flux = data['ERR'] * self._lowFluxErrorCorrection(data, corrError)
+        err_flux = data['ERR'] * _lowFluxErrorCorrection(data, corrError)
         # dv = d['Dispersion']
         dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
                    
