@@ -342,6 +342,8 @@ if __name__ == '__main__':
             xq_mf_hist.getMeanFlux()
             xq_mf_hist.saveHistograms(ospath_join(args.OutputDir, "xq-stats%s"%settings_txt))
 
+    # ------------------------------
+    # UVES/SQUAD
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
 
@@ -360,7 +362,7 @@ if __name__ == '__main__':
                 no_lya_quasar_list.append(f)
                 continue
 
-            if qso.flag != 0:
+            if qso.flag != '0':
                 print("SKIP: Spec. status is not 0.")
                 no_lya_quasar_list.append(f)
                 continue
