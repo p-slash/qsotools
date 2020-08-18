@@ -1023,6 +1023,31 @@ class SQUADFits(Spectrum):
 
     uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
 
+    def _seeingCorrection(self, d, correctSeeing):
+        slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
+        seeing_med = slit_width
+        print("Slit width: ", slit_width)
+
+        if d['Seeing']:
+            tmp = d['Seeing'].split(",")[1]
+            if tmp!='NA':
+                seeing_med = float(tmp)
+        print("Median seeing: ", seeing_med)
+        
+        if correctSeeing and seeing_med < slit_width:
+            return slit_width/seeing_med
+        else:
+            return 1
+
+    def _lowFluxErrorCorrection(self, data, corrError, filter_size=5):
+        if corrError:
+            chi_sq_clip = data['CHACLIP']/(data['NPACLIP']-1+1e-8)
+            chi_sq_clip = scipy_median_filter(chi_sq_clip, size=filter_size, mode='reflect')
+            chi_sq_clip[chi_sq_clip<1] = 1
+            return np.sqrt(chi_sq_clip)
+        else:
+            return 1
+
     def __init__(self, filename, correctSeeing=True, corrError=True):
         with fitsio.FITS(filename) as usf:
             hdr0 = usf[0].read_header()
@@ -1035,19 +1060,7 @@ class SQUADFits(Spectrum):
         z_qso = float(d["zem_Adopt"])
         self.flag = int(d["Spec_status"])
         
-        slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
-        seeing_med = slit_width
-        print("Slit width: ", slit_width)
-
-        if d['Seeing']:
-            tmp = d['Seeing'].split(",")[1]
-            if tmp!='NA':
-                seeing_med = float(tmp)
-        print("Median seeing: ", seeing_med)
-        
-        specres = hdr0['SPEC_RES']
-        if correctSeeing and seeing_med < slit_width:
-            specres *= slit_width/seeing_med
+        specres = hdr0['SPEC_RES'] * self._seeingCorrection(d, correctSeeing)
         specres = int(np.around(specres, decimals=-2))
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
@@ -1055,16 +1068,10 @@ class SQUADFits(Spectrum):
         wave = data['WAVE']
         flux = data['FLUX']
         self.cont = data['CONTINUUM']
-        err_flux = data['ERR']
+        err_flux = data['ERR'] * self._lowFluxErrorCorrection(data, corrError)
         # dv = d['Dispersion']
-        dv = np.around(np.mean(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
-        
-        if corrError:
-            chi_sq_clip = data['CHACLIP']/(data['NPACLIP']-1+1e-8)
-            chi_sq_clip = scipy_median_filter(chi_sq_clip, size=5, mode='reflect')
-            chi_sq_clip[chi_sq_clip<1] = 1
-            err_flux *= np.sqrt(chi_sq_clip)
-           
+        dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
+                   
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
 
