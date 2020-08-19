@@ -100,8 +100,8 @@ class Spectrum:
         lyman_alpha_ind = np.logical_and(self.wave >= f1 * (1+self.z_qso), \
             self.wave <= f2 * (1+self.z_qso))
         # Cut analysis boundaries
-        forest_boundary = np.logical_and(self.wave >= fid.LYA_WAVELENGTH*(1+zmin), \
-            self.wave <= fid.LYA_WAVELENGTH*(1+zmax))
+        forest_boundary = np.logical_and(self.wave >= LYA_WAVELENGTH*(1+zmin), \
+            self.wave <= LYA_WAVELENGTH*(1+zmax))
         lyman_alpha_ind = np.logical_and(lyman_alpha_ind, forest_boundary)
 
         self.wave  = self.wave[lyman_alpha_ind]
