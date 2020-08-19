@@ -1071,8 +1071,8 @@ class SQUADFits(Spectrum):
         flux = data['FLUX']
         self.cont = data['CONTINUUM']
         err_flux = data['ERR'] * SQUADFits._lowFluxErrorCorrection(data, corrError)
-        # dv = d['Dispersion']
-        dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
+        dv = d['Dispersion']
+        # dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
                    
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c.ra.radian, c.dec.radian)
