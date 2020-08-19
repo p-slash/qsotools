@@ -123,8 +123,6 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     if args.compute_mean_flux:
         mean_flux_hist.addSpectrum(qso, f1, f2)
 
-    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
-
     # Re-sample real data onto lower resolution grid
     if args.lowdv:
         wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
@@ -134,6 +132,7 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     else:
         wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
 
+    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
     fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args)
 
     # Skip short spectrum
