@@ -15,7 +15,17 @@ import qsotools.fiducial as fid
 
 # Define Saving Functions
 # ------------------------------
-def saveParameters(txt_basefilename, args):
+def saveParameters(txt_basefilename, f1, f2, args):
+    err_txt = str(args.const_error) if args.const_error \
+        else "Observed Errors"
+
+    if args.chunk_dyn:
+        chn_txt = "Dynamic"
+    elif args.chunk_fixed:
+        chn_txt = "Fixed"
+    else:
+        chn_txt = "OFF"
+
     Parameters_txt = ("Parameters for these mocks\n"
                     "Type                 : %s\n"
                     "Errors               : %s\n"
@@ -29,14 +39,14 @@ def saveParameters(txt_basefilename, args):
                     "SkipShortChunks      : %f\n"
                     "Redshift Evolution   : %s\n") % ( 
         "Gaussian Mocks" if args.gauss else "Lognormal Mocks", \
-        "OFF" if args.noerrors else "ON", \
+        err_txt, \
         args.seed, \
         args.ngrid, \
         args.griddv, \
         args.lowdv if args.lowdv else 0., \
-        fid.LYA_FIRST_WVL, \
-        fid.LYA_LAST_WVL, \
-        "ON" if args.chunk_dyn else "OFF", \
+        f1, \
+        f2, \
+        chn_txt, \
         args.skip if args.skip else 0., \
         "ON" if not args.without_z_evo else "OFF")
             
@@ -240,7 +250,7 @@ if __name__ == '__main__':
 
     txt_basefilename  = "%s/highres%s" % (args.OutputDir, settings_txt)
 
-    saveParameters(txt_basefilename, args)
+    saveParameters(txt_basefilename, forest_1, forest_2, args)
     # ------------------------------
 
     # Set up initial objects and variables
