@@ -124,8 +124,8 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
         mean_flux_hist.addSpectrum(qso, f1, f2)
 
     qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
-    if len(qso.wave) == 0:
-        raise ValueError("Empty spectrum", len(wave), MAX_NO_PIXELS)
+    if qso.size == 0:
+        raise ValueError("Empty spectrum", len(qso.wave), MAX_NO_PIXELS)
 
     # Re-sample real data onto lower resolution grid
     if args.lowdv:
