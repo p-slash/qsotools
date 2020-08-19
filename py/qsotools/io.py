@@ -1062,7 +1062,7 @@ class SQUADFits(Spectrum):
         z_qso = float(d["zem_Adopt"])
         self.flag = str(d["Spec_status"])
         
-        specres = hdr0['SPEC_RES'] * _seeingCorrection(d, correctSeeing)
+        specres = hdr0['SPEC_RES'] * SQUADFits._seeingCorrection(d, correctSeeing)
         specres = int(np.around(specres, decimals=-2))
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
@@ -1070,7 +1070,7 @@ class SQUADFits(Spectrum):
         wave = data['WAVE']
         flux = data['FLUX']
         self.cont = data['CONTINUUM']
-        err_flux = data['ERR'] * _lowFluxErrorCorrection(data, corrError)
+        err_flux = data['ERR'] * SQUADFits._lowFluxErrorCorrection(data, corrError)
         # dv = d['Dispersion']
         dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
                    
