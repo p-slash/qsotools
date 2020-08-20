@@ -104,11 +104,7 @@ class Spectrum:
             self.wave <= LYA_WAVELENGTH*(1+zmax))
         lyman_alpha_ind = np.logical_and(lyman_alpha_ind, forest_boundary)
 
-        self.wave  = self.wave[lyman_alpha_ind]
-        self.flux  = self.flux[lyman_alpha_ind]
-        self.error = self.error[lyman_alpha_ind]
-        self.mask  = self.mask[lyman_alpha_ind]
-        self.size  = len(self.wave)
+        self.applyMask(lyman_alpha_ind, removePixels=True)
 
     def applyMask(self, good_pixels=None, removePixels=True):
         if good_pixels is None:
@@ -121,6 +117,9 @@ class Spectrum:
             self.mask  = np.ones_like(self.flux, dtype=np.bool)
 
             self.size = len(self.wave)
+
+            if self.size == 0:
+                raise ValueError("Empty spectrum")
         else:
             self.flux[~good_pixels]  = 0
             self.error[~good_pixels] = 1e10
