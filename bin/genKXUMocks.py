@@ -93,7 +93,8 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
     print("Ly-alpha forest central redshift is ", z_center)
 
-    pixel_width  = args.lowdv if args.lowdv else qso.dv
+    resamplingCondition = args.lowdv and args.lowdv > qso.dv
+    pixel_width  = args.lowdv if resamplingCondition else qso.dv
     low_spec_res = qso.specres
     MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / pixel_width)
     
@@ -128,7 +129,7 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
         raise ValueError("Empty spectrum", len(qso.wave), MAX_NO_PIXELS)
 
     # Re-sample real data onto lower resolution grid
-    if args.lowdv:
+    if resamplingCondition:
         wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
             qso.error.reshape(1,qso.size), pixel_width)
         print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
@@ -366,6 +367,7 @@ if __name__ == '__main__':
 
         for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
             print("********************************************", flush=True)
+            print(qso.object)
             qso = SQUADFits(f, correctSeeing=True, corrError=True)
             qso.getS2NLya(forest_1, forest_2)
 
