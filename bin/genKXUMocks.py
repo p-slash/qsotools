@@ -106,6 +106,7 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     
     # This sets err=1e10 and flux=0
     qso.applyMask(removePixels=False)
+    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
 
     if not isRealData:
         lya_m.setCentralRedshift(z_center)
@@ -123,10 +124,6 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
 
     if args.compute_mean_flux:
         mean_flux_hist.addSpectrum(qso, f1, f2)
-
-    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
-    if qso.size == 0:
-        raise ValueError("Empty spectrum", len(qso.wave), MAX_NO_PIXELS)
 
     # Re-sample real data onto lower resolution grid
     if resamplingCondition:
