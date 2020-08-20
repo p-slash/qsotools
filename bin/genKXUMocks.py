@@ -88,7 +88,7 @@ def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
     return fluxes, errors
 
 def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
-    isRealData, mean_flux_hist, args, disableChunk=False):
+    mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
     print("Ly-alpha forest central redshift is ", z_center)
@@ -108,7 +108,7 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     qso.applyMask(removePixels=False)
     qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
 
-    if not isRealData:
+    if not args.real_data:
         lya_m.setCentralRedshift(z_center)
         if args.const_resolution:
             low_spec_res = args.const_resolution
@@ -234,12 +234,9 @@ if __name__ == '__main__':
         mean_flux_function = lm.lognMeanFluxGH
 
     # Decide if it's real data
-    if "mock0/data" in args.OutputDir or args.real_data:
-        print("MOCK0 is real data!")
-        isRealData = True
+    if args.real_data:
         settings_txt  = ''
     else:
-        isRealData = False
         settings_txt  = '_gaussian' if args.gauss else '_lognormal' 
 
     # Set settings text
@@ -258,7 +255,7 @@ if __name__ == '__main__':
     filename_list = []
     specres_list  = set()
     
-    if not isRealData:
+    if not args.real_data:
         lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
             REDSHIFT_ON=not args.without_z_evo, GAUSSIAN_MOCKS=args.gauss)
 
@@ -268,7 +265,7 @@ if __name__ == '__main__':
         print("RUNNING ON KODIAQ.........")
         qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, clean_pix=False)
 
-        if isRealData:
+        if args.real_data:
             mean_flux_function = fid.meanFluxFG08
 
         kod_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
@@ -292,7 +289,7 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(max_obs_spectrum, \
                     forest_1, forest_2, mean_flux_function, specres_list, \
-                    isRealData, kod_mf_hist, args)
+                    kod_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
@@ -316,7 +313,7 @@ if __name__ == '__main__':
     # XQ-100
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
-        if isRealData:
+        if args.real_data:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
 
         xq_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
@@ -334,7 +331,7 @@ if __name__ == '__main__':
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, \
                     forest_2, mean_flux_function, specres_list, \
-                    isRealData, xq_mf_hist, args, disableChunk=True)
+                    xq_mf_hist, args, disableChunk=True)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
@@ -357,7 +354,7 @@ if __name__ == '__main__':
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
 
-        if isRealData:
+        if args.real_data:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS_NODLA)
 
         us_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
@@ -380,7 +377,7 @@ if __name__ == '__main__':
                 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, forest_2, \
-                    mean_flux_function, specres_list, isRealData, us_mf_hist, args)
+                    mean_flux_function, specres_list, us_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
