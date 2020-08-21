@@ -180,7 +180,8 @@ def fitBecker13MeanFlux(z, F, e):
     try:
         # lambda z, tau0, beta, C: evaluateBecker13MeanFlux(z, tau0, beta, C)
         pnew, pcov = curve_fit(evaluateBecker13MeanFlux, \
-            z, F, BECKER13_parameters[:-1], sigma=e, absolute_sigma=True)
+            z, F, BECKER13_parameters[:-1], sigma=e, absolute_sigma=True, \
+            bounds=([0, 0, -2], [2, 10, 2]))
     except ValueError:
         raise
         exit(1)
