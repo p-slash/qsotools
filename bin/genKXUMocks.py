@@ -361,8 +361,8 @@ if __name__ == '__main__':
 
         for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
             print("********************************************", flush=True)
-            print(qso.object)
             qso = SQUADFits(f, correctSeeing=True, corrError=True)
+            print(qso.object)
             qso.getS2NLya(forest_1, forest_2)
 
             if qso.s2n_lya == -1:
