@@ -74,12 +74,12 @@ def saveListByLine(array, fname):
 # ------------------------------
 
 def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
-    if args.without_z_evo:
-        spectrum_z = z_center * np.ones_like(wave)
-    else:
-        spectrum_z = np.array(wave, dtype=np.double)  / fid.LYA_WAVELENGTH - 1
-
     if not args.save_full_flux:
+        if args.without_z_evo:
+            spectrum_z = z_center * np.ones_like(wave)
+        else:
+            spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
+        
         true_mean_flux = mean_flux_function(spectrum_z)
 
         fluxes  = fluxes / true_mean_flux - 1
