@@ -64,8 +64,8 @@ def saveParameters(txt_basefilename, f1, f2, args):
 def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width, args):
     for (w, f, e, fname) in zip(waves, fluxes, errors, fnames):
         mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
-        mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.dec, obs_fits.ra, obs_fits.s2n, \
-            spec_res, pixel_width)
+        mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.coord.dec.rad, obs_fits.coord.ra.dec, \
+            obs_fits.s2n, spec_res, pixel_width)
 
 def saveListByLine(array, fname):
     toWrite = open(fname, 'w')
