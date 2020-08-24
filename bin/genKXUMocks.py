@@ -94,6 +94,7 @@ def findDuplicates(spectral_record_list, args):
     idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
 
     np.savetxt(ospath_join(args.OutputDir, "d2d_arcsec.dat"), d2d.arcsec)
+    print("d2d values in arcsec are saved in output directory.")
     nonduplicates = []
 
     for i, (spr, idxi, d2di) in enumerate(zip(spectral_record_list, idx, d2d)):
@@ -454,7 +455,6 @@ if __name__ == '__main__':
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt")
-    #temp_fname = "%s/_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname)
     saveListByLine(filename_list, temp_fname)
 
@@ -465,9 +465,7 @@ if __name__ == '__main__':
     filename_list = []
     for fl in map(lambda x: x.fnames, nondups):
         filename_list.extend(fl)
-    # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso-nonduplicates.txt")
-    #temp_fname = "%s/_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname)
     saveListByLine(filename_list, temp_fname)
 
