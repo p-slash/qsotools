@@ -4,8 +4,13 @@ from os.path import join as ospath_join
 from os import makedirs as os_makedirs
 import glob
 import argparse
+from collections import namedtuple
 
 import numpy as np
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+from astropy.table import Table
+from astropy.io import ascii
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
@@ -71,7 +76,39 @@ def saveListByLine(array, fname):
         else:
             toWrite.write('%s\n'%str(a))
     toWrite.close()
+
+def saveSPRasTable(spr, fname):
+    qsos = np.array(list(map(lambda x: x.qso, spr)))
+    sets = np.array(list(map(lambda x: x.set, spr)))
+    ras  = np.array(list(map(lambda x: x.c.icrs.ra.deg, spr)))
+    decs = np.array(list(map(lambda x: x.c.icrs.dec.deg, spr)))
+    s2ns = np.array(list(map(lambda x: x.s2n, spr)))
+
+    data = Table([qsos, ras, decs, s2ns, sets], \
+        names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET'])
+    ascii.write(data, fname, format='csv', overwrite=True)
+
 # ------------------------------
+def findDuplicates(spectral_record_list, args):
+    catalog = SkyCoord(list(map(lambda x: x.c.fk5, spectral_record_list)))
+    idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
+
+    np.savetxt(ospath_join(args.OutputDir, "d2d_arcsec.dat"), d2d.arcsec)
+    nonduplicates = []
+
+    for i, (spr, idxi, d2di) in enumerate(zip(spectral_record_list, idx, d2d)):
+        m2 = spectral_record_list[idxi]
+        if d2di < args.separation * u.arcsec and spr.set != m2.set:
+            if idxi <= i:
+                continue
+            if spr.s2n > m2.s2n:
+                nonduplicates.append(spr)
+            else:
+                nonduplicates.append(m2)
+        else:
+            nonduplicates.append(spr)
+    
+    return nonduplicates
 
 def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
     if not args.save_full_flux:
@@ -171,7 +208,10 @@ if __name__ == '__main__':
     
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
     parser.add_argument("--UVESSQUADDir", help="Directory of SQUAD/UVES")
-
+    
+    parser.add_argument("--separation", type=float, default=2.5, \
+        help="Maximum separation in arc sec. Default: %(default)s")
+    
     parser.add_argument("--save_full_flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
@@ -254,7 +294,9 @@ if __name__ == '__main__':
     no_lya_quasar_list = []
     filename_list = []
     specres_list  = set()
-    
+    SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
+    spectral_record_list = []
+
     if not args.real_data:
         lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
             REDSHIFT_ON=not args.without_z_evo, GAUSSIAN_MOCKS=args.gauss)
@@ -299,7 +341,11 @@ if __name__ == '__main__':
             temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
                 max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
                 for nc in range(nchunks)]
-                
+            
+            spr = SpectralRecord('KOD', qso.qso_name, maxs2n/max_obs_spectrum.dv, \
+                max_obs_spectrum.coord, temp_fname)
+            spectral_record_list.append(spr)
+
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
@@ -339,7 +385,10 @@ if __name__ == '__main__':
             
             temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
                 wave[0][0], wave[0][-1], settings_txt)]
-                
+            
+            spr = SpectralRecord('XQ', qso.object, qso.s2n_lya/qso.dv, qso.coord, temp_fname)
+            spectral_record_list.append(spr)
+
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
@@ -386,7 +435,10 @@ if __name__ == '__main__':
             nchunks = len(wave)
             temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
                     wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
-                
+            
+            spr = SpectralRecord('UVE', qso.object, qso.s2n_lya/qso.dv, qso.coord, temp_fname)
+            spectral_record_list.append(spr)
+
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
@@ -396,7 +448,7 @@ if __name__ == '__main__':
             us_mf_hist.getMeanFlux()
             us_mf_hist.saveHistograms(ospath_join(args.OutputDir, "us-stats%s"%settings_txt))
 
-    temp_fname = ospath_join(args.OutputDir, "specres_list.txt" )
+    temp_fname = ospath_join(args.OutputDir, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
     saveListByLine(specres_list, temp_fname)
 
@@ -405,5 +457,43 @@ if __name__ == '__main__':
     #temp_fname = "%s/_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname)
     saveListByLine(filename_list, temp_fname)
+
+    saveSPRasTable(spectral_record_list, ospath_join(args.OutputDir, "spr-all.csv"))
+    nondups = findDuplicates(spectral_record_list, args)
+    saveSPRasTable(nondups, ospath_join(args.OutputDir, "spr-nonduplicates.csv"))
+
+    filename_list = []
+    for fl in map(lambda x: x.fnames, nondups):
+        filename_list.extend(fl)
+    # Save the list of files in a txt
+    temp_fname = ospath_join(args.OutputDir, "file_list_qso-nonduplicates.txt")
+    #temp_fname = "%s/_filelist.txt" % txt_basefilename
+    print("Saving chunk spectra file list as ", temp_fname)
+    saveListByLine(filename_list, temp_fname)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
