@@ -41,12 +41,10 @@ class Spectrum:
         Spectral resolution of the instrument.
     dv : float
         Pixel width.
-    ra : float
-        Right ascension in radians
-    dec : float
-        Declination in radians
+    coord : SkyCoord
+        SkyCoord object from astropy.
 
-    __init__(self, wave, flux, error, z_qso, specres, dv, ra, dec)
+    __init__(self, wave, flux, error, z_qso, specres, dv, coord)
         Creates this spectrum object. Computes s2n.
 
     Attributes
@@ -77,15 +75,14 @@ class Spectrum:
         Computes the signal-to-noise in lyman alpha region as average(1/e)
 
     """
-    def __init__(self, wave, flux, error, z_qso, specres, dv, ra, dec):
+    def __init__(self, wave, flux, error, z_qso, specres, dv, coord):
         self.wave  = wave
         self.flux  = flux
         self.error = error
         self.z_qso = z_qso
         self.specres = specres
         self.dv = dv
-        self.ra = ra
-        self.dec = dec
+        self.coord = coord
         
         self.size = len(self.wave)
         self.mask = error > 0
@@ -170,7 +167,8 @@ class Spectrum:
     def saveAsBQ(self, fname):
         tbq = BinaryQSO(fname, 'w')
         tbq.save(self.wave, self.flux, self.error, self.size, self.z_qso, \
-            self.dec, self.ra, self.s2n, self.specres, self.dv)
+            self.coord.icrs.dec.rad, self.coord.icrs.ra.rad, self.s2n, \
+            self.specres, self.dv)
         tbq.close()
 
 class BinaryQSO:
@@ -442,10 +440,8 @@ class KODIAQFits(Spectrum):
         Signal to noise ratio of the Lya forest. 
         Initial value is 0. Run getS2NLya to calculate this value.
         -1 if there is no Lya coverage for a given spectrum.
-    ra : float
-        RA in radians
-    dec : float
-        DECL in radians
+    coord : SkyCoord
+        SkyCoord object from astropy.
 
     qso_name : str
         Name of the quasar.
@@ -511,14 +507,15 @@ class KODIAQFits(Spectrum):
         with fitsio.FITS(erro_fname) as ke:
             self.error = np.array(ke[0].read()*1., dtype=np.double)
 
-        c = SkyCoord('%s %s'%(hdr["RA"], hdr["DEC"]), unit=(hourangle, deg)) 
+        c = SkyCoord('%s %s'%(hdr["RA"], hdr["DEC"]), \
+            frame=hdr['FRAME'].lower(), unit=(hourangle, deg)) 
 
         self.s2n_kodiaq = hdr["SIG2NOIS"]
 
         self._setWavelengthArray(hdr)
 
         super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
-            self.dv, c.ra.radian, c.dec.radian)
+            self.dv, c)
 
     # def setOutliersMask(self, MEAN_FLUX = 0.7113803432881693, SIGMA_FLUX = 0.37433547084407937, \
     #     MEAN_ERROR = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT = 5.):
@@ -800,8 +797,8 @@ class KODIAQMasterTable():
                 dimless_specres.append(obs.spectrum.specres)
                 pixel_widths.append("%.2f"%obs.spectrum.dv)
 
-                right_ascensions.append(obs.spectrum.ra)
-                declinations.append(obs.spectrum.dec)
+                right_ascensions.append(obs.spectrum.coord.ra.rad)
+                declinations.append(obs.spectrum.coord.dec.rad)
 
 
         self.master_table = Table([qso_names, observations, spec_prefixes, \
@@ -922,7 +919,8 @@ class XQ100Fits(Spectrum):
         seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
         seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
 
-        c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
+        c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), \
+            frame=hdr0['RADECSYS'].lower(), unit=deg) 
 
         wave = data['WAVE'] * 10.
         flux = data['FLUX']
@@ -939,7 +937,7 @@ class XQ100Fits(Spectrum):
                 if correctSeeing else int(hdr0["SPEC_RES"])
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
-            z_qso, specres, dv, c.ra.radian, c.dec.radian)
+            z_qso, specres, dv, c)
         
         # d = XQ100Fits.xq100_dla_csv[XQ100Fits.xq100_dla_csv["QSO"] == self.object]
         # d = np.array(d)[0]
@@ -1064,7 +1062,8 @@ class SQUADFits(Spectrum):
         specres = hdr0['SPEC_RES'] * SQUADFits._seeingCorrection(d, correctSeeing)
         specres = int(np.around(specres, decimals=-2))
 
-        c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), unit=deg) 
+        c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), \
+            frame=hdr0['RADECSYS'].lower(), unit=deg) 
 
         wave = data['WAVE']
         flux = data['FLUX']
@@ -1074,7 +1073,7 @@ class SQUADFits(Spectrum):
         # dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
                    
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
-            z_qso, specres, dv, c.ra.radian, c.dec.radian)
+            z_qso, specres, dv, c)
 
         if d['DLAzabs']:
             self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
