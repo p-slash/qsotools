@@ -11,7 +11,7 @@ import fitsio
 
 from astropy.io import ascii
 from astropy.coordinates import SkyCoord
-from astropy.units import hourangle, deg, arcsec
+from astropy.units import hourangle, deg
 
 from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
     LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA
@@ -904,7 +904,7 @@ class XQ100Fits(Spectrum):
         bounds_error=False, fill_value=(18400, 8900))
     fits_list = fitsio.FITS(TABLE_XQ100_SUM)[1]
     dla_csv = ascii.read(TABLE_XQ100_DLA, fill_values="")
-    dla_coords = SkyCoord(XQ100Fits.dla_csv["RA"], XQ100Fits.dla_csv["Dec"], \
+    dla_coords = SkyCoord(dla_csv["RA"], dla_csv["Dec"], \
         equinox='j2000', unit=deg)
 
     def __init__(self, filename, correctSeeing=True):
@@ -945,7 +945,7 @@ class XQ100Fits(Spectrum):
         idx, d2d, _ = c.match_to_catalog_sky(XQ100Fits.dla_coords)
 
         # if separation is small, then it is the same qso
-        if d2d.arcsec < 10. * arcsec:
+        if d2d.arcsec < 10.:
             d = XQ100Fits.dla_csv[idx]
             if d['zabs']!='nan':
                 self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
