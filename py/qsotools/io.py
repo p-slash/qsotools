@@ -11,7 +11,7 @@ import fitsio
 
 from astropy.io import ascii
 from astropy.coordinates import SkyCoord
-from astropy.units import hourangle, deg
+from astropy.units import hourangle, deg, arcsec
 
 from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
     LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA
@@ -902,8 +902,10 @@ class XQ100Fits(Spectrum):
         bounds_error=False, fill_value=(9700, 5400))
     specres_interp_vis = interp1d([0.4, 0.7, 0.9], [18400, 11400, 8900], \
         bounds_error=False, fill_value=(18400, 8900))
-    xq100_list_fits = fitsio.FITS(TABLE_XQ100_SUM)[1]
-    xq100_dla_csv = ascii.read(TABLE_XQ100_DLA, fill_values="")
+    fits_list = fitsio.FITS(TABLE_XQ100_SUM)[1]
+    dla_csv = ascii.read(TABLE_XQ100_DLA, fill_values="")
+    dla_coords = SkyCoord(XQ100Fits.dla_csv["RA"], XQ100Fits.dla_csv["Dec"], \
+        equinox='j2000', unit=deg)
 
     def __init__(self, filename, correctSeeing=True):
         with fitsio.FITS(filename) as xqf:
@@ -913,8 +915,8 @@ class XQ100Fits(Spectrum):
         self.object = hdr0['OBJECT']
         self.arm    = hdr0['DISPELEM']
 
-        i = XQ100Fits.xq100_list_fits.where("OBJECT == '%s'"%self.object)[0]
-        d = XQ100Fits.xq100_list_fits[i]
+        i = XQ100Fits.fits_list.where("OBJECT == '%s'"%self.object)[0]
+        d = XQ100Fits.fits_list[i]
         z_qso = d['Z_QSO']
         seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
         seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
@@ -939,12 +941,15 @@ class XQ100Fits(Spectrum):
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c)
         
-        # d = XQ100Fits.xq100_dla_csv[XQ100Fits.xq100_dla_csv["QSO"] == self.object]
-        # d = np.array(d)[0]
+        # Find matching row by ra and dec
+        idx, d2d, _ = c.match_to_catalog_sky(XQ100Fits.dla_coords)
 
-        # if d['zabs']!='nan':
-        #     self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
-        #     self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
+        # if separation is small, then it is the same qso
+        if d2d.arcsec < 10. * arcsec:
+            d = XQ100Fits.dla_csv[idx]
+            if d['zabs']!='nan':
+                self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
+                self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
 
     def setHardCutMask(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
@@ -1020,7 +1025,7 @@ class SQUADFits(Spectrum):
     
     """
 
-    uves_squad_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
+    dr1_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
 
     def _seeingCorrection(d, correctSeeing):
         slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
@@ -1054,7 +1059,7 @@ class SQUADFits(Spectrum):
 
         self.object = hdr0['OBJECT']
 
-        d = SQUADFits.uves_squad_csv[SQUADFits.uves_squad_csv["Name_Adopt"] == self.object]
+        d = SQUADFits.dr1_csv[SQUADFits.dr1_csv["Name_Adopt"] == self.object]
         d = np.array(d)[0]
         z_qso = float(d["zem_Adopt"])
         self.flag = str(d["Spec_status"])
