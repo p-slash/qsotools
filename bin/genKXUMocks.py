@@ -343,7 +343,7 @@ if __name__ == '__main__':
                 max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
                 for nc in range(nchunks)]
             
-            spr = SpectralRecord('KOD', qso.qso_name, maxs2n/max_obs_spectrum.dv, \
+            spr = SpectralRecord('KOD', qso.qso_name, maxs2n/np.sqrt(max_obs_spectrum.dv), \
                 max_obs_spectrum.coord, temp_fname)
             spectral_record_list.append(spr)
 
@@ -387,7 +387,8 @@ if __name__ == '__main__':
             temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
                 wave[0][0], wave[0][-1], settings_txt)]
             
-            spr = SpectralRecord('XQ', qso.object, qso.s2n_lya/qso.dv, qso.coord, temp_fname)
+            spr = SpectralRecord('XQ', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
+                qso.coord, temp_fname)
             spectral_record_list.append(spr)
 
             filename_list.extend(temp_fname) 
@@ -437,7 +438,8 @@ if __name__ == '__main__':
             temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
                     wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
             
-            spr = SpectralRecord('UVE', qso.object, qso.s2n_lya/qso.dv, qso.coord, temp_fname)
+            spr = SpectralRecord('UVE', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
+                qso.coord, temp_fname)
             spectral_record_list.append(spr)
 
             filename_list.extend(temp_fname) 
