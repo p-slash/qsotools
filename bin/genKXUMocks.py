@@ -83,9 +83,10 @@ def saveSPRasTable(spr, fname):
     ras  = np.array(list(map(lambda x: x.c.icrs.ra.deg, spr)))
     decs = np.array(list(map(lambda x: x.c.icrs.dec.deg, spr)))
     s2ns = np.array(list(map(lambda x: x.s2n, spr)))
+    fnames = np.array(list(map(lambda x: ",".join(x.fnames), spr)))
 
-    data = Table([qsos, ras, decs, s2ns, sets], \
-        names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET'])
+    data = Table([qsos, ras, decs, s2ns, sets, fnames], \
+        names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET', 'FNAMES'])
     ascii.write(data, fname, format='csv', overwrite=True)
 
 # ------------------------------
@@ -196,6 +197,9 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     wave   = [x for x in wave   if not isShort(x)]
     fluxes = [x for x in fluxes if not isShort(x)]
     errors = [x for x in errors if not isShort(x)]
+    
+    if isShort(wave):
+        raise ValueError("Empty chunks", len(wave))
 
     return wave, fluxes, errors, low_spec_res, pixel_width
 
