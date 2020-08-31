@@ -96,7 +96,7 @@ def jacobianPD13Lorentz(X, A, n, alpha, B, beta, lmd):
 # All 1d arrays
 # Pass z=None to turn off B, beta parameters
 # initial_params always has 6 values: A, n, alpha, B, beta, lambda
-def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS):
+def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS, bounds=None):
     fitted_power = np.zeros(len(power))
 
     mask     = np.logical_and(power > 0, error > 0)
@@ -108,6 +108,7 @@ def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS):
     ub = np.full(6, np.inf)
     lb[0] = 0
     lb[5] = 0
+    ub[2] = 0 # alpha > 0 diverges at low and high k
 
     if z is not None:
         z_masked = z[mask]
@@ -118,13 +119,16 @@ def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS):
         lb[4] = 0
         ub[3] = 0
         ub[4] = 0
-        NUMBER_OF_PARAMS =4 
+        NUMBER_OF_PARAMS = 4 
+
+    if bounds is None:
+        bounds = (lb, ub)
 
     X_masked = (k_masked, z_masked)
 
     try:
         pnew, pcov = curve_fit(evaluatePD13Lorentz, X_masked, p_masked, initial_params, \
-            sigma=e_masked,  absolute_sigma=True, bounds=(lb, ub), method='trf', \
+            sigma=e_masked,  absolute_sigma=True, bounds=bounds, method='trf', \
             jac=jacobianPD13Lorentz)
     except ValueError:
         raise
