@@ -322,14 +322,16 @@ class PowerPlotter(object):
             verticalalignment='bottom', horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
 
         if noise_dom:
-            top_ax.axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
+            top_ax.set_xlim(xmax=self.k_bins[-1]*1.1)
+            top_ax.axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
+
+            if two_row:
+                bot_ax.axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
         
         if two_row:
             rel_err = psz / ptz  - 1
             bot_ax.errorbar(self.k_bins, rel_err, xerr = 0, yerr = erz/ptz, fmt='s:', \
                 markersize=3, capsize=0, color='k')
-            
-            bot_ax.axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
 
             self._autoRelativeYLim(bot_ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
 
@@ -340,7 +342,7 @@ class PowerPlotter(object):
 
     def plotAll(self, outplot_fname=None, two_row=False, plot_true=True, pk_ymax=0.5, \
         pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
-        auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
+        fmt=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
         """Plot QMLE results for all redshifts in one figure.
 
         Parameters
@@ -374,6 +376,9 @@ class PowerPlotter(object):
         
         chi_sq = 0
 
+        if fmt is None:
+            fmt = "o"
+
         # Plot for each redshift bin
         for i in range(self.nz):
             psz = self.power_qmle[i]
@@ -390,7 +395,7 @@ class PowerPlotter(object):
             chi_sq += np.sum(chi_sq_zb)
 
             top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, yerr=erz*self.k_bins/np.pi, \
-                fmt='o', label="z=%.2f"%z_val, markersize=3, capsize=2, color=ci)
+                fmt=fmt, label="z=%.2f"%z_val, markersize=3, capsize=2, color=ci)
             
             if plot_true:
                 top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, fmt=':', capsize=0, color=ci)
@@ -407,9 +412,10 @@ class PowerPlotter(object):
         add_legend_no_error_bars(top_ax, "upper left", bbox_to_anchor=(1.03, 1))
 
         if noise_dom:
-            top_ax.axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
+            top_ax.set_xlim(xmax=self.k_bins[-1]*1.1)
+            top_ax.axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
             if two_row:
-                bot_ax.axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
+                bot_ax.axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
 
         if ignore_last_k_bins > 0:
             ddof = self.k_bins.size-ignore_last_k_bins
@@ -464,7 +470,8 @@ class PowerPlotter(object):
             axs[i].axhline(color='k')
             
             if noise_dom:
-                axs[i].axvspan(noise_dom, self.k_bins[-1]*1.4, facecolor='0.5', alpha=0.5)
+                axs[i].set_xlim(xmax=self.k_bins[-1]*1.1)
+                axs[i].axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
 
             self._autoRelativeYLim(axs[i], rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
 
