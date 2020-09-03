@@ -198,7 +198,7 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     fluxes = [x for x in fluxes if not isShort(x)]
     errors = [x for x in errors if not isShort(x)]
     
-    if isShort(wave):
+    if len(wave) == 0:
         raise ValueError("Empty chunks", len(wave))
 
     return wave, fluxes, errors, low_spec_res, pixel_width
