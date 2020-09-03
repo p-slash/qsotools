@@ -36,7 +36,7 @@ def getCounts(booted_indices, bootnum, no_spectra):
 
 # This function assumes spectra are organized s0/ s1/ .. folders
 # and individual results are saved under s0/combined_Fp.fits
-def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
+def qmleBootRunDESI(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
     total_fisher   = np.zeros((bootnum, N, N))
     total_power_b4 = np.zeros((bootnum, N))
     total_power    = np.zeros((bootnum, N))
@@ -48,6 +48,7 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
     
     qso_fname_list.sort(key=getSno) # Sort for groupby
     no_spectra = len(qso_filename_list)
+    perc = int(no_spectra/20)
 
     # counts shape (no_spectra, bootnum)
     print("Getting repetitions...", flush=True)
@@ -68,10 +69,47 @@ def qmleBootRun(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
                 total_power_b4 += data['power']*ci[:, None]
                 
                 qind+=1
-                if qind%4000==0:
+                if qind%perc==0:
                     print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
 
-        print("Results from {:s} are read and added.".format(fitspath, grno), flush=True)
+        print("Results from {:s} are read and added.".format(fitspath), flush=True)
+
+    print("Calculating bootstrapped inverse Fisher and power...", flush=True)
+    for bi in range(bootnum):
+        inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
+        total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
+    
+    return total_power
+
+# This function assumes one Fp_fits file under one directory.
+def qmleBootRun(booted_indices, no_spectra, N, inputdir, bootnum, fp_file):
+    total_fisher   = np.zeros((bootnum, N, N))
+    total_power_b4 = np.zeros((bootnum, N))
+    total_power    = np.zeros((bootnum, N))
+    
+    perc = int(no_spectra/20)
+
+    # counts shape (no_spectra, bootnum)
+    print("Getting repetitions...", flush=True)
+    counts = getCounts(booted_indices, bootnum, no_spectra)
+
+    qind = 0 
+    fitspath = ospath_join(inputdir, fp_file)
+    print("Reading {:s}...".format(fitspath), flush=True)
+
+    with fitsio.FITS(fitspath) as fitsfile:
+        for hdu in fitsfile[1:]:
+            ci = counts[qind]
+            data = hdu.read()
+            
+            total_fisher   += data['fisher']*ci[:, None, None]
+            total_power_b4 += data['power']*ci[:, None]
+            
+            qind+=1
+            if qind%perc==0:
+                print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
+
+    print("Results from {:s} are read and added.".format(fitspath), flush=True)
 
     print("Calculating bootstrapped inverse Fisher and power...", flush=True)
     for bi in range(bootnum):
@@ -86,6 +124,7 @@ if __name__ == '__main__':
     parser.add_argument("ConfigFile", help="Config file")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
+    parser.add_argument("--desilite-mocks", action="store_true")
     parser.add_argument("--fp-file", default="combined_Fp.fits")
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
@@ -116,8 +155,12 @@ if __name__ == '__main__':
         np.count_nonzero(booted_indices==0, axis=1), flush=True)
 
     print("Running analysis...", flush=True)
-    bootresult=qmleBootRun(booted_indices, qso_filename_list, N, config_qmle.qso_dir, \
-        args.bootnum, args.fp_file)
+    if args.desilite_mocks:
+        bootresult=qmleBootRunDESI(booted_indices, qso_filename_list, N, \
+            config_qmle.qso_dir, args.bootnum, args.fp_file)
+    else:
+        bootresult=qmleBootRunDESI(booted_indices, no_spectra, N, \
+            config_qmle.qso_dir, args.bootnum, args.fp_file)
 
     # Save power to a file
     power_filename = ospath_join(output_dir, output_base \
