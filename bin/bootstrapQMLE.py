@@ -159,7 +159,7 @@ if __name__ == '__main__':
         bootresult=qmleBootRunDESI(booted_indices, qso_filename_list, N, \
             config_qmle.qso_dir, args.bootnum, args.fp_file)
     else:
-        bootresult=qmleBootRunDESI(booted_indices, no_spectra, N, \
+        bootresult=qmleBootRun(booted_indices, no_spectra, N, \
             config_qmle.qso_dir, args.bootnum, args.fp_file)
 
     # Save power to a file
