@@ -503,7 +503,6 @@ class FisherPlotter(object):
     ----------
     fisher
     invfisher
-    norm
     nz
     nk
     zlabels
@@ -517,9 +516,6 @@ class FisherPlotter(object):
         except Exception as e:
             self.invfisher = None
             print("Cannot invert the Fisher matrix.")
-
-        fk_v = np.sqrt(self.fisher.diagonal())
-        self.norm = np.outer(fk_v, fk_v)
 
         if nz:
             self.nz = nz
@@ -560,7 +556,9 @@ class FisherPlotter(object):
             cbarlbl = r"$%s_{%s%s'}/\sqrt{%s_{%s%s}%s_{%s'%s'}}$" \
                 % (Ftxt, Fsub, Fsub, Ftxt,Fsub, Fsub, Ftxt, Fsub, Fsub)
             
-            grid = matrix/self.norm
+            fk_v = np.sqrt(matrix.diagonal())
+            norm = np.outer(fk_v, fk_v)
+            grid = matrix/norm
             colormap = plt.cm.seismic
         elif scale == "log":
             cbarlbl = r"$\log %s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
