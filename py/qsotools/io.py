@@ -898,14 +898,41 @@ class XQ100Fits(Spectrum):
         Cut from Irsic et al 2016. Keeps F>r and f>fc.
     
     """
+
+    # These numbers are accessed September 4, 2020
+    # https://www.eso.org/sci/facilities/paranal/instruments/xshooter/inst.html
     specres_interp_uvb = interp1d([0.5, 0.8, 1.0], [9700, 6700, 5400], \
         bounds_error=False, fill_value=(9700, 5400))
     specres_interp_vis = interp1d([0.4, 0.7, 0.9], [18400, 11400, 8900], \
         bounds_error=False, fill_value=(18400, 8900))
+    specres_interp_nir = interp1d([0.4, 0.6, 0.9], [11600, 8100, 5600], \
+        bounds_error=False, fill_value=(11600, 5600))
+
     fits_list = fitsio.FITS(TABLE_XQ100_SUM)[1]
     dla_csv = ascii.read(TABLE_XQ100_DLA, fill_values="")
     dla_coords = SkyCoord(dla_csv["RA"], dla_csv["Dec"], \
         equinox='j2000', unit=deg)
+
+    def _seeingCorrectedResolution(arm, seeing_ave):
+        if arm == 'VIS':
+            specres_interp_arm = XQ100Fits.specres_interp_vis
+        elif arm == 'UVB':
+            specres_interp_arm = XQ100Fits.specres_interp_uvb
+        elif arm == "NIR":
+            specres_interp_arm = XQ100Fits.specres_interp_nir
+
+        return int(np.around(specres_interp_arm(seeing_ave), decimals=-2))
+
+    def _findDLAs(self):
+        # Find matching row by ra and dec
+        idx, d2d, _ = self.coord.match_to_catalog_sky(XQ100Fits.dla_coords)
+
+        # if separation is small, then it is the same qso
+        if d2d.arcsec < 10.:
+            d = XQ100Fits.dla_csv[idx]
+            if d['zabs']!='nan':
+                self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
+                self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
 
     def __init__(self, filename, correctSeeing=True):
         with fitsio.FITS(filename) as xqf:
@@ -918,8 +945,13 @@ class XQ100Fits(Spectrum):
         i = XQ100Fits.fits_list.where("OBJECT == '%s'"%self.object)[0]
         d = XQ100Fits.fits_list[i]
         z_qso = d['Z_QSO']
-        seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
-        seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
+        
+        if correctSeeing:
+            seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
+            seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
+            specres = XQ100Fits._seeingCorrectedResolution(self.arm, seeing_ave)
+        else:
+            specres = int(hdr0["SPEC_RES"])
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), \
             frame=hdr0['RADECSYS'].lower(), unit=deg) 
@@ -931,25 +963,15 @@ class XQ100Fits(Spectrum):
 
         if self.arm == 'VIS':
             dv = 11. # km/s
-            specres = int(np.around(XQ100Fits.specres_interp_vis(seeing_ave), decimals=-2)) \
-                if correctSeeing else int(hdr0["SPEC_RES"])
         elif self.arm == 'UVB':
             dv = 20. # km/s
-            specres = int(np.around(XQ100Fits.specres_interp_uvb(seeing_ave), decimals=-2)) \
-                if correctSeeing else int(hdr0["SPEC_RES"])
+        elif self.arm == "NIR":
+            dv = 19. # km/s
 
         super(XQ100Fits, self).__init__(wave, flux/self.cont, err_flux/self.cont, \
             z_qso, specres, dv, c)
-        
-        # Find matching row by ra and dec
-        idx, d2d, _ = c.match_to_catalog_sky(XQ100Fits.dla_coords)
 
-        # if separation is small, then it is the same qso
-        if d2d.arcsec < 10.:
-            d = XQ100Fits.dla_csv[idx]
-            if d['zabs']!='nan':
-                self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
-                self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
+        self._findDLAs()
 
     def setHardCutMask(self, r=-100, fc=-1e-15):
         good_pixels = np.logical_and(self.flux > r, self.flux*self.cont > fc)
