@@ -313,7 +313,8 @@ if __name__ == '__main__':
         qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, clean_pix=False)
 
         if args.real_data:
-            mean_flux_function = fid.meanFluxFG08
+            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
+            # mean_flux_function = fid.meanFluxFG08
 
         kod_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
@@ -324,6 +325,7 @@ if __name__ == '__main__':
             print("********************************************", flush=True)
             obs_iter = KODIAQ_OBS_Iterator(qso)
 
+            # TODO: Co-add multiple observations
             # Pick highest S2N obs
             max_obs_spectrum, maxs2n = obs_iter.maxLyaObservation(forest_1, forest_2)
             max_obs_spectrum.print_details()
@@ -365,7 +367,8 @@ if __name__ == '__main__':
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
         if args.real_data:
-            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
+            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
+            # lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
 
         xq_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
@@ -410,7 +413,8 @@ if __name__ == '__main__':
         print("RUNNING ON SQUAD/UVES.........")
 
         if args.real_data:
-            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS_NODLA)
+            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
+            # lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS_NODLA)
 
         us_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
