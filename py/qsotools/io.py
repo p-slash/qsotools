@@ -3,6 +3,7 @@ from configparser import ConfigParser
 from os.path import exists as os_exists, join as ospath_join
 
 import numpy as np
+from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 from scipy.stats import zscore as scipy_zscore, norm as scipy_norm
 from scipy.ndimage import median_filter as scipy_median_filter
@@ -15,6 +16,7 @@ from astropy.units import hourangle, deg
 
 from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
     LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA
+import qsotools.specops as so
 
 from pkg_resources import resource_filename
 TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
@@ -699,6 +701,7 @@ class KODIAQ_OBS_Iterator:
         self.dr          = t['kodrelease']
         self.kodw0       = t['kodwblue']
         self.kodw1       = t['kodwred']
+        self.exp_time    = t['kodetime']
 
     def readSpectrum(self):
         self.spectrum = KODIAQFits(self.kqso_iter.kodiaq_dir, \
@@ -727,6 +730,56 @@ class KODIAQ_OBS_Iterator:
         self.readSpectrum()
 
         return self.spectrum, max_s2n_lya
+
+    def coaddObservations(self, dv=3.0):
+        dv_c = dv / LIGHT_SPEED
+        new_N = int(np.log(self.kqso_iter.Olam1 / self.kqso_iter.Olam0) / dv_c) + 1
+    
+        new_wave_centers = self.kqso_iter.Olam0 * np.exp(np.arange(new_N) * dv_c)
+        new_wave_edges   = so.createEdgesFromCenters(new_wave_centers, dv)
+
+        coadded_flux   = np.zeros_like(new_wave_centers)
+        coadded_error  = np.zeros_like(new_wave_centers)
+        coadded_weight = np.zeros_like(new_wave_centers)
+        new_specres = 0
+        total_exp_time = 0
+
+        for obs in self:
+            weights = obs.spectrum.mask * self.exp_time
+            flux    = weights * obs.spectrum.flux
+            error   = weights * obs.spectrum.error
+            
+            new_specres    += self.exp_time * obs.spectrum.specres
+            total_exp_time += self.exp_time 
+
+            binned_flux, _, _   = binned_statistic(obs.spectrum.wave, flux, \
+                statistic='sum', bins=new_wave_edges)
+            binned_error, _, _  = binned_statistic(obs.spectrum.wave, error, \
+                statistic='sum', bins=new_wave_edges)
+            binned_weight, _, _ = binned_statistic(obs.spectrum.wave, weights, \
+                statistic='sum', bins=new_wave_edges)
+
+            coadded_flux   += binned_flux
+            coadded_error  += binned_error
+            coadded_weight += binned_weight
+
+        coadded_flux  /= coadded_weight
+        coadded_error /= coadded_weight
+
+        coadded_flux[coadded_weight==0]  = 0
+        coadded_error[coadded_weight==0] = 0
+
+        new_specres = int(np.around(new_specres/total_exp_time, decimals=-2))
+        obs.spectrum.wave    = new_wave_centers
+        obs.spectrum.flux    = coadded_flux
+        obs.spectrum.error   = coadded_error
+        obs.spectrum.specres = new_specres
+        obs.spectrum.mask    = obs.spectrum.error > 0
+        obs.spectrum.size    = len(obs.spectrum.wave)
+        obs.spectrum.s2n     = np.mean(1./obs.spectrum.error[obs.spectrum.mask])
+        obs.spectrum.s2n_lya = obs.spectrum.getS2NLya()
+
+        return obs.spectrum
 
 class KODIAQMasterTable():
     """

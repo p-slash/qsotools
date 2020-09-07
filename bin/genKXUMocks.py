@@ -209,8 +209,10 @@ if __name__ == '__main__':
     parser.add_argument("OutputDir", help="Output directory")
     parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
 
-    parser.add_argument("--KODIAQdir", help="Directory of KODIAQ")
-    
+    parser.add_argument("--KODIAQDir", help="Directory of KODIAQ")
+    parser.add_argument("--coadd-kodiaq", type=float, \
+        help="Co-adds different observations of the same quasar onto given dv grid.")
+
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
     parser.add_argument("--UVESSQUADDir", help="Directory of SQUAD/UVES")
     
@@ -325,10 +327,15 @@ if __name__ == '__main__':
             print("********************************************", flush=True)
             obs_iter = KODIAQ_OBS_Iterator(qso)
 
-            # TODO: Co-add multiple observations
-            # Pick highest S2N obs
-            max_obs_spectrum, maxs2n = obs_iter.maxLyaObservation(forest_1, forest_2)
-            max_obs_spectrum.print_details()
+            if args.coadd_kodiaq:
+                # Co-add multiple observations
+                chosen_spectrum = obs_iter.coaddObservations(args.coadd_kodiaq)
+                maxs2n = chosen_spectrum.getS2NLya(forest_1, forest_2)
+            else:
+                # Pick highest S2N obs
+                chosen_spectrum, maxs2n = obs_iter.maxLyaObservation(forest_1, forest_2)
+
+            chosen_spectrum.print_details()
 
             if maxs2n == -1:
                 print("SKIP: No Lya or Side Band coverage!")
@@ -336,7 +343,7 @@ if __name__ == '__main__':
                 continue
 
             try:
-                wave, fluxes, errors, lspecr, pixw = genMocks(max_obs_spectrum, \
+                wave, fluxes, errors, lspecr, pixw = genMocks(chosen_spectrum, \
                     forest_1, forest_2, mean_flux_function, specres_list, \
                     kod_mf_hist, args)
             except ValueError as ve:
@@ -345,18 +352,18 @@ if __name__ == '__main__':
                 continue
             
             nchunks = len(wave)
-            temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, max_obs_spectrum.pi_date, \
-                max_obs_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
+            temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, chosen_spectrum.pi_date, \
+                chosen_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
                 for nc in range(nchunks)]
             
-            spr = SpectralRecord('KOD', qso.qso_name, maxs2n/np.sqrt(max_obs_spectrum.dv), \
-                max_obs_spectrum.coord, temp_fname)
+            spr = SpectralRecord('KOD', qso.qso_name, maxs2n/np.sqrt(chosen_spectrum.dv), \
+                chosen_spectrum.coord, temp_fname)
             spectral_record_list.append(spr)
 
             filename_list.extend(temp_fname) 
 
             if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, max_obs_spectrum, lspecr, pixw, args)
+                saveData(wave, fluxes, errors, temp_fname, chosen_spectrum, lspecr, pixw, args)
 
         if args.compute_mean_flux:
             kod_mf_hist.getMeanFlux()
