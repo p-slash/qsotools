@@ -5,6 +5,7 @@ from os import makedirs as os_makedirs
 import glob
 import argparse
 from collections import namedtuple
+from itertools import groupby
 
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -90,6 +91,34 @@ def saveSPRasTable(spr, fname):
     ascii.write(data, fname, format='csv', overwrite=True)
 
 # ------------------------------
+def findDuplicates(spectral_record_list, args):
+    set_func = lambda x: x.set
+    spectral_record_list.sort(key=set_func)
+
+    for key, gr in groupby(spectral_record_list, key=set_func):
+        # key would be KOD, XQ and UVE
+        cs = list(map(lambda x: x.c.fk5, gr))
+        if key = 'KOD':
+            kod_coord = SkyCoord(cs)
+            kod_spr   = np.array(gr)
+        elif:
+            uve_coord = SkyCoord(cs)
+            uve_spr   = np.array(gr)
+        elif:
+            xq_coord  = SkyCoord(cs)
+            xq_spr    = np.array(gr)
+
+    # Eliminate one by one
+    # kodiaq to squad
+    idx, d2d, d3d = kod_coord.match_to_catalog_sky(uve_coord, nthneighbor=1)
+    sep_constraint = d2d < args.separation * u.arcsec
+    kod_matches = kod_spr[sep_constraint]
+    uve_matches = uve_spr[idx[sep_constraint]]
+
+    for (km, um) in zip(kod_matches, uve_matches):
+        if km.s2n > um.s2n:
+            
+
 def findDuplicates(spectral_record_list, args):
     catalog = SkyCoord(list(map(lambda x: x.c.fk5, spectral_record_list)))
     idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
