@@ -289,8 +289,10 @@ class PowerPlotter(object):
         if plot_dbt:
             psz = self.power_qmle_full[nz]
             pnz = self.power_qmle_noise[nz]
+            psz_label = "Raw"
         else:
             psz = self.power_qmle[nz]
+            psz_label = "Est"
 
         erz = self.error[nz]
         ptz = self.power_true[nz]
@@ -308,18 +310,19 @@ class PowerPlotter(object):
 
         # Start plotting
         top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, xerr = 0, yerr = erz*self.k_bins/np.pi, \
-            fmt='o', label="z=%.1f"%z_val, markersize=3, capsize=2, color='k')
+            fmt='o', label=psz_label, markersize=3, capsize=2, color='k')
         
         if plot_dbt:
             top_ax.errorbar(self.k_bins, pnz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
                 fmt='s', label="Noise", markersize=3, capsize=0, color='r')
+            top_ax.legend(fontsize = 'large')
         
         if plot_true:
             top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, xerr = 0, yerr = 0, \
                 fmt=':', capsize=0, color='k')
 
-        top_ax.text(0.05, 0.15, "z=%.1f"%z_val, transform=top_ax.transAxes, fontsize=TICK_LBL_FONT_SIZE, \
-            verticalalignment='bottom', horizontalalignment='left', bbox={'facecolor':'white', 'pad':5})
+        top_ax.text(0.9, 0.9, "z=%.1f"%z_val, transform=top_ax.transAxes, fontsize=TICK_LBL_FONT_SIZE, \
+            verticalalignment='top', horizontalalignment='right', bbox={'facecolor':'white', 'pad':4})
 
         if noise_dom:
             top_ax.set_xlim(xmax=self.k_bins[-1]*1.1)
