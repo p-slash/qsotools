@@ -87,7 +87,7 @@ class Spectrum:
         self.coord = coord
         
         self.size = len(self.wave)
-        self.mask = error > 0
+        self.mask = np.logical_and(error > 0, flux != 0)
         self.s2n = np.mean(1./error[self.mask])
         self.s2n_lya = self.getS2NLya()
 
@@ -747,7 +747,7 @@ class KODIAQ_OBS_Iterator:
         for obs in self:
             weights = obs.spectrum.mask * self.exp_time
             flux    = weights * obs.spectrum.flux
-            error   = weights * obs.spectrum.error
+            error   = weights * obs.spectrum.error**2
             
             new_specres    += self.exp_time * obs.spectrum.specres
             total_exp_time += self.exp_time 
@@ -765,7 +765,8 @@ class KODIAQ_OBS_Iterator:
 
         coadded_flux  /= coadded_weight
         coadded_error /= coadded_weight
-
+        coadded_error  = np.sqrt(coadded_error)
+        
         coadded_flux[coadded_weight==0]  = 0
         coadded_error[coadded_weight==0] = 0
 
