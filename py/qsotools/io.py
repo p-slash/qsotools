@@ -46,7 +46,7 @@ def readSPRTable(fname):
     t = ascii.read(fname, format='csv')
     SRlambda = lambda x: SpectralRecord(x['SET'], x['QSO'], x['S2N [s/km]'], \
         SkyCoord(x['RA (ICRS)'], x['DEC (ICRS)'], unit='deg'), \
-        x['FNAMES'])
+        x['FNAMES'].split(","))
 
     spr = list(map(SRlambda, t))
 
@@ -69,6 +69,7 @@ def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
             # If that separation is smaller, ignore this match
             other_d2d = d2d[other_idx]
             if np.any(other_d2d < d2d[i]):
+                nonduplicates.append(obj1)
                 continue
 
         if sep_constraint[i] and (idx[i] not in added_idx) and (obj2.s2n > obj1.s2n):
