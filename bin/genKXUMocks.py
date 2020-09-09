@@ -116,7 +116,7 @@ def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
         else:
             nonduplicates.append(obj1)
     
-    rem_objs2 = [cs2i for i, cs2i in cs2.spr if i not in set(idx[sep_constraint])]
+    rem_objs2 = [cs2i for i, cs2i in enumerate(cs2.spr) if i not in set(idx[sep_constraint])]
     nonduplicates += rem_objs2
 
     return nonduplicates
