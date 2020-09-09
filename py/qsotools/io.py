@@ -15,7 +15,7 @@ import fitsio
 from astropy.io import ascii
 from astropy.table import Table
 from astropy.coordinates import SkyCoord
-from astropy.units import hourangle, deg
+from astropy.units import hourangle, deg, arcsec
 
 from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
     LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA
@@ -54,7 +54,7 @@ def readSPRTable(fname):
 
 def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
     idx, d2d, d3d = cs1.coord.match_to_catalog_sky(cs2.coord, nthneighbor=1)
-    sep_constraint = d2d < sep_arcsec * u.arcsec
+    sep_constraint = d2d < sep_arcsec * arcsec
 
     nonduplicates = []
     added_idx = []
