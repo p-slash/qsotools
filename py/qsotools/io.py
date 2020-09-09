@@ -1,6 +1,8 @@
 import struct
 from configparser import ConfigParser
 from os.path import exists as os_exists, join as ospath_join
+from collections import namedtuple
+from itertools import groupby
 
 import numpy as np
 from scipy.stats import binned_statistic
@@ -11,6 +13,7 @@ from scipy.ndimage import median_filter as scipy_median_filter
 import fitsio
 
 from astropy.io import ascii
+from astropy.Table import Table
 from astropy.coordinates import SkyCoord
 from astropy.units import hourangle, deg
 
@@ -24,6 +27,108 @@ TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.
 TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
 TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
 TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
+
+SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
+
+def saveSPRasTable(spr, fname):
+    qsos = np.array(list(map(lambda x: x.qso, spr)))
+    sets = np.array(list(map(lambda x: x.set, spr)))
+    ras  = np.array(list(map(lambda x: x.c.icrs.ra.deg, spr)))
+    decs = np.array(list(map(lambda x: x.c.icrs.dec.deg, spr)))
+    s2ns = np.array(list(map(lambda x: x.s2n, spr)))
+    fnames = np.array(list(map(lambda x: ",".join(x.fnames), spr)))
+
+    data = Table([qsos, ras, decs, s2ns, sets, fnames], \
+        names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET', 'FNAMES'])
+    ascii.write(data, fname, format='csv', overwrite=True)
+
+def readSPRTable(fname):
+    t = ascii.read(fname, format='csv')
+    SRlambda = lambda x: SpectralRecord(x['SET'], x['QSO'], x['S2N [s/km]'], \
+        SkyCoord(x['RA (ICRS)'], x['DEC (ICRS)'], unit='deg'), \
+        x['FNAMES'])
+
+    spr = list(map(SRlambda, t))
+
+    return spr
+    
+def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
+    idx, d2d, d3d = cs1.coord.match_to_catalog_sky(cs2.coord, nthneighbor=1)
+    sep_constraint = d2d < sep_arcsec * u.arcsec
+
+    nonduplicates = []
+    added_idx = []
+
+    for i, obj1 in enumerate(cs1.spr):
+        obj2 = cs2.spr[idx[i]] # Corresponding object
+        
+        # See if obj2 is identified as a match for other targets
+        other_idx = np.where(idx == idx[i])[0]
+        other_idx = other_idx[other_idx != i]
+        if len(other_idx) != 0:
+            # If that separation is smaller, ignore this match
+            other_d2d = d2d[other_idx]
+            if np.any(other_d2d < d2d[i]):
+                continue
+
+        if sep_constraint[i] and (idx[i] not in added_idx) and (obj2.s2n > obj1.s2n):
+            nonduplicates.append(obj2)
+            added_idx.append(idx[i])
+        else:
+            nonduplicates.append(obj1)
+    
+    rem_objs2 = [cs2i for i, cs2i in enumerate(cs2.spr) if i not in set(idx[sep_constraint])]
+    nonduplicates += rem_objs2
+
+    return nonduplicates
+
+def findDuplicates(spectral_record_list, sep_arcsec):
+    set_func = lambda x: x.set
+    spectral_record_list.sort(key=set_func)
+    
+    CoordSPR = namedtuple('CoordSPR', ['coord', 'spr'])
+    cs_list = []
+
+    for key, gr in groupby(spectral_record_list, key=set_func):
+        # key would be KOD, XQ and UVE
+        data = list(gr)
+        cs = list(map(lambda x: x.c.fk5, data))
+        cs_list.append(CoordSPR(SkyCoord(cs), data))
+
+    if len(cs_list) == 1:
+        return spectral_record_list
+
+    two_spr = mergeTwoCatalogs(cs_list[0], cs_list[1], sep_arcsec)
+
+    if len(cs_list) == 2:
+        return two_spr
+
+    two_cs   = SkyCoord(list(map(lambda x: x.c.fk5, two_spr)))
+    three_cs = mergeTwoCatalogs(CoordSPR(two_cs, two_spr), cs_list[2], sep_arcsec)
+    
+    return three_cs
+
+# def findDuplicatesAllIn(spectral_record_list, args):
+#     catalog = SkyCoord(list(map(lambda x: x.c.fk5, spectral_record_list)))
+#     idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
+
+#     np.savetxt(ospath_join(args.OutputDir, "d2d_arcsec.dat"), d2d.arcsec)
+#     print("d2d values in arcsec are saved in output directory.")
+#     nonduplicates = []
+
+#     for i, (spr, idxi, d2di) in enumerate(zip(spectral_record_list, idx, d2d)):
+#         m2 = spectral_record_list[idxi]
+#         if d2di < args.separation * u.arcsec and spr.set != m2.set:
+#             if idxi <= i:
+#                 continue
+#             if spr.s2n > m2.s2n:
+#                 nonduplicates.append(spr)
+#             else:
+#                 nonduplicates.append(m2)
+#         else:
+#             nonduplicates.append(spr)
+    
+#     return nonduplicates
 
 class Spectrum:
     """
