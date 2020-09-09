@@ -4,19 +4,12 @@ from os.path import join as ospath_join
 from os import makedirs as os_makedirs
 import glob
 import argparse
-from collections import namedtuple
-from itertools import groupby
 
 import numpy as np
-from astropy.coordinates import SkyCoord
-import astropy.units as u
-from astropy.table import Table
-from astropy.io import ascii
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-from qsotools.io import BinaryQSO, XQ100Fits, SQUADFits, \
-    TABLE_KODIAQ_ASU, KODIAQ_QSO_Iterator, KODIAQ_OBS_Iterator
+import qsotools.io as qio
 import qsotools.fiducial as fid
 
 # Define Saving Functions
@@ -64,7 +57,7 @@ def saveParameters(txt_basefilename, f1, f2, args):
 
 def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width, args):
     for (w, f, e, fname) in zip(waves, fluxes, errors, fnames):
-        mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
+        mfile = qio.BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
         mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.coord.dec.rad, obs_fits.coord.ra.rad, \
             obs_fits.s2n, spec_res, pixel_width)
 
@@ -78,97 +71,7 @@ def saveListByLine(array, fname):
             toWrite.write('%s\n'%str(a))
     toWrite.close()
 
-def saveSPRasTable(spr, fname):
-    qsos = np.array(list(map(lambda x: x.qso, spr)))
-    sets = np.array(list(map(lambda x: x.set, spr)))
-    ras  = np.array(list(map(lambda x: x.c.icrs.ra.deg, spr)))
-    decs = np.array(list(map(lambda x: x.c.icrs.dec.deg, spr)))
-    s2ns = np.array(list(map(lambda x: x.s2n, spr)))
-    fnames = np.array(list(map(lambda x: ",".join(x.fnames), spr)))
-
-    data = Table([qsos, ras, decs, s2ns, sets, fnames], \
-        names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET', 'FNAMES'])
-    ascii.write(data, fname, format='csv', overwrite=True)
-
 # ------------------------------
-def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
-    idx, d2d, d3d = cs1.coord.match_to_catalog_sky(cs2.coord, nthneighbor=1)
-    sep_constraint = d2d < sep_arcsec * u.arcsec
-
-    nonduplicates = []
-    added_idx = []
-
-    for i, obj1 in enumerate(cs1.spr):
-        obj2 = cs2.spr[idx[i]] # Corresponding object
-        
-        # See if obj2 is identified as a match for other targets
-        other_idx = np.where(idx == idx[i])[0]
-        other_idx = other_idx[other_idx != i]
-        if len(other_idx) != 0:
-            # If that separation is smaller, ignore this match
-            other_d2d = d2d[other_idx]
-            if np.any(other_d2d < d2d[i]):
-                continue
-
-        if sep_constraint[i] and (idx[i] not in added_idx) and (obj2.s2n > obj1.s2n):
-            nonduplicates.append(obj2)
-            added_idx.append(idx[i])
-        else:
-            nonduplicates.append(obj1)
-    
-    rem_objs2 = [cs2i for i, cs2i in enumerate(cs2.spr) if i not in set(idx[sep_constraint])]
-    nonduplicates += rem_objs2
-
-    return nonduplicates
-
-def findDuplicates(spectral_record_list, args):
-    set_func = lambda x: x.set
-    spectral_record_list.sort(key=set_func)
-    
-    CoordSPR = namedtuple('CoordSPR', ['coord', 'spr'])
-    cs_list = []
-
-    for key, gr in groupby(spectral_record_list, key=set_func):
-        # key would be KOD, XQ and UVE
-        data = list(gr)
-        cs = list(map(lambda x: x.c.fk5, data))
-        cs_list.append(CoordSPR(SkyCoord(cs), data))
-
-    if len(cs_list) == 1:
-        return spectral_record_list
-
-    two_spr = mergeTwoCatalogs(cs_list[0], cs_list[1], args.separation)
-
-    if len(cs_list) == 2:
-        return two_spr
-
-    two_cs   = SkyCoord(list(map(lambda x: x.c.fk5, two_spr)))
-    three_cs = mergeTwoCatalogs(CoordSPR(two_cs, two_spr), cs_list[2], args.separation)
-    
-    return three_cs
-
-def findDuplicatesAllIn(spectral_record_list, args):
-    catalog = SkyCoord(list(map(lambda x: x.c.fk5, spectral_record_list)))
-    idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
-
-    np.savetxt(ospath_join(args.OutputDir, "d2d_arcsec.dat"), d2d.arcsec)
-    print("d2d values in arcsec are saved in output directory.")
-    nonduplicates = []
-
-    for i, (spr, idxi, d2di) in enumerate(zip(spectral_record_list, idx, d2d)):
-        m2 = spectral_record_list[idxi]
-        if d2di < args.separation * u.arcsec and spr.set != m2.set:
-            if idxi <= i:
-                continue
-            if spr.s2n > m2.s2n:
-                nonduplicates.append(spr)
-            else:
-                nonduplicates.append(m2)
-        else:
-            nonduplicates.append(spr)
-    
-    return nonduplicates
-
 def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
     if not args.save_full_flux:
         if args.without_z_evo:
@@ -358,7 +261,6 @@ if __name__ == '__main__':
     no_lya_quasar_list = []
     filename_list = []
     specres_list  = set()
-    SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
     spectral_record_list = []
 
     if not args.real_data:
@@ -369,7 +271,7 @@ if __name__ == '__main__':
     # Start with KODIAQ
     if args.KODIAQDir:
         print("RUNNING ON KODIAQ.........")
-        qso_iter = KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
+        qso_iter = qio.KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
 
         if args.real_data:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
@@ -382,7 +284,7 @@ if __name__ == '__main__':
         # Pick the one with highest signal to noise in Ly-alpha region
         for qso in qso_iter:
             print("********************************************", flush=True)
-            obs_iter = KODIAQ_OBS_Iterator(qso)
+            obs_iter = qio.KODIAQ_OBS_Iterator(qso)
 
             if args.coadd_kodiaq:
                 # Co-add multiple observations
@@ -413,7 +315,7 @@ if __name__ == '__main__':
                 chosen_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
                 for nc in range(nchunks)]
             
-            spr = SpectralRecord('KOD', qso.qso_name, maxs2n/np.sqrt(chosen_spectrum.dv), \
+            spr = qio.SpectralRecord('KOD', qso.qso_name, maxs2n/np.sqrt(chosen_spectrum.dv), \
                 chosen_spectrum.coord, temp_fname)
             spectral_record_list.append(spr)
 
@@ -438,7 +340,7 @@ if __name__ == '__main__':
 
         for f in glob.glob(ospath_join(args.XQ100Dir, "*.fits")):
             print("********************************************", flush=True)
-            qso = XQ100Fits(f, correctSeeing=True)
+            qso = qio.XQ100Fits(f, correctSeeing=True)
             qso.getS2NLya(forest_1, forest_2)
 
             if qso.s2n_lya == -1:
@@ -458,7 +360,7 @@ if __name__ == '__main__':
             temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
                 wave[0][0], wave[0][-1], settings_txt)]
             
-            spr = SpectralRecord('XQ', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
+            spr = qio.SpectralRecord('XQ', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
                 qso.coord, temp_fname)
             spectral_record_list.append(spr)
 
@@ -484,7 +386,7 @@ if __name__ == '__main__':
 
         for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
             print("********************************************", flush=True)
-            qso = SQUADFits(f, correctSeeing=True, corrError=True)
+            qso = qio.SQUADFits(f, correctSeeing=True, corrError=True)
             print(qso.object)
             qso.getS2NLya(forest_1, forest_2)
 
@@ -510,7 +412,7 @@ if __name__ == '__main__':
             temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
                     wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
             
-            spr = SpectralRecord('UVE', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
+            spr = qio.SpectralRecord('UVE', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
                 qso.coord, temp_fname)
             spectral_record_list.append(spr)
 
@@ -532,9 +434,9 @@ if __name__ == '__main__':
     print("Saving chunk spectra file list as ", temp_fname)
     saveListByLine(filename_list, temp_fname)
 
-    saveSPRasTable(spectral_record_list, ospath_join(args.OutputDir, "spr-all.csv"))
-    nondups = findDuplicates(spectral_record_list, args)
-    saveSPRasTable(nondups, ospath_join(args.OutputDir, "spr-nonduplicates.csv"))
+    qio.saveSPRasTable(spectral_record_list, ospath_join(args.OutputDir, "spr-all.csv"))
+    nondups = qio.findDuplicates(spectral_record_list, args)
+    qio.saveSPRasTable(nondups, ospath_join(args.OutputDir, "spr-nonduplicates.csv"))
 
     filename_list = []
     for fl in map(lambda x: x.fnames, nondups):
