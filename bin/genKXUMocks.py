@@ -261,7 +261,7 @@ if __name__ == '__main__':
     no_lya_quasar_list = []
     filename_list = []
     specres_list  = set()
-    spectral_record_list = []
+    spectral_record_list = qio.SpectralRecordList()
 
     if not args.real_data:
         lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
@@ -315,9 +315,8 @@ if __name__ == '__main__':
                 chosen_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
                 for nc in range(nchunks)]
             
-            spr = qio.SpectralRecord('KOD', qso.qso_name, maxs2n/np.sqrt(chosen_spectrum.dv), \
+            spectral_record_list.append('KOD', qso.qso_name, maxs2n/np.sqrt(chosen_spectrum.dv), \
                 chosen_spectrum.coord, temp_fname)
-            spectral_record_list.append(spr)
 
             filename_list.extend(temp_fname) 
 
@@ -360,9 +359,8 @@ if __name__ == '__main__':
             temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
                 wave[0][0], wave[0][-1], settings_txt)]
             
-            spr = qio.SpectralRecord('XQ', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
+            spectral_record_list.append('XQ', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
                 qso.coord, temp_fname)
-            spectral_record_list.append(spr)
 
             filename_list.extend(temp_fname) 
 
@@ -412,9 +410,8 @@ if __name__ == '__main__':
             temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
                     wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
             
-            spr = qio.SpectralRecord('UVE', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
+            spectral_record_list.append('UVE', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
                 qso.coord, temp_fname)
-            spectral_record_list.append(spr)
 
             filename_list.extend(temp_fname) 
 
@@ -434,9 +431,9 @@ if __name__ == '__main__':
     print("Saving chunk spectra file list as ", temp_fname)
     saveListByLine(filename_list, temp_fname)
 
-    qio.saveSPRasTable(spectral_record_list, ospath_join(args.OutputDir, "spr-all.csv"))
-    nondups = qio.findDuplicates(spectral_record_list, args)
-    qio.saveSPRasTable(nondups, ospath_join(args.OutputDir, "spr-nonduplicates.csv"))
+    spectral_record_list.saveAsTable(ospath_join(args.OutputDir, "spr-all.csv"))
+    nondups = spectral_record_list.getNonDuplicates(args.separation)
+    nondups.saveAsTable(ospath_join(args.OutputDir, "spr-nonduplicates.csv"))
 
     filename_list = []
     for fl in map(lambda x: x.fnames, nondups):
