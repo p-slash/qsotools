@@ -96,17 +96,28 @@ def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
     sep_constraint = d2d < sep_arcsec * u.arcsec
 
     nonduplicates = []
-    for i, km in enumerate(cs1.spr):
-        um = cs2.spr[idx[i]] # Corresponding uves object
-        
-        if sep_constraint[i] and um.s2n > km.s2n:
-            nonduplicates.append(um)
-        else:
-            nonduplicates.append(km)
-    
-    rem_uve = [cs2.spr[i] for i in idx[~sep_constraint]]
+    added_idx = []
 
-    nonduplicates += rem_uve
+    for i, obj1 in enumerate(cs1.spr):
+        obj2 = cs2.spr[idx[i]] # Corresponding object
+        
+        # See if obj2 is identified as a match for other targets
+        other_idx = np.where(idx == idx[i])[0]
+        other_idx = other_idx[other_idx != i]
+        if len(other_idx) != 0:
+            # If that separation is smaller, ignore this match
+            other_d2d = d2d[other_idx]
+            if np.any(other_d2d < d2d[i]):
+                continue
+
+        if sep_constraint[i] and (idx[i] not in added_idx) and (obj2.s2n > obj1.s2n):
+            nonduplicates.append(obj2)
+            added_idx.append(idx[i])
+        else:
+            nonduplicates.append(obj1)
+    
+    rem_objs2 = [cs2i for i, cs2i in cs2.spr if i not in set(idx[sep_constraint])]
+    nonduplicates += rem_objs2
 
     return nonduplicates
 
