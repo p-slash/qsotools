@@ -5,6 +5,7 @@ from os import makedirs as os_makedirs
 import glob
 import argparse
 from collections import namedtuple
+from itertools import groupby
 
 import numpy as np
 from astropy.coordinates import SkyCoord
@@ -90,7 +91,52 @@ def saveSPRasTable(spr, fname):
     ascii.write(data, fname, format='csv', overwrite=True)
 
 # ------------------------------
+def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
+    idx, d2d, d3d = cs1.coord.match_to_catalog_sky(cs2.coord, nthneighbor=1)
+    sep_constraint = d2d < sep_arcsec * u.arcsec
+
+    nonduplicates = []
+    for i, km in enumerate(cs1.spr):
+        um = cs2.spr[idx[i]] # Corresponding uves object
+        
+        if sep_constraint[i] and um.s2n > km.s2n:
+            nonduplicates.append(um)
+        else:
+            nonduplicates.append(km)
+    
+    rem_uve = [cs2.spr[i] for i in idx[~sep_constraint]]
+
+    nonduplicates += rem_uve
+
+    return nonduplicates
+
 def findDuplicates(spectral_record_list, args):
+    set_func = lambda x: x.set
+    spectral_record_list.sort(key=set_func)
+    
+    CoordSPR = namedtuple('CoordSPR', ['coord', 'spr'])
+    cs_list = []
+
+    for key, gr in groupby(spectral_record_list, key=set_func):
+        # key would be KOD, XQ and UVE
+        data = list(gr)
+        cs = list(map(lambda x: x.c.fk5, data))
+        cs_list.append(CoordSPR(SkyCoord(cs), data))
+
+    if len(cs_list) == 1:
+        return spectral_record_list
+
+    two_spr = mergeTwoCatalogs(cs_list[0], cs_list[1], args.separation)
+
+    if len(cs_list) == 2:
+        return two_spr
+
+    two_cs   = SkyCoord(list(map(lambda x: x.c.fk5, two_spr)))
+    three_cs = mergeTwoCatalogs(CoordSPR(two_cs, two_spr), cs_list[2], args.separation)
+    
+    return three_cs
+
+def findDuplicatesAllIn(spectral_record_list, args):
     catalog = SkyCoord(list(map(lambda x: x.c.fk5, spectral_record_list)))
     idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
 
@@ -310,9 +356,9 @@ if __name__ == '__main__':
 
     # ------------------------------    
     # Start with KODIAQ
-    if args.KODIAQdir:
+    if args.KODIAQDir:
         print("RUNNING ON KODIAQ.........")
-        qso_iter = KODIAQ_QSO_Iterator(args.KODIAQdir, clean_pix=False)
+        qso_iter = KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
 
         if args.real_data:
             mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
