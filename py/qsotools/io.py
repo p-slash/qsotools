@@ -13,7 +13,7 @@ from scipy.ndimage import median_filter as scipy_median_filter
 import fitsio
 
 from astropy.io import ascii
-from astropy.Table import Table
+from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from astropy.units import hourangle, deg
 
@@ -51,7 +51,7 @@ def readSPRTable(fname):
     spr = list(map(SRlambda, t))
 
     return spr
-    
+
 def mergeTwoCatalogs(cs1, cs2, sep_arcsec):
     idx, d2d, d3d = cs1.coord.match_to_catalog_sky(cs2.coord, nthneighbor=1)
     sep_constraint = d2d < sep_arcsec * u.arcsec
