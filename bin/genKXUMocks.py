@@ -72,21 +72,21 @@ def saveListByLine(array, fname):
     toWrite.close()
 
 # ------------------------------
-def convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args):
+def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
     if not args.save_full_flux:
         if args.without_z_evo:
             spectrum_z = z_center * np.ones_like(wave)
         else:
             spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
         
-        true_mean_flux = mean_flux_function(spectrum_z)
+        true_mean_flux = meanFluxFunc(spectrum_z)
 
         fluxes  = fluxes / true_mean_flux - 1
         errors /= true_mean_flux
 
     return fluxes, errors
 
-def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
+def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
@@ -133,7 +133,7 @@ def genMocks(qso, f1, f2, mean_flux_function, specres_list, \
     else:
         wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
 
-    fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, mean_flux_function, args)
+    fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args)
 
     # Skip short spectrum
     isShort = lambda x: (args.skip and len(x) < MAX_NO_PIXELS * args.skip) or len(x)==0
@@ -236,9 +236,9 @@ if __name__ == '__main__':
 
     # Pick mean flux function
     if args.gauss:
-        mean_flux_function = fid.meanFluxFG08
+        meanFluxFunc = fid.meanFluxFG08
     else:
-        mean_flux_function = lm.lognMeanFluxGH
+        meanFluxFunc = lm.lognMeanFluxGH
 
     # Decide if it's real data
     if args.real_data:
@@ -274,8 +274,11 @@ if __name__ == '__main__':
         qso_iter = qio.KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
 
         if args.real_data:
-            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
-            # mean_flux_function = fid.meanFluxFG08
+            if args.side_band == 0:
+                meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
+            else:
+                meanFluxFunc = lambda z: 1.0
+            # meanFluxFunc = fid.meanFluxFG08
 
         kod_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
@@ -303,7 +306,7 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(chosen_spectrum, \
-                    forest_1, forest_2, mean_flux_function, specres_list, \
+                    forest_1, forest_2, meanFluxFunc, specres_list, \
                     kod_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
@@ -332,7 +335,10 @@ if __name__ == '__main__':
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
         if args.real_data:
-            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
+            if args.side_band == 0:
+                meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
+            else:
+                meanFluxFunc = lambda z: 1.0
             # lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
 
         xq_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
@@ -349,7 +355,7 @@ if __name__ == '__main__':
 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, \
-                    forest_2, mean_flux_function, specres_list, \
+                    forest_2, meanFluxFunc, specres_list, \
                     xq_mf_hist, args, disableChunk=True)
             except ValueError as ve:
                 # print(ve)
@@ -377,7 +383,10 @@ if __name__ == '__main__':
         print("RUNNING ON SQUAD/UVES.........")
 
         if args.real_data:
-            mean_flux_function = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
+            if args.side_band == 0:
+                meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
+            else:
+                meanFluxFunc = lambda z: 1.0
             # lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS_NODLA)
 
         us_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
@@ -400,7 +409,7 @@ if __name__ == '__main__':
                 
             try:
                 wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, forest_2, \
-                    mean_flux_function, specres_list, us_mf_hist, args)
+                    meanFluxFunc, specres_list, us_mf_hist, args)
             except ValueError as ve:
                 # print(ve)
                 print(ve.args)
@@ -436,7 +445,7 @@ if __name__ == '__main__':
     nondups.saveAsTable(ospath_join(args.OutputDir, "spr-nonduplicates.csv"))
 
     filename_list = []
-    for fl in map(lambda x: x.fnames, nondups):
+    for fl in map(lambda x: x.fnames, nondups.spr):
         filename_list.extend(fl)
     temp_fname = ospath_join(args.OutputDir, "file_list_qso-nonduplicates.txt")
     print("Saving chunk spectra file list as ", temp_fname)
