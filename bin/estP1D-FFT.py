@@ -70,7 +70,7 @@ if __name__ == '__main__':
     power_table.write(p1d_filename, format='ascii.fixed_width', \
         formats={'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
 
-     print("P1D saved as ", p1d_filename)
+    print("P1D saved as ", p1d_filename)
 
 
 
