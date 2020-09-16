@@ -19,10 +19,9 @@ def interpolate2Grid(v, f, padding = 1000.):
 
     interpF, _, _ = binned_statistic(v, f, statistic='sum', bins=new_varr)
 
-    print(interpF)
     return interpF, dv
 
-def binPowerSpectra(raw_p, raw_k, k_edges):
+def binPowerSpectra(raw_k, raw_p, k_edges):
     binned_power,  _, binnumber = binned_statistic(raw_k, raw_p, statistic='sum', bins=k_edges)
     counts = np.bincount(binnumber, minlength=len(k_edges)+1)
 
@@ -42,6 +41,7 @@ if __name__ == '__main__':
     header = file_list.readline()
 
     power = np.zeros((config_qmle.z_n, config_qmle.k_bins.size))
+    print(power.shape)
     counts = np.zeros_like(power)
 
     for fl in file_list:
@@ -63,8 +63,10 @@ if __name__ == '__main__':
         p1d_f = np.abs(np.fft.rfft(delta_f))**2 * dv
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
 
-        p, c = binPowerSpectra(p1d_f, this_k_arr, config_qmle.k_edges)
-        print(p.shape, power[z_bin_no].shape)
+        p, c = binPowerSpectra(this_k_arr, p1d_f, config_qmle.k_edges)
+        print(p.shape)
+        print(power[z_bin_no].shape)
+        
         power[z_bin_no] += p
         counts[z_bin_no] += c[1:-1]
 
