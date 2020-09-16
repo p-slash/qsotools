@@ -61,7 +61,7 @@ if __name__ == '__main__':
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
 
         p, c = binPowerSpectra(p1d_f, this_k_arr, config_qmle.k_edges)
-        power[z_bin_no] += p
+        power[z_bin_no] += p[:]
         counts[z_bin_no] += c[1:-1]
 
     power /= counts
