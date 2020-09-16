@@ -41,17 +41,16 @@ if __name__ == '__main__':
     header = file_list.readline()
 
     power = np.zeros((config_qmle.z_n, config_qmle.k_bins.size))
-    print(power.shape)
     counts = np.zeros_like(power)
 
     for fl in file_list:
-        print("Reading", fl)
+        print("Reading", fl.rstrip())
         f = ospath_join(config_qmle.qso_dir, fl.rstrip())
         bq = qio.BinaryQSO(f, 'r')
         bq.read()
 
         z_med = bq.wave[int(bq.N/2)] / fid.LYA_WAVELENGTH - 1
-        z_bin_no = (z_med - config_qmle.z_0) / config_qmle.z_d
+        z_bin_no = int((z_med - config_qmle.z_0) / config_qmle.z_d)
         print("Median redshift:", z_med)
 
         if z_bin_no < 0 or z_bin_no > config_qmle.z_n-1:
@@ -64,8 +63,6 @@ if __name__ == '__main__':
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
 
         p, c = binPowerSpectra(this_k_arr, p1d_f, config_qmle.k_edges)
-        print(p.shape)
-        print(power[z_bin_no].shape)
         
         power[z_bin_no] += p
         counts[z_bin_no] += c[1:-1]
