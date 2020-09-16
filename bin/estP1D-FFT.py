@@ -59,9 +59,9 @@ if __name__ == '__main__':
 
         p, c = binPowerSpectra(p1d_f, this_k_arr, k_edges)
         power += p
-        counts += c
+        counts += c[1:-1]
 
-    power /= c
+    power /= counts
 
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
 
