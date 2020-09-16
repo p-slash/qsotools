@@ -19,6 +19,7 @@ def interpolate2Grid(v, f, padding = 1000.):
 
     interpF, _, _ = binned_statistic(v, f, statistic='sum', bins=new_varr)
 
+    print(interpF)
     return interpF, dv
 
 def binPowerSpectra(raw_p, raw_k, k_edges):
@@ -44,13 +45,15 @@ if __name__ == '__main__':
     counts = np.zeros_like(power)
 
     for fl in file_list:
+        print("Reading", fl)
         f = ospath_join(config_qmle.qso_dir, fl.rstrip())
         bq = qio.BinaryQSO(f, 'r')
         bq.read()
 
         z_med = bq.wave[int(bq.N/2)] / fid.LYA_WAVELENGTH - 1
         z_bin_no = (z_med - config_qmle.z_0) / config_qmle.z_d
-        
+        print("Median redshift:", z_med)
+
         if z_bin_no < 0 or z_bin_no > config_qmle.z_n-1:
             continue
 
@@ -61,7 +64,8 @@ if __name__ == '__main__':
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
 
         p, c = binPowerSpectra(p1d_f, this_k_arr, config_qmle.k_edges)
-        power[z_bin_no] += p[:]
+        print(p.shape, power[z_bin_no].shape)
+        power[z_bin_no] += p
         counts[z_bin_no] += c[1:-1]
 
     power /= counts
