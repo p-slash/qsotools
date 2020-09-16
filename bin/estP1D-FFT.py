@@ -37,13 +37,10 @@ if __name__ == '__main__':
     output_dir  = config_qmle.parameters['OutputDir']
     output_base = config_qmle.parameters['OutputFileBase']
 
-    k_edges, k_centers = fid.formBins(config_qmle.k_nlin, config_qmle.k_nlog, \
-        config_qmle.k_dlin, config_qmle.k_dlog, config_qmle.k_0, config_qmle.k_ledge)
-
     file_list = open(config_qmle.qso_list, 'r')
     header = file_list.readline()
 
-    power = np.zeros(len(k_centers))
+    power = np.zeros((config_qmle.z_n, config_qmle.k_bins.size))
     counts = np.zeros_like(power)
 
     for fl in file_list:
@@ -51,24 +48,33 @@ if __name__ == '__main__':
         bq = qio.BinaryQSO(f, 'r')
         bq.read()
 
+        z_med = bq.wave[int(bq.N/2)] / fid.LYA_WAVELENGTH - 1
+        z_bin_no = (z_med - config_qmle.z_0) / config_qmle.z_d
+        
+        if z_bin_no < 0 or z_bin_no > config_qmle.z_n-1:
+            continue
+
         v_arr = fid.LIGHT_SPEED * np.log(bq.wave)
         delta_f, dv = interpolate2Grid(v_arr, bq.flux)
 
         p1d_f = np.abs(np.fft.rfft(delta_f))**2 * dv
-        this_k_arr = np.fft.rfftfreq(delta_f.size, dv)
+        this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
 
-        p, c = binPowerSpectra(p1d_f, this_k_arr, k_edges)
-        power += p
-        counts += c[1:-1]
+        p, c = binPowerSpectra(p1d_f, this_k_arr, config_qmle.k_edges)
+        power[z_bin_no] += p
+        counts[z_bin_no] += c[1:-1]
 
     power /= counts
 
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
 
-    power_table = Table([k_centers, power], names=('k', 'P1D'))
+    zarr_repeated = np.repeat(config_qmle.z_bins, config_qmle.k_bins.size)
+    karr_repeated = np.tile(config_qmle.k_bins, config_qmle.z_n)
+
+    power_table = Table([zarr_repeated, karr_repeated, power.ravel()], names=('z', 'k', 'P1D'))
 
     power_table.write(p1d_filename, format='ascii.fixed_width', \
-        formats={'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
+        formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
 
     print("P1D saved as ", p1d_filename)
 
