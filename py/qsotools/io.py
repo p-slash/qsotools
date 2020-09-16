@@ -1052,7 +1052,7 @@ class XQ100Fits(Spectrum):
     dec : float
         DECL in radians
 
-    object : str
+    qso_name : str
         Name of the quasar.
     arm : str
         Spectrograph arm.
@@ -1112,10 +1112,10 @@ class XQ100Fits(Spectrum):
             hdr0 = xqf[0].read_header()
             data = xqf[1].read()[0]
 
-        self.object = hdr0['OBJECT']
+        self.qso_name = hdr0['OBJECT']
         self.arm    = hdr0['DISPELEM']
 
-        i = XQ100Fits.fits_list.where("OBJECT == '%s'"%self.object)[0]
+        i = XQ100Fits.fits_list.where("OBJECT == '%s'"%self.qso_name)[0]
         d = XQ100Fits.fits_list[i]
         z_qso = d['Z_QSO']
         
@@ -1209,7 +1209,7 @@ class SQUADFits(Spectrum):
     dec : float
         DECL in radians
 
-    object : str
+    qso_name : str
         Name of the quasar.
     
     Methods
@@ -1252,9 +1252,9 @@ class SQUADFits(Spectrum):
             hdr0 = usf[0].read_header()
             data = usf[1].read()[0]
 
-        self.object = hdr0['OBJECT']
+        self.qso_name = hdr0['OBJECT']
 
-        d = SQUADFits.dr1_csv[SQUADFits.dr1_csv["Name_Adopt"] == self.object]
+        d = SQUADFits.dr1_csv[SQUADFits.dr1_csv["Name_Adopt"] == self.qso_name]
         d = np.array(d)[0]
         z_qso = float(d["zem_Adopt"])
         self.flag = str(d["Spec_status"])
