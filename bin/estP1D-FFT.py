@@ -59,7 +59,7 @@ if __name__ == '__main__':
         v_arr = fid.LIGHT_SPEED * np.log(bq.wave)
         delta_f, dv = interpolate2Grid(v_arr, bq.flux)
 
-        p1d_f = np.abs(np.fft.rfft(delta_f))**2 * dv
+        p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
 
         p, c = binPowerSpectra(this_k_arr, p1d_f, config_qmle.k_edges)
