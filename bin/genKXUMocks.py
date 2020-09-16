@@ -86,6 +86,7 @@ def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
 
     return fluxes, errors
 
+# This function is the main pipeline for reduction
 def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     mean_flux_hist, args, disableChunk=False):
     forest_c = (f1+f2)/2
@@ -163,6 +164,80 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
 
     return wave, fluxes, errors, low_spec_res, pixel_width
 
+# This function is wrapper for iterations of each data set
+def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
+    filename_list, meanFluxFunc, settings_txt, args):
+    mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
+
+    if args.real_data and args.side_band == 0:
+        if dataset == 'KOD':
+            meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
+        elif dataset == 'XQ':
+            meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
+        elif dataset == 'UVE':
+            meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
+    elif args.real_data and args.side_band != 0:
+        meanFluxFunc = lambda z: 1.0
+
+    for it in set_iter:
+        print("********************************************", flush=True)
+        if dataset == 'KOD':
+            obs_iter = qio.KODIAQ_OBS_Iterator(it)
+            if args.coadd_kodiaq:
+                # Co-add multiple observations
+                qso = obs_iter.coaddObservations(args.coadd_kodiaq)
+                s2n_this = qso.getS2NLya(f1, f2)
+            else:
+                # Pick highest S2N obs
+                qso, s2n_this = obs_iter.maxLyaObservation(f1, f2)
+            qso.print_details()
+
+        elif dataset == 'XQ':
+            qso = qio.XQ100Fits(it, correctSeeing=True)
+            s2n_this = qso.getS2NLya(f1, f2)
+
+        elif dataset == 'UVE':
+            qso = qio.SQUADFits(it, correctSeeing=True, corrError=True)
+            s2n_this = qso.getS2NLya(f1, f2)
+        
+        print(qso.qso_name)
+
+        if s2n_this == -1:
+            print("SKIP: No Lya or Side Band coverage!")
+            continue
+
+        if dataset == 'UVE' and qso.flag != '0':
+            print("SKIP: Spec. status is not 0.")
+            continue
+
+        try:
+            wave, fluxes, errors, lspecr, pixw = genMocks(qso, \
+                f1, f2, meanFluxFunc, specres_list, \
+                mf_hist, args, disableChunk=(dataset == 'XQ'))
+        except ValueError as ve:
+            print(ve.args)
+            continue
+
+        nchunks = len(wave)
+        qname = qso.qso_name.replace(" ", "")
+        if dataset == 'XQ':
+            qname += "_"+qso.arm
+
+        temp_fname = ["k%s-%d_%dA_%dA%s.dat" % (qso.qso_name, nc, \
+            wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
+        
+        record.append(dataset, qso.qso_name, s2n_this/np.sqrt(qso.dv), \
+            qso.coord, temp_fname)
+
+        filename_list.extend(temp_fname) 
+
+        if not args.nosave:
+            saveData(wave, fluxes, errors, temp_fname, chosen_spectrum, lspecr, pixw, args)
+
+    if args.compute_mean_flux:
+        mf_hist.getMeanFlux()
+        mf_hist.saveHistograms(ospath_join(args.OutputDir, "%s-stats%s"%(dataset, settings_txt)))
+
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
@@ -192,9 +267,8 @@ if __name__ == '__main__':
     parser.add_argument("--const-resolution", type=int, \
         help="Use this resolution for mocks when passed instead.")
     parser.add_argument("--const-error", type=float, \
-        help="Use this constant error for mocks when passed instead.")
-    parser.add_argument("--observed-errors", help=("Add exact KODIAQ/XQ-100 errors onto final grid. "\
-        "Beware of resampling."), action="store_true")
+        help="Use this constant error for mocks when passed instead. " \
+        "Otherwise data errors are used.")
 
     parser.add_argument("--gauss", help="Generate Gaussian mocks", action="store_true")
     parser.add_argument("--without_z_evo", help="Turn of redshift evolution", action="store_true")
@@ -272,164 +346,26 @@ if __name__ == '__main__':
     if args.KODIAQDir:
         print("RUNNING ON KODIAQ.........")
         qso_iter = qio.KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
-
-        if args.real_data:
-            if args.side_band == 0:
-                meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
-            else:
-                meanFluxFunc = lambda z: 1.0
-            # meanFluxFunc = fid.meanFluxFG08
-
-        kod_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
-
+        
         # Start iterating quasars in KODIAQ sample
         # Each quasar has multiple observations
         # Pick the one with highest signal to noise in Ly-alpha region
-        for qso in qso_iter:
-            print("********************************************", flush=True)
-            obs_iter = qio.KODIAQ_OBS_Iterator(qso)
-
-            if args.coadd_kodiaq:
-                # Co-add multiple observations
-                chosen_spectrum = obs_iter.coaddObservations(args.coadd_kodiaq)
-                maxs2n = chosen_spectrum.getS2NLya(forest_1, forest_2)
-            else:
-                # Pick highest S2N obs
-                chosen_spectrum, maxs2n = obs_iter.maxLyaObservation(forest_1, forest_2)
-
-            chosen_spectrum.print_details()
-
-            if maxs2n == -1:
-                print("SKIP: No Lya or Side Band coverage!")
-                no_lya_quasar_list.append(qso.qso_name)
-                continue
-
-            try:
-                wave, fluxes, errors, lspecr, pixw = genMocks(chosen_spectrum, \
-                    forest_1, forest_2, meanFluxFunc, specres_list, \
-                    kod_mf_hist, args)
-            except ValueError as ve:
-                # print(ve)
-                print(ve.args)
-                continue
-            
-            nchunks = len(wave)
-            temp_fname = ["k%s_%s_%s-%d_%dA_%dA%s.dat" % (qso.qso_name, chosen_spectrum.pi_date, \
-                chosen_spectrum.spec_prefix, nc, wave[nc][0], wave[nc][-1], settings_txt) \
-                for nc in range(nchunks)]
-            
-            spectral_record_list.append('KOD', qso.qso_name, maxs2n/np.sqrt(chosen_spectrum.dv), \
-                chosen_spectrum.coord, temp_fname)
-
-            filename_list.extend(temp_fname) 
-
-            if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, chosen_spectrum, lspecr, pixw, args)
-
-        if args.compute_mean_flux:
-            kod_mf_hist.getMeanFlux()
-            kod_mf_hist.saveHistograms(ospath_join(args.OutputDir, "kod-stats%s"%settings_txt))
-
+        iterateSpectra(qso_iter, 'KOD', forest_1, forest_2, specres_list, spectral_record_list, \
+            filename_list, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # XQ-100
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
-        if args.real_data:
-            if args.side_band == 0:
-                meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
-            else:
-                meanFluxFunc = lambda z: 1.0
-            # lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_FIT_PARAMS)
-
-        xq_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
-
-        for f in glob.glob(ospath_join(args.XQ100Dir, "*.fits")):
-            print("********************************************", flush=True)
-            qso = qio.XQ100Fits(f, correctSeeing=True)
-            qso.getS2NLya(forest_1, forest_2)
-
-            if qso.s2n_lya == -1:
-                print("SKIP: No Lya or Side Band coverage!")
-                no_lya_quasar_list.append(f)
-                continue
-
-            try:
-                wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, \
-                    forest_2, meanFluxFunc, specres_list, \
-                    xq_mf_hist, args, disableChunk=True)
-            except ValueError as ve:
-                # print(ve)
-                print(ve.args)
-                continue
-            
-            temp_fname = ["xq%s_%s_%dA_%dA%s.dat" % (qso.object.replace(" ", ""), qso.arm, \
-                wave[0][0], wave[0][-1], settings_txt)]
-            
-            spectral_record_list.append('XQ', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
-                qso.coord, temp_fname)
-
-            filename_list.extend(temp_fname) 
-
-            if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
-
-        if args.compute_mean_flux:
-            xq_mf_hist.getMeanFlux()
-            xq_mf_hist.saveHistograms(ospath_join(args.OutputDir, "xq-stats%s"%settings_txt))
-
+        iterateSpectra(glob.glob(ospath_join(args.XQ100Dir, "*.fits")), 'XQ', forest_1, forest_2, \
+            specres_list, spectral_record_list, filename_list, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # UVES/SQUAD
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
-
-        if args.real_data:
-            if args.side_band == 0:
-                meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
-            else:
-                meanFluxFunc = lambda z: 1.0
-            # lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_FIT_PARAMS_NODLA)
-
-        us_mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
-
-        for f in glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")):
-            print("********************************************", flush=True)
-            qso = qio.SQUADFits(f, correctSeeing=True, corrError=True)
-            print(qso.object)
-            qso.getS2NLya(forest_1, forest_2)
-
-            if qso.s2n_lya == -1:
-                print("SKIP: No Lya or Side Band coverage!")
-                no_lya_quasar_list.append(f)
-                continue
-
-            if qso.flag != '0':
-                print("SKIP: Spec. status is not 0.")
-                no_lya_quasar_list.append(f)
-                continue
-                
-            try:
-                wave, fluxes, errors, lspecr, pixw = genMocks(qso, forest_1, forest_2, \
-                    meanFluxFunc, specres_list, us_mf_hist, args)
-            except ValueError as ve:
-                # print(ve)
-                print(ve.args)
-                continue
-            
-            nchunks = len(wave)
-            temp_fname = ["us%s_%d_w%d-%dA%s.dat" % (qso.object.replace(" ", ""), nc, \
-                    wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
-            
-            spectral_record_list.append('UVE', qso.object, qso.s2n_lya/np.sqrt(qso.dv), \
-                qso.coord, temp_fname)
-
-            filename_list.extend(temp_fname) 
-
-            if not args.nosave:
-                saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
-
-        if args.compute_mean_flux:
-            us_mf_hist.getMeanFlux()
-            us_mf_hist.saveHistograms(ospath_join(args.OutputDir, "us-stats%s"%settings_txt))
+        iterateSpectra(glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")), 'XQ', forest_1, \
+            forest_2, specres_list, spectral_record_list, filename_list, meanFluxFunc, \
+            settings_txt, args)
+    # ------------------------------
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
