@@ -100,7 +100,8 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     
     print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
 
-    qso.setOutliersMask(sigma=2.5)
+    if args.mask_sigma_percentile:
+        qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
         qso.setZScoreMask(args.mask_spikes_zscore)
     
@@ -275,6 +276,8 @@ if __name__ == '__main__':
     parser.add_argument("--lowdv", help="Resamples grid to this pixel size (km/s) when passed", \
         type=float)
     parser.add_argument("--mask-dlas", action="store_true")
+    parser.add_argument("--mask-sigma-percentile", help="Mask outliers by percentile by sigma.", \
+        type=float)
     parser.add_argument("--mask-spikes-zscore", help="Mask spikes by given zscore.", type=float)
     parser.add_argument("--keep-masked-pix", help="Assign large errors.", action="store_true")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
