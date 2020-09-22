@@ -38,6 +38,8 @@ if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
     parser.add_argument("ConfigFile", help="Config file")
+    parser.add_argument("--deconv-window", help="Deconvolve window function", \
+        action="store_true")
     args = parser.parse_args()
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
@@ -68,7 +70,8 @@ if __name__ == '__main__':
 
         p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
-        p1d_f /= getSpectographWindow2(this_k_arr, bq.specres, bq.dv)
+        if args.deconv_window:
+            p1d_f /= getSpectographWindow2(this_k_arr, bq.specres, bq.dv)
 
         # ignore k=0 mode
         p, c = binPowerSpectra(this_k_arr, p1d_f, config_qmle.k_edges)
