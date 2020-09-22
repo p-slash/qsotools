@@ -74,7 +74,7 @@ if __name__ == '__main__':
             p1d_f /= getSpectographWindow2(this_k_arr, bq.specres, bq.dv)
 
         # ignore k=0 mode
-        p, c = binPowerSpectra(this_k_arr, p1d_f, config_qmle.k_edges)
+        p, c = binPowerSpectra(this_k_arr[1:], p1d_f[1:], config_qmle.k_edges)
         
         power[z_bin_no] += p
         counts[z_bin_no] += c[1:-1]
