@@ -365,7 +365,7 @@ if __name__ == '__main__':
     # UVES/SQUAD
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
-        iterateSpectra(glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")), 'XQ', forest_1, \
+        iterateSpectra(glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")), 'UVE', forest_1, \
             forest_2, specres_list, spectral_record_list, filename_list, meanFluxFunc, \
             settings_txt, args)
     # ------------------------------
