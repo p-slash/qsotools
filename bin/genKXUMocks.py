@@ -233,7 +233,7 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
         filename_list.extend(temp_fname) 
 
         if not args.nosave:
-            saveData(wave, fluxes, errors, temp_fname, chosen_spectrum, lspecr, pixw, args)
+            saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
 
     if args.compute_mean_flux:
         mf_hist.getMeanFlux()
