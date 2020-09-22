@@ -224,7 +224,7 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
         if dataset == 'XQ':
             qname += "_"+qso.arm
 
-        temp_fname = ["k%s-%d_%dA_%dA%s.dat" % (qso.qso_name, nc, \
+        temp_fname = ["k%s-%d_%dA_%dA%s.dat" % (qname, nc, \
             wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
         
         record.append(dataset, qso.qso_name, s2n_this/np.sqrt(qso.dv), \
