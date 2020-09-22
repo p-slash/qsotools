@@ -275,13 +275,13 @@ class Spectrum:
             pivot = np.median(arr)
         return (arr - pivot)/scipy_mad(arr)
 
-    def setZScoreMask(self, thres=3.5):
+    def setZScoreMask(self, fsigma=1, esigma=3.5):
         # zsc_mask_f = np.abs(Spectrum.modifiedZScore(self.flux)) < thres
         # instead demand f - 0 > - thres * MAD & f - 1 < thres * MAD
-        zsc_mask_f_0 = Spectrum.modifiedZScore(self.flux, 0) > -thres
-        zsc_mask_f_1 = Spectrum.modifiedZScore(self.flux, 1) <  thres
+        zsc_mask_f_0 = Spectrum.modifiedZScore(self.flux, 0) > -fsigma
+        zsc_mask_f_1 = Spectrum.modifiedZScore(self.flux, 1) <  fsigma
         zsc_mask_f   = np.logical_and(zsc_mask_f_0, zsc_mask_f_1)
-        zsc_mask_e = Spectrum.modifiedZScore(self.error)< thres
+        zsc_mask_e = Spectrum.modifiedZScore(self.error)< esigma
         zsc_mask = np.logical_and(zsc_mask_f, zsc_mask_e)
         # zsc_mask = np.abs(scipy_zscore(self.flux))<thres
         # zsc_mask = np.logical_and(zsc_mask, np.abs(scipy_zscore(self.error))<thres)
