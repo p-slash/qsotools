@@ -31,7 +31,7 @@ def getSpectographWindow2(k, Rint, dv):
     Rv = fid.LIGHT_SPEED / Rint / fid.ONE_SIGMA_2_FWHM
     x = k*dv/2/np.pi # numpy sinc convention multiplies x with pi
     
-    W2k = np.exp(-k*k * Rv*Rv) * np.sinc(x)**2
+    W2k = np.exp(-(k*Rv)**2) * np.sinc(x)**2
     return W2k
 
 if __name__ == '__main__':
@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
         p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
-        p1d_f /= getSpectographWindow2(this_k_arr, bq.specres, bq.dv)
+        # p1d_f /= getSpectographWindow2(this_k_arr, bq.specres, bq.dv)
 
         # ignore k=0 mode
         p, c = binPowerSpectra(this_k_arr[1:], p1d_f[1:], config_qmle.k_edges)
