@@ -150,7 +150,7 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         wave, fluxes, errors = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
     elif not disableChunk and args.chunk_fixed:
         NUMBER_OF_CHUNKS = 3
-        FIXED_CHUNK_EDGES = np.linspace(forest_1, forest_2, num=NUMBER_OF_CHUNKS+1)
+        FIXED_CHUNK_EDGES = np.linspace(f1, f2, num=NUMBER_OF_CHUNKS+1)
         wave, fluxes, errors = so.divideIntoChunks(wave, fluxes[0], errors[0], \
             qso.z_qso, FIXED_CHUNK_EDGES)
     else:
@@ -214,7 +214,7 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
         try:
             wave, fluxes, errors, lspecr, pixw = genMocks(qso, \
                 f1, f2, meanFluxFunc, specres_list, \
-                mf_hist, args, disableChunk=(dataset == 'XQ'))
+                mf_hist, args)#, disableChunk=(dataset == 'XQ'))
         except ValueError as ve:
             print(ve.args)
             continue
