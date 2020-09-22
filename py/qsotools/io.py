@@ -271,10 +271,10 @@ class Spectrum:
             self.applyMask(self.mask_dla, removePixels)
 
     def modifiedZScore(arr):
-        return np.abs(arr - np.median(arr))/scipy_mad(arr)
+        return (arr - np.median(arr))/scipy_mad(arr)
 
     def setZScoreMask(self, thres=3.5):
-        zsc_mask_f = Spectrum.modifiedZScore(self.flux) < thres
+        zsc_mask_f = np.abs(Spectrum.modifiedZScore(self.flux)) < thres
         zsc_mask_e = Spectrum.modifiedZScore(self.error)< thres
         zsc_mask = np.logical_and(zsc_mask_f, zsc_mask_e)
         # zsc_mask = np.abs(scipy_zscore(self.flux))<thres
