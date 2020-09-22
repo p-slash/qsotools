@@ -105,7 +105,7 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     if args.mask_sigma_percentile:
         qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
-        qso.setZScoreMask(args.mask_spikes_zscore)
+        qso.setZScoreMask(fsigma=1, args.mask_spikes_zscore)
     
     # This sets err=1e10 and flux=0
     qso.applyMask(removePixels=False)
