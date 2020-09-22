@@ -9,7 +9,7 @@ from astropy.table import Table
 import qsotools.io as qio
 import qsotools.fiducial as fid
 
-def interpolate2Grid(v, f, padding = 1000.):
+def interpolate2Grid(v, f, padding = 100.):
     v1 = v[0] - padding
     v2 = v[-1] + padding
     dv = np.min(np.diff(v))
