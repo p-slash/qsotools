@@ -51,14 +51,12 @@ def resample(wave, flux, error, new_dv_or_edge):
         
         # Remove empty bins with epsilon error
         empty_bins = np.logical_or(np.abs(binned_flux[0]) < 1e-8, binned_error[0] < 1e-8)
-        binned_flux  = np.array([b[~empty_bins] for b in binned_flux])
-        binned_error = np.array([b[~empty_bins] for b in binned_error])
 
         binned_flux /= binned_error
         binned_error = 1./np.sqrt(binned_error)
         
     # Remove empty bins from resampled data
-    finite_bins = np.isfinite(binned_flux)[0]
+    finite_bins = np.logical_and(np.isfinite(binned_flux)[0], ~empty_bins)
     
     new_wave_centers = new_wave_centers[finite_bins]
     binned_flux      = np.array([b[finite_bins] for b in binned_flux])
