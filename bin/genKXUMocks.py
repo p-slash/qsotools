@@ -120,7 +120,7 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     print("Spectral Res: from %d to %d." % (qso.specres, low_spec_res))
     print("Pixel width: from %.2f to %.2f km/s" %(qso.dv, pixel_width))
     
-    qso.applyMask(good_pixels=qso.error<1e6, removePixels=not args.keep_masked_pix)
+    qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
     if args.mask_dlas:
         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
 
