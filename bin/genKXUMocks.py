@@ -135,7 +135,7 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
             %(pixel_width, len(wave)))
 
         if np.any(fluxes > 10) or np.any(errors > 10):
-            raise ValueError("Spike occured in resampling!! f: %d, e: %d." \
+            print("WARNING: Spike occured in resampling!! f: %d, e: %d." \
                 % (np.sum(fluxes > 10), np.sum(errors > 10)))
         
         qso.wave  = wave
