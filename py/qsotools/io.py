@@ -273,7 +273,10 @@ class Spectrum:
     def modifiedZScore(arr, pivot=None):
         if pivot is None:
             pivot = np.median(arr)
-        return (arr - pivot)/scipy_mad(arr)
+        
+        MAD = min(scipy_mad(arr), 1)
+
+        return (arr - pivot) / MAD
 
     def setZScoreMask(self, fsigma=1, esigma=3.5):
         # zsc_mask_f = np.abs(Spectrum.modifiedZScore(self.flux)) < thres
