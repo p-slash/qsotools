@@ -281,7 +281,9 @@ class Spectrum:
         zsc_mask_f_0 = Spectrum.modifiedZScore(self.flux, 0) > -fsigma
         zsc_mask_f_1 = Spectrum.modifiedZScore(self.flux, 1) <  fsigma
         zsc_mask_f   = np.logical_and(zsc_mask_f_0, zsc_mask_f_1)
+        
         zsc_mask_e = Spectrum.modifiedZScore(self.error)< esigma
+
         zsc_mask = np.logical_and(zsc_mask_f, zsc_mask_e)
         # zsc_mask = np.abs(scipy_zscore(self.flux))<thres
         # zsc_mask = np.logical_and(zsc_mask, np.abs(scipy_zscore(self.error))<thres)
