@@ -124,10 +124,6 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     if args.mask_dlas:
         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
 
-    if np.any(qso.flux > 10) or np.any(qso.error > 10):
-        raise ValueError("Spike remained!! f: %d, e: %d." \
-            % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
-
     if args.compute_mean_flux:
         mean_flux_hist.addSpectrum(qso, f1, f2)
 
@@ -141,8 +137,19 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         if np.any(fluxes > 10) or np.any(errors > 10):
             raise ValueError("Spike occured in resampling!! f: %d, e: %d." \
                 % (np.sum(fluxes > 10), np.sum(errors > 10)))
-    else:
-        wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
+        
+        qso.wave  = wave
+        qso.flux  = fluxes[0]
+        qso.error = errors[0]
+        qso.size  = qso.wave.size
+
+        qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
+    
+    if np.any(qso.flux > 10) or np.any(qso.error > 10):
+        raise ValueError("Spike remained!! f: %d, e: %d." \
+            % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
+
+    wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
 
     fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args)
 
