@@ -109,7 +109,7 @@ class SpectralRecordList():
             cs_list.append(CoordSPR(SkyCoord(cs), data))
 
         if len(cs_list) == 1:
-            return self.spr
+            return self
 
         two_spr = SpectralRecordList._mergeTwoCatalogs( \
             cs_list[0], cs_list[1], sep_arcsec)
@@ -233,15 +233,24 @@ class Spectrum:
             self.wave  = self.wave[good_pixels]
             self.flux  = self.flux[good_pixels]
             self.error = self.error[good_pixels]
+            
+            try:
+                self.cont = self.cont[good_pixels]
+            except:
+                pass
+
             self.mask  = np.ones_like(self.flux, dtype=np.bool)
-
             self.size = len(self.wave)
-
             if self.size == 0:
                 raise ValueError("Empty spectrum")
         else:
             self.flux[~good_pixels]  = 0
             self.error[~good_pixels] = 1e10
+            try:
+                self.cont[~good_pixels]  = 0
+            except:
+                pass
+            
     
     def setOutliersMask(self, sigma=2.5):
         sigma = np.abs(sigma)
