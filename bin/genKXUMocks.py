@@ -99,18 +99,17 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / pixel_width)
     
     print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
-    
+    # If computing continuum power, set F to be C before removing/masking pixels.
+    # Do not set error here, because later removal relies on error < 10.
+    if args.continuum_power:
+        qso.flux = qso.cont
+        
     qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
 
     if args.mask_sigma_percentile:
         qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
         qso.setZScoreMask(fsigma=1, esigma=args.mask_spikes_zscore)
-
-    # If computing continuum power, set F to be C before removing/masking pixels.
-    # Do not set error here, because later removal relies on error < 10.
-    if args.continuum_power:
-        qso.flux = qso.cont
 
     # This sets err=1e10 and flux=0
     qso.applyMask(removePixels=False)
@@ -169,8 +168,8 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         raise ValueError("Short spectrum", len(qso.wave), MAX_NO_PIXELS)
 
     specres_list.add((low_spec_res, pixel_width))
-    print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
-    print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
+    # print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
+    # print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
 
     if not disableChunk and args.chunk_dyn:
         waves, fluxes, errors = so.chunkDynamic(qso.wave, qso.flux, qso.error, MAX_NO_PIXELS)
