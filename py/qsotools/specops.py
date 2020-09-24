@@ -54,9 +54,13 @@ def resample(wave, flux, error, new_dv_or_edge):
 
         binned_flux /= binned_error
         binned_error = 1./np.sqrt(binned_error)
+
+        for bi in range(binned_flux):
+            binned_flux[bi][empty_bins]  = np.nan
+            binned_error[bi][empty_bins] = np.nan
         
     # Remove empty bins from resampled data
-    finite_bins = np.logical_and(np.isfinite(binned_flux)[0], ~empty_bins)
+    finite_bins = np.logical_and(np.isfinite(binned_flux)[0])
     
     new_wave_centers = new_wave_centers[finite_bins]
     binned_flux      = np.array([b[finite_bins] for b in binned_flux])
