@@ -106,7 +106,12 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
         qso.setZScoreMask(fsigma=1, esigma=args.mask_spikes_zscore)
-    
+
+    # If computing continuum power, set F to be C before removing/masking pixels.
+    # Do not set error here, because later removal relies on error < 10.
+    if args.continuum_power:
+        qso.flux = qso.cont
+
     # This sets err=1e10 and flux=0
     qso.applyMask(removePixels=False)
 
@@ -123,11 +128,11 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
     if args.mask_dlas:
         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
-
+    
     if args.compute_mean_flux:
         mean_flux_hist.addSpectrum(qso, f1, f2)
 
-    # Re-sample real data onto lower resolution grid
+    # Resample real data onto lower resolution grid
     if resamplingCondition:
         wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
             qso.error.reshape(1,qso.size), pixel_width)
@@ -148,38 +153,45 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     if np.any(qso.flux > 10) or np.any(qso.error > 10):
         raise ValueError("Spike remained!! f: %d, e: %d." \
             % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
-
-    wave, fluxes, errors = qso.wave, qso.flux.reshape(1,qso.size), qso.error.reshape(1,qso.size)
-
-    fluxes, errors = convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args)
+    
+    # If computing continuum power, approximate the error as the error on f.
+    # Note cont is not touched in applyMask, so use flux
+    if args.continuum_power:
+        meanC      = np.mean(qso.flux)
+        qso.error *= qso.flux / meanC
+        qso.flux   = qso.flux / meanC - 1
+    else:
+        qso.flux, qso.error = convert2DeltaFlux(qso.wave, qso.flux, qso.error, meanFluxFunc, args)
 
     # Skip short spectrum
     isShort = lambda x: (args.skip and len(x) < MAX_NO_PIXELS * args.skip) or len(x)==0
-    if isShort(wave):
-        raise ValueError("Short spectrum", len(wave), MAX_NO_PIXELS)
+    if isShort(qso.wave):
+        raise ValueError("Short spectrum", len(qso.wave), MAX_NO_PIXELS)
 
     specres_list.add((low_spec_res, pixel_width))
     print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
     print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
 
     if not disableChunk and args.chunk_dyn:
-        wave, fluxes, errors = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
+        waves, fluxes, errors = so.chunkDynamic(qso.wave, qso.flux, qso.error, MAX_NO_PIXELS)
     elif not disableChunk and args.chunk_fixed:
         NUMBER_OF_CHUNKS = 3
         FIXED_CHUNK_EDGES = np.linspace(f1, f2, num=NUMBER_OF_CHUNKS+1)
-        wave, fluxes, errors = so.divideIntoChunks(wave, fluxes[0], errors[0], \
+        waves, fluxes, errors = so.divideIntoChunks(qso.wave, qso.flux, qso.error, \
             qso.z_qso, FIXED_CHUNK_EDGES)
     else:
-        wave = [wave]
+        waves  = [qso.wave]
+        fluxes = [qso.flux]
+        errors = [qso.error]
 
-    wave   = [x for x in wave   if not isShort(x)]
+    waves  = [x for x in waves  if not isShort(x)]
     fluxes = [x for x in fluxes if not isShort(x)]
     errors = [x for x in errors if not isShort(x)]
     
-    if len(wave) == 0:
-        raise ValueError("Empty chunks", len(wave))
+    if len(waves) == 0:
+        raise ValueError("Empty chunks", len(waves))
 
-    return wave, fluxes, errors, low_spec_res, pixel_width
+    return waves, fluxes, errors, low_spec_res, pixel_width
 
 # This function is wrapper for iterations of each data set
 def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
@@ -303,6 +315,8 @@ if __name__ == '__main__':
     
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
     parser.add_argument("--real-data", action="store_true")
+    parser.add_argument("--continuum-power", action="store_true", \
+        help="Use continuum instead of flux. Compute dC/C-bar, C-bar is the chunk average.")
     parser.add_argument("--compute-mean-flux", action="store_true")
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
@@ -362,7 +376,7 @@ if __name__ == '__main__':
 
     # ------------------------------    
     # Start with KODIAQ
-    if args.KODIAQDir:
+    if args.KODIAQDir and not args.continuum_power:
         print("RUNNING ON KODIAQ.........")
         qso_iter = qio.KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
         
