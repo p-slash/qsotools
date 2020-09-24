@@ -99,11 +99,7 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / pixel_width)
     
     print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
-    # If computing continuum power, set F to be C before removing/masking pixels.
-    # Do not set error here, because later removal relies on error < 10.
-    if args.continuum_power:
-        qso.flux = qso.cont
-        
+
     qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
 
     if args.mask_sigma_percentile:
@@ -131,6 +127,11 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     if args.compute_mean_flux:
         mean_flux_hist.addSpectrum(qso, f1, f2)
 
+    # If computing continuum power, set F to be C, so that it's resampled.
+    # Do not set error here, because later removal relies on error < 10.
+    if args.continuum_power:
+        qso.flux = qso.cont
+    
     # Resample real data onto lower resolution grid
     if resamplingCondition:
         wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
