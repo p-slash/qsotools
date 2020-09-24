@@ -139,9 +139,9 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
             %(pixel_width, len(wave)))
 
-        if np.any(fluxes > 10) or np.any(errors > 10):
-            print("WARNING: Spike occured in resampling!! f: %d, e: %d." \
-                % (np.sum(fluxes > 10), np.sum(errors > 10)))
+        # if np.any(fluxes > 10) or np.any(errors > 10):
+        #     print("WARNING: Spike occured in resampling!! f: %d, e: %d." \
+        #         % (np.sum(fluxes > 10), np.sum(errors > 10)))
         
         qso.wave  = wave
         qso.flux  = fluxes[0]
@@ -150,9 +150,9 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
 
         qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
     
-    if np.any(qso.flux > 10) or np.any(qso.error > 10):
-        raise ValueError("Spike remained!! f: %d, e: %d." \
-            % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
+    # if np.any(qso.flux > 10) or np.any(qso.error > 10):
+    #     raise ValueError("Spike remained!! f: %d, e: %d." \
+    #         % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
     
     # If computing continuum power, approximate the error as the error on f.
     # Note cont is not touched in applyMask, so use flux
