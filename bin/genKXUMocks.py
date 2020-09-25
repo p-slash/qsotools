@@ -130,7 +130,8 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     # If computing continuum power, set F to be C, so that it's resampled.
     # Do not set error here, because later removal relies on error < 10.
     if args.continuum_power:
-        qso.flux = qso.cont
+        meanC    = np.mean(qso.cont)
+        qso.flux = qso.cont / meanC
     
     # Resample real data onto lower resolution grid
     if resamplingCondition:
@@ -139,9 +140,9 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
             %(pixel_width, len(wave)))
 
-        # if np.any(fluxes > 10) or np.any(errors > 10):
-        #     print("WARNING: Spike occured in resampling!! f: %d, e: %d." \
-        #         % (np.sum(fluxes > 10), np.sum(errors > 10)))
+        if np.any(fluxes > 10) or np.any(errors > 10):
+            print("WARNING: Spike occured in resampling!! f: %d, e: %d." \
+                % (np.sum(fluxes > 10), np.sum(errors > 10)))
         
         qso.wave  = wave
         qso.flux  = fluxes[0]
@@ -150,16 +151,15 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
 
         qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
     
-    # if np.any(qso.flux > 10) or np.any(qso.error > 10):
-    #     raise ValueError("Spike remained!! f: %d, e: %d." \
-    #         % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
+    if np.any(qso.flux > 10) or np.any(qso.error > 10):
+        raise ValueError("Spike remained!! f: %d, e: %d." \
+            % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
     
     # If computing continuum power, approximate the error as the error on f.
     # Note cont is not touched in applyMask, so use flux
     if args.continuum_power:
-        meanC      = np.mean(qso.flux)
-        qso.error *= qso.flux / meanC
-        qso.flux   = qso.flux / meanC - 1
+        qso.error *= qso.flux
+        qso.flux  -= 1
     else:
         qso.flux, qso.error = convert2DeltaFlux(qso.wave, qso.flux, qso.error, meanFluxFunc, args)
 
@@ -304,6 +304,8 @@ if __name__ == '__main__':
     parser.add_argument("--lowdv", help="Resamples grid to this pixel size (km/s) when passed", \
         type=float)
     parser.add_argument("--mask-dlas", action="store_true")
+    parser.add_argument("--add-dlas-to-mocks", action="store_true")
+    
     parser.add_argument("--mask-sigma-percentile", help="Mask outliers by percentile by sigma.", \
         type=float)
     parser.add_argument("--mask-spikes-zscore", help="Mask spikes by given zscore.", type=float)
@@ -316,7 +318,7 @@ if __name__ == '__main__':
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
     parser.add_argument("--real-data", action="store_true")
     parser.add_argument("--continuum-power", action="store_true", \
-        help="Use continuum instead of flux. Compute dC/C-bar, C-bar is the chunk average.")
+        help="Use continuum instead of flux. Compute dC/C-bar, C-bar is the full forest average.")
     parser.add_argument("--compute-mean-flux", action="store_true")
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
