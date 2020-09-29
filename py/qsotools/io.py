@@ -19,7 +19,8 @@ from astropy.coordinates import SkyCoord
 from astropy.units import hourangle, deg, arcsec
 
 from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
-    LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA
+    LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA, \
+    getNHIfromEquvalentWidthDLA
 import qsotools.specops as so
 
 from pkg_resources import resource_filename
@@ -250,8 +251,7 @@ class Spectrum:
                 self.cont[~good_pixels]  = 0
             except:
                 pass
-            
-    
+
     def setOutliersMask(self, sigma=2.5):
         sigma = np.abs(sigma)
         high_perc = scipy_norm.cdf(sigma)*100
@@ -266,6 +266,31 @@ class Spectrum:
         good_pixels = np.logical_and(flux_within_perc, error_within_perc)
 
         self.mask = np.logical_and(good_pixels, self.mask)
+
+    def findDLAs(self, mfluxfunc):
+        N = len(self.wave)
+        indices = np.arange(N)
+
+        consecutive = lambda x: np.split(x, np.where(np.diff(x) != 1)[0]+1)
+        low_flux_regions = indices[self.flux<mfluxfunc(self.wave/LYA_WAVELENGTH-1)+self.error]
+        low_flux_regions = consecutive(low_flux_regions)
+
+        z_dlas   = []
+        nhi_dlas = []
+
+        for lfr in low_flux_regions:
+            w1 = self.wave[lfr[0]]
+            w2 = self.wave[lfr[-1]]
+            z_dla = (w1+w2)/2./LYA_WAVELENGTH - 1
+
+            thres_w = equivalentWidthDLA(10**19, z_dla) # A
+            if w2 - w1 > thres_w:
+                z_dlas.append(z_dla)
+                nhi_dlas.append(10*getNHIfromEquvalentWidthDLA(w2-w1, z_dla))
+        
+        if len(z_dlas) != 0:
+            self.z_dlas = z_dlas
+            self.nhi_dlas = nhi_dlas
 
     def applyMaskDLAs(self, scale=1.0, removePixels=True):
         if self.z_dlas:
