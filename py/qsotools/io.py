@@ -286,7 +286,7 @@ class Spectrum:
             thres_w = equivalentWidthDLA(10**19, z_dla) # A
             if w2 - w1 > thres_w:
                 z_dlas.append(z_dla)
-                nhi_dlas.append(10*getNHIfromEquvalentWidthDLA(w2-w1, z_dla))
+                nhi_dlas.append(2*getNHIfromEquvalentWidthDLA(w2-w1, z_dla))
         
         if len(z_dlas) != 0:
             self.z_dlas = z_dlas
