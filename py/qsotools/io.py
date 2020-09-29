@@ -267,7 +267,7 @@ class Spectrum:
 
         self.mask = np.logical_and(good_pixels, self.mask)
 
-    def findDLAs(self, mfluxfunc):
+    def findDLAs(self, mfluxfunc, NHI_THRES=19.):
         N = len(self.wave)
         indices = np.arange(N)
 
@@ -283,10 +283,10 @@ class Spectrum:
             w2 = self.wave[lfr[-1]]
             z_dla = (w1+w2)/2./LYA_WAVELENGTH - 1
 
-            thres_w = equivalentWidthDLA(10**19, z_dla) # A
+            thres_w = equivalentWidthDLA(10**NHI_THRES, z_dla) # A
             if w2 - w1 > thres_w:
                 z_dlas.append(z_dla)
-                nhi_dlas.append(2*getNHIfromEquvalentWidthDLA(w2-w1, z_dla))
+                nhi_dlas.append(np.log10(2*getNHIfromEquvalentWidthDLA(w2-w1, z_dla)))
         
         if len(z_dlas) != 0:
             self.z_dlas = z_dlas
