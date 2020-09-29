@@ -227,6 +227,10 @@ def equivalentWidthDLA(nhi, z_dla):
     w = 7.3 * np.sqrt(nhi/10**20) # A
     return w*(1+z_dla)
 
+def getNHIfromEquvalentWidthDLA(dw, z_dla):
+    n = (dw/7.3/(1+z_dla))**2
+    return 10**20 * n
+
 
 
 
