@@ -121,7 +121,8 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     print("Pixel width: from %.2f to %.2f km/s" %(qso.dv, pixel_width))
     
     qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
-    
+    qso.findDLAs(meanFluxFunc)
+
     if args.mask_dlas:
         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
     
@@ -217,7 +218,6 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
                 # Co-add multiple observations
                 qso = obs_iter.coaddObservations(args.coadd_kodiaq)
                 s2n_this = qso.getS2NLya(f1, f2)
-                qso.findDLAs(meanFluxFunc)
             else:
                 # Pick highest S2N obs
                 qso, s2n_this = obs_iter.maxLyaObservation(f1, f2)
