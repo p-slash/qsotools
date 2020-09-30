@@ -288,7 +288,10 @@ class Spectrum:
                 z_dlas.append(z_dla)
                 nhi_dlas.append(np.log10(2*getNHIfromEquvalentWidthDLA(w2-w1, z_dla)))
         
-        if len(z_dlas) != 0:
+        if len(z_dlas) != 0 and self.z_dlas:
+            self.z_dlas.extend(z_dlas)
+            self.nhi_dlas.extend(nhi_dlas)
+        elif len(z_dlas) != 0:
             self.z_dlas = z_dlas
             self.nhi_dlas = nhi_dlas
 
