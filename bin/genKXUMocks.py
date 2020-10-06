@@ -241,6 +241,10 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
             print("SKIP: Spec. status is not 0.")
             continue
 
+        if s2n_this/np.sqrt(qso.dv) < args.sn_cut:
+            print("SKIP: Does not pass S/N cut.")
+            continue
+
         try:
             wave, fluxes, errors, lspecr, pixw = genMocks(qso, \
                 f1, f2, meanFluxFunc, specres_list, \
@@ -285,6 +289,9 @@ if __name__ == '__main__':
     parser.add_argument("--separation", type=float, default=2.5, \
         help="Maximum separation in arc sec. Default: %(default)s")
     
+    parser.add_argument("--sn-cut", type=float, default=-1, \
+        help="S/N cut per sqrt of km/s.")
+
     parser.add_argument("--save_full_flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
