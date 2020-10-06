@@ -125,9 +125,6 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     if args.mask_dlas:
         qso.findDLAs(meanFluxFunc)
         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
-    
-    if args.compute_mean_flux:
-        mean_flux_hist.addSpectrum(qso, f1, f2)
 
     # If computing continuum power, set F to be C, so that it's resampled.
     # Do not set error here, because later removal relies on error < 10.
@@ -157,6 +154,9 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         raise ValueError("Spike remained!! f: %d, e: %d." \
             % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
     
+    if args.compute_mean_flux:
+        mean_flux_hist.addSpectrum(qso, f1, f2)
+
     # If computing continuum power, approximate the error as the error on f.
     # Note cont is not touched in applyMask, so use flux
     if args.continuum_power:
