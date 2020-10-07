@@ -299,6 +299,8 @@ class Spectrum:
             
             return z_dlas, nhi_dlas
 
+        return None, None
+
     def applyMaskDLAs(self, scale=1.0, removePixels=True):
         if self.z_dlas:
             self.mask_dla = np.ones_like(self.wave, dtype=bool)
