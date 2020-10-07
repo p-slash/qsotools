@@ -291,9 +291,13 @@ class Spectrum:
         if len(z_dlas) != 0 and self.z_dlas:
             self.z_dlas.extend(z_dlas)
             self.nhi_dlas.extend(nhi_dlas)
+
+            return z_dlas, nhi_dlas
         elif len(z_dlas) != 0:
             self.z_dlas = z_dlas
             self.nhi_dlas = nhi_dlas
+            
+            return z_dlas, nhi_dlas
 
     def applyMaskDLAs(self, scale=1.0, removePixels=True):
         if self.z_dlas:
