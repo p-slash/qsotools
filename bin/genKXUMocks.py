@@ -86,6 +86,25 @@ def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
 
     return fluxes, errors
 
+def manageDLAs(qso, meanFluxFunc, args):
+    if args.find_dlas:
+        qso.findDLAs(meanFluxFunc)
+        # Save to file
+        # dla_file.write("# qso_name, set, ra, dec, z_dlas, nhi_dlas\n")
+        # write qso_name, set, ra and dec in iterateSpectra function
+        if qso.z_dlas:
+            ztxt = "%.4f"%qso.z_dlas[0] if len(qso.z_dlas)==1 else \
+                '"%s"' % ",".join(format(x, ".4f") for x in qso.z_dlas)
+
+            ntxt = "%.4f"%qso.nhi_dlas[0] if len(qso.nhi_dlas)==1 else \
+                '"%s"' % ",".join(format(x, ".4f") for x in qso.nhi_dlas)
+            dla_file.write('%s,%s,'%(ztxt, ntxt))
+        else:
+            dla_file.write("nan,nan,")
+
+    if args.mask_dlas:
+        qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
+
 # This function is the main pipeline for reduction
 def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     mean_flux_hist, args, disableChunk=False):
@@ -122,9 +141,7 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     
     qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
 
-    if args.mask_dlas:
-        qso.findDLAs(meanFluxFunc)
-        qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
+    manageDLAs(qso, meanFluxFunc, args)
 
     # If computing continuum power, set F to be C, so that it's resampled.
     # Do not set error here, because later removal relies on error < 10.
@@ -221,16 +238,19 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
             else:
                 # Pick highest S2N obs
                 qso, s2n_this = obs_iter.maxLyaObservation(f1, f2)
+            qso.qso_name = qso.qso_name.replace(" ", "")
             qso.print_details()
 
         elif dataset == 'XQ':
             qso = qio.XQ100Fits(it, correctSeeing=True)
             s2n_this = qso.getS2NLya(f1, f2)
+            qso.qso_name = qso.qso_name.replace(" ", "")+"_"+qso.arm
 
         elif dataset == 'UVE':
             qso = qio.SQUADFits(it, correctSeeing=True, corrError=True)
             s2n_this = qso.getS2NLya(f1, f2)
-        
+            qso.qso_name = qso.qso_name.replace(" ", "")
+
         print(qso.qso_name)
 
         if s2n_this == -1:
@@ -251,14 +271,19 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
                 mf_hist, args)#, disableChunk=(dataset == 'XQ'))
         except ValueError as ve:
             print(ve.args)
+            if args.find_dlas:
+                # z_dlas, nhi_dlas, qso_name, set, ra, dec
+                dla_file.write("%s,%s,%.10f,%.10f\n" % (qso.qso_name, dataset, \
+                    qso.coord.icrs.ra.deg, qso.coord.icrs.dec.deg))
             continue
 
         nchunks = len(wave)
-        qname = qso.qso_name.replace(" ", "")
-        if dataset == 'XQ':
-            qname += "_"+qso.arm
+        if args.find_dlas:
+            # z_dlas, nhi_dlas, qso_name, set, ra, dec
+            dla_file.write("%s,%s,%.10f,%.10f\n" % (qso.qso_name, dataset, \
+                qso.coord.icrs.ra.deg, qso.coord.icrs.dec.deg))
 
-        temp_fname = ["%s-%s-%d_%dA_%dA%s.dat" % (dataset, qname, nc, \
+        temp_fname = ["%s-%s-%d_%dA_%dA%s.dat" % (dataset, qso.qso_name, nc, \
             wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
         
         record.append(dataset, qso.qso_name, s2n_this/np.sqrt(qso.dv), \
@@ -312,6 +337,8 @@ if __name__ == '__main__':
     parser.add_argument("--without_z_evo", help="Turn of redshift evolution", action="store_true")
     parser.add_argument("--lowdv", help="Resamples grid to this pixel size (km/s) when passed", \
         type=float)
+    parser.add_argument("--find-dlas", action="store_true", \
+        help="Use simple DLA finder to find DLAs, then save to a file.")
     parser.add_argument("--mask-dlas", action="store_true")
     parser.add_argument("--add-dlas-to-mocks", action="store_true")
     
@@ -373,6 +400,9 @@ if __name__ == '__main__':
     txt_basefilename  = "%s/highres%s" % (args.OutputDir, settings_txt)
 
     saveParameters(txt_basefilename, forest_1, forest_2, args)
+    if args.find_dlas:
+        dla_file = open(txt_basefilename+"_dlas.txt", 'w')
+        dla_file.write("z_dlas,nhi_dlas,qso_name,set,ra,dec\n")
     # ------------------------------
 
     # Set up initial objects and variables
@@ -410,6 +440,9 @@ if __name__ == '__main__':
             forest_2, specres_list, spectral_record_list, filename_list, meanFluxFunc, \
             settings_txt, args)
     # ------------------------------
+
+    if args.find_dlas:
+        dla_file.close()
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
