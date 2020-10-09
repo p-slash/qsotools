@@ -29,6 +29,7 @@ TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.
 TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
 TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
 TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
+TABLE_KSX_VI_DLA    = resource_filename('qsotools', 'tables/ksx_vi_dlas.csv')
 
 SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
 
@@ -124,28 +125,6 @@ class SpectralRecordList():
         
         return SpectralRecordList(three_cs)
 
-# def findDuplicatesAllIn(spectral_record_list, args):
-#     catalog = SkyCoord(list(map(lambda x: x.c.fk5, spectral_record_list)))
-#     idx, d2d, d3d = catalog.match_to_catalog_sky(catalog, nthneighbor=2)
-
-#     np.savetxt(ospath_join(args.OutputDir, "d2d_arcsec.dat"), d2d.arcsec)
-#     print("d2d values in arcsec are saved in output directory.")
-#     nonduplicates = []
-
-#     for i, (spr, idxi, d2di) in enumerate(zip(spectral_record_list, idx, d2d)):
-#         m2 = spectral_record_list[idxi]
-#         if d2di < args.separation * u.arcsec and spr.set != m2.set:
-#             if idxi <= i:
-#                 continue
-#             if spr.s2n > m2.s2n:
-#                 nonduplicates.append(spr)
-#             else:
-#                 nonduplicates.append(m2)
-#         else:
-#             nonduplicates.append(spr)
-    
-#     return nonduplicates
-
 class Spectrum:
     """
     A generic spectrum object. Sets up a mask where error > 0.
@@ -198,6 +177,11 @@ class Spectrum:
         Computes the signal-to-noise in lyman alpha region as average(1/e)
 
     """
+
+    dla_csv = ascii.read(TABLE_KSX_VI_DLA, fill_values="")
+    dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
+        frame='fk5', unit=deg)
+
     def __init__(self, wave, flux, error, z_qso, specres, dv, coord):
         self.wave  = wave
         self.flux  = flux
@@ -214,6 +198,7 @@ class Spectrum:
 
         self.z_dlas = None
         self.nhi_dlas = None
+        self._matchDLACatalog()
 
     def cutForestAnalysisRegion(self, f1, f2, zmin, zmax):
         # Cut Lyman-alpha forest region
@@ -267,7 +252,7 @@ class Spectrum:
 
         self.mask = np.logical_and(good_pixels, self.mask)
 
-    def findDLAs(self, mfluxfunc, NHI_THRES=19.):
+    def autoFindDLAs(self, mfluxfunc, NHI_THRES=19.):
         N = len(self.wave)
         indices = np.arange(N)
 
@@ -300,6 +285,17 @@ class Spectrum:
             return z_dlas, nhi_dlas
 
         return None, None
+
+    # Find matching row by ra and dec
+    def _matchDLACatalog(self):
+        idx, d2d, _ = self.coord.match_to_catalog_sky(Spectrum.dla_coords)
+
+        # if separation is small, then it is the same qso
+        if d2d.arcsec < 10.:
+            d = Spectrum.dla_csv[idx]
+            if d['z_dlas']!='nan':
+                self.z_dlas  = [float(z) for z in str(d['z_dlas']).split(',')]
+                self.nhi_dlas= [float(n) for n in str(d['nhi_dlas']).split(',')]
 
     def applyMaskDLAs(self, scale=1.0, removePixels=True):
         if self.z_dlas:
