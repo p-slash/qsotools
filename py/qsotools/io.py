@@ -27,12 +27,12 @@ from pkg_resources import resource_filename
 TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
 TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
-TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/DLA_Catalogs/xq100_dla_table_sanchez-ramirez_2016.csv')
-TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/DLA_Catalogs/uves_squad_dr1_quasars_master.csv')
+TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
+TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
 
-TABLE_KODIAQ_VI_DLA = resource_filename('qsotools', 'tables/DLA_Catalogs/kodiaq_vi_dlas.csv')
-TABLE_SQUAD_VI_DLA  = resource_filename('qsotools', 'tables/DLA_Catalogs/squad_vi_dlas.csv')
-TABLE_XQ100_VI_DLA  = resource_filename('qsotools', 'tables/DLA_Catalogs/xq100_vi_dlas.csv')
+TABLE_KODIAQ_VI_DLA = resource_filename('qsotools', 'tables/kodiaq_vi_dlas.csv')
+TABLE_SQUAD_VI_DLA  = resource_filename('qsotools', 'tables/squad_vi_dlas.csv')
+TABLE_XQ100_VI_DLA  = resource_filename('qsotools', 'tables/xq100_vi_dlas.csv')
 
 SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
 
