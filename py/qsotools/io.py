@@ -644,7 +644,7 @@ class KODIAQFits(Spectrum):
         Returns <1/e> in the Lya forest. -1 if no coverage.
 
     """
-    dla_csv = ascii.read(TABLE_KODIAQ_VI_DLA, fill_values="")
+    dla_csv = ascii.read(TABLE_KODIAQ_VI_DLA, format='csv')
     dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
         frame='fk5', unit=deg)
 
@@ -1143,7 +1143,7 @@ class XQ100Fits(Spectrum):
         bounds_error=False, fill_value=(11600, 5600))
 
     fits_list = fitsio.FITS(TABLE_XQ100_SUM)[1]
-    dla_csv = ascii.read(TABLE_XQ100_VI_DLA, fill_values="")
+    dla_csv = ascii.read(TABLE_XQ100_VI_DLA, format='csv')
     dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
         frame='fk5', unit=deg)
 
@@ -1282,7 +1282,7 @@ class SQUADFits(Spectrum):
     """
 
     dr1_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
-    dla_csv = ascii.read(TABLE_SQUAD_VI_DLA, fill_values="")
+    dla_csv = ascii.read(TABLE_SQUAD_VI_DLA, format='csv')
     dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
         frame='fk5', unit=deg)
 
