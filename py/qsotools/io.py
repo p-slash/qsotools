@@ -27,9 +27,12 @@ from pkg_resources import resource_filename
 TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
 TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
-TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
-TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
-TABLE_KSX_VI_DLA    = resource_filename('qsotools', 'tables/ksx_vi_dlas.csv')
+TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/DLA_Catalogs/xq100_dla_table_sanchez-ramirez_2016.csv')
+TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/DLA_Catalogs/uves_squad_dr1_quasars_master.csv')
+
+TABLE_KODIAQ_VI_DLA = resource_filename('qsotools', 'tables/DLA_Catalogs/kodiaq_vi_dlas.csv')
+TABLE_SQUAD_VI_DLA  = resource_filename('qsotools', 'tables/DLA_Catalogs/squad_vi_dlas.csv')
+TABLE_XQ100_VI_DLA  = resource_filename('qsotools', 'tables/DLA_Catalogs/xq100_vi_dlas.csv')
 
 SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
 
@@ -178,10 +181,6 @@ class Spectrum:
 
     """
 
-    dla_csv = ascii.read(TABLE_KSX_VI_DLA, fill_values="")
-    dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
-        frame='fk5', unit=deg)
-
     def __init__(self, wave, flux, error, z_qso, specres, dv, coord):
         self.wave  = wave
         self.flux  = flux
@@ -198,7 +197,6 @@ class Spectrum:
 
         self.z_dlas = None
         self.nhi_dlas = None
-        self._matchDLACatalog()
 
     def cutForestAnalysisRegion(self, f1, f2, zmin, zmax):
         # Cut Lyman-alpha forest region
@@ -285,17 +283,6 @@ class Spectrum:
             return z_dlas, nhi_dlas
 
         return None, None
-
-    # Find matching row by ra and dec
-    def _matchDLACatalog(self):
-        idx, d2d, _ = self.coord.match_to_catalog_sky(Spectrum.dla_coords)
-
-        # if separation is small, then it is the same qso
-        if d2d.arcsec < 10.:
-            d = Spectrum.dla_csv[idx]
-            if d['z_dlas']!='nan':
-                self.z_dlas  = [float(z) for z in str(d['z_dlas']).split(',')]
-                self.nhi_dlas= [float(n) for n in str(d['nhi_dlas']).split(',')]
 
     def applyMaskDLAs(self, scale=1.0, removePixels=True):
         if self.z_dlas:
@@ -657,6 +644,21 @@ class KODIAQFits(Spectrum):
         Returns <1/e> in the Lya forest. -1 if no coverage.
 
     """
+    dla_csv = ascii.read(TABLE_KODIAQ_VI_DLA, fill_values="")
+    dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
+        frame='fk5', unit=deg)
+
+    def _findDLAs(self):
+        # Find matching row by ra and dec
+        idx, d2d, _ = self.coord.match_to_catalog_sky(KODIAQFits.dla_coords)
+
+        # if separation is small, then it is the same qso
+        if d2d.arcsec < 10.:
+            d = KODIAQFits.dla_csv[idx]
+            if d['z_dlas']!='nan':
+                self.z_dlas  = [float(z) for z in str(d['z_dlas']).split(',')]
+                self.nhi_dlas= [float(n) for n in str(d['nhi_dlas']).split(',')]
+
     def _setWavelengthArray(self, hdr):
         CRPIX1 = hdr["CRPIX1"]
         CDELT1 = hdr["CDELT1"]
@@ -694,6 +696,8 @@ class KODIAQFits(Spectrum):
 
         super().__init__(self.wave, self.flux, self.error, z_qso, hdr["SPECRES"], \
             self.dv, c)
+
+        self._findDLAs()
 
     # def setOutliersMask(self, MEAN_FLUX = 0.7113803432881693, SIGMA_FLUX = 0.37433547084407937, \
     #     MEAN_ERROR = 0.09788299539216311, SIGMA_ERROR = 0.08333137595138172, SIGMA_CUT = 5.):
@@ -1139,9 +1143,9 @@ class XQ100Fits(Spectrum):
         bounds_error=False, fill_value=(11600, 5600))
 
     fits_list = fitsio.FITS(TABLE_XQ100_SUM)[1]
-    dla_csv = ascii.read(TABLE_XQ100_DLA, fill_values="")
-    dla_coords = SkyCoord(dla_csv["RA"], dla_csv["Dec"], \
-        equinox='j2000', unit=deg)
+    dla_csv = ascii.read(TABLE_XQ100_VI_DLA, fill_values="")
+    dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
+        frame='fk5', unit=deg)
 
     def _seeingCorrectedResolution(arm, seeing_ave):
         if arm == 'VIS':
@@ -1160,9 +1164,9 @@ class XQ100Fits(Spectrum):
         # if separation is small, then it is the same qso
         if d2d.arcsec < 10.:
             d = XQ100Fits.dla_csv[idx]
-            if d['zabs']!='nan':
-                self.z_dlas  = [float(z) for z in str(d['zabs']).split(',')]
-                self.nhi_dlas= [float(n) for n in str(d['logN']).split(',')]
+            if d['z_dlas']!='nan':
+                self.z_dlas  = [float(z) for z in str(d['z_dlas']).split(',')]
+                self.nhi_dlas= [float(n) for n in str(d['nhi_dlas']).split(',')]
 
     def __init__(self, filename, correctSeeing=True):
         with fitsio.FITS(filename) as xqf:
@@ -1278,6 +1282,20 @@ class SQUADFits(Spectrum):
     """
 
     dr1_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
+    dla_csv = ascii.read(TABLE_SQUAD_VI_DLA, fill_values="")
+    dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
+        frame='fk5', unit=deg)
+
+    def _findDLAs(self):
+        # Find matching row by ra and dec
+        idx, d2d, _ = self.coord.match_to_catalog_sky(SQUADFits.dla_coords)
+
+        # if separation is small, then it is the same qso
+        if d2d.arcsec < 10.:
+            d = SQUADFits.dla_csv[idx]
+            if d['z_dlas']!='nan':
+                self.z_dlas  = [float(z) for z in str(d['z_dlas']).split(',')]
+                self.nhi_dlas= [float(n) for n in str(d['nhi_dlas']).split(',')]
 
     def _seeingCorrection(d, correctSeeing):
         slit_width = np.mean(np.array(d['SlitWidths'].split(","), dtype=np.double))
@@ -1332,9 +1350,10 @@ class SQUADFits(Spectrum):
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c)
 
-        if d['DLAzabs']:
-            self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
-            self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
+        # if d['DLAzabs']:
+        #     self.z_dlas  = [float(z) for z in str(d['DLAzabs']).split(',')]
+        #     self.nhi_dlas= [float(n) for n in str(d['DLAlogNHI']).split(',')]
+        self._findDLAs()
 
     def setHardCutMask(self):
         pass
