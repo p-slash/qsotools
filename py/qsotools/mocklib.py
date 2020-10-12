@@ -353,6 +353,7 @@ class LyaMocks():
         
         qso.flux = qso.flux.ravel()
         qso.error = qso.error.ravel()
+        qso.specres = spectrograph_resolution
 
         return qso
 
