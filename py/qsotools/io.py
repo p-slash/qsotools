@@ -943,12 +943,13 @@ class KODIAQ_OBS_Iterator:
             coadded_error  += binned_error
             coadded_weight += binned_weight
 
-        coadded_flux  /= coadded_weight
-        coadded_error /= coadded_weight
+        # Divide by weights
+        coadded_flux  /= coadded_weight + 1e-8
+        coadded_error /= coadded_weight + 1e-8
         coadded_error  = np.sqrt(coadded_error)
         
-        coadded_flux[coadded_weight==0]  = 0
-        coadded_error[coadded_weight==0] = 0
+        coadded_flux[coadded_weight<1e-6]  = 0
+        coadded_error[coadded_weight<1e-6] = 0
 
         new_specres = int(np.around(new_specres/total_exp_time, decimals=-2))
         obs.spectrum.wave    = new_wave_centers
