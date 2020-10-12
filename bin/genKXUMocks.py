@@ -12,6 +12,16 @@ import qsotools.specops  as so
 import qsotools.io as qio
 import qsotools.fiducial as fid
 
+# Global variables
+global filename_list
+global specres_list
+global spectral_record_list
+global lya_m
+
+filename_list = []
+specres_list  = set()
+spectral_record_list = qio.SpectralRecordList()
+
 # Define Saving Functions
 # ------------------------------
 def saveParameters(txt_basefilename, f1, f2, args):
@@ -86,38 +96,43 @@ def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
 
     return fluxes, errors
 
-def manageDLAs(qso, meanFluxFunc, args):
-    if args.find_dlas:
-        qso.findDLAs(meanFluxFunc)
-        # Save to file
-        # dla_file.write("# qso_name, set, ra, dec, z_dlas, nhi_dlas\n")
-        # write qso_name, set, ra and dec in iterateSpectra function
-        if qso.z_dlas:
-            ztxt = "%.4f"%qso.z_dlas[0] if len(qso.z_dlas)==1 else \
-                '"%s"' % ",".join(format(x, ".4f") for x in qso.z_dlas)
+# def manageDLAs(qso, meanFluxFunc, args):
+#     if args.find_dlas:
+#         qso.findDLAs(meanFluxFunc)
+#         # Save to file
+#         # dla_file.write("# qso_name, set, ra, dec, z_dlas, nhi_dlas\n")
+#         # write qso_name, set, ra and dec in iterateSpectra function
+#         if qso.z_dlas:
+#             ztxt = "%.4f"%qso.z_dlas[0] if len(qso.z_dlas)==1 else \
+#                 '"%s"' % ",".join(format(x, ".4f") for x in qso.z_dlas)
 
-            ntxt = "%.4f"%qso.nhi_dlas[0] if len(qso.nhi_dlas)==1 else \
-                '"%s"' % ",".join(format(x, ".4f") for x in qso.nhi_dlas)
-            dla_file.write('%s,%s,'%(ztxt, ntxt))
-        else:
-            dla_file.write("nan,nan,")
+#             ntxt = "%.4f"%qso.nhi_dlas[0] if len(qso.nhi_dlas)==1 else \
+#                 '"%s"' % ",".join(format(x, ".4f") for x in qso.nhi_dlas)
+#             dla_file.write('%s,%s,'%(ztxt, ntxt))
+#         else:
+#             dla_file.write("nan,nan,")
 
-    if args.mask_dlas:
-        qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
+#     if args.mask_dlas:
+#         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
 
-# This function is the main pipeline for reduction
-def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
-    mean_flux_hist, args, disableChunk=False):
+def safeResample(qso, pixel_width):
+    wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
+            qso.error.reshape(1,qso.size), pixel_width)
+    
+    qso.dv    = pixel_width
+    qso.wave  = wave
+    qso.flux  = fluxes[0]
+    qso.error = errors[0]
+    qso.size  = qso.wave.size
+    
+    return qso
+
+def cleanup(qso, f1, f2, meanFluxFunc, args):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
-    print("Ly-alpha forest central redshift is ", z_center)
-
-    resamplingCondition = args.lowdv and args.lowdv > qso.dv
-    pixel_width  = args.lowdv if resamplingCondition else qso.dv
-    low_spec_res = qso.specres
-    MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / pixel_width)
     
-    print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
+    # print("Ly-alpha forest central redshift is ", z_center)
+    # print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
 
     qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
 
@@ -131,48 +146,40 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
 
     if not args.real_data:
         lya_m.setCentralRedshift(z_center)
-        if args.const_resolution:
-            low_spec_res = args.const_resolution
+        mock_spec_res = args.const_resolution if args.const_resolution else qso.specres
 
-        qso = lya_m.qsoMock(qso, low_spec_res, args.const_error)
-
-    print("Spectral Res: from %d to %d." % (qso.specres, low_spec_res))
-    print("Pixel width: from %.2f to %.2f km/s" %(qso.dv, pixel_width))
+        qso = lya_m.qsoMock(qso, mock_spec_res, args.const_error)
     
     qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
 
-    manageDLAs(qso, meanFluxFunc, args)
+    # manageDLAs(qso, meanFluxFunc, args)
+    if args.mask_dlas:
+        qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
 
     # If computing continuum power, set F to be C, so that it's resampled.
     # Do not set error here, because later removal relies on error < 10.
     if args.continuum_power:
         meanC    = np.mean(qso.cont)
         qso.flux = qso.cont / meanC
-    
+
     # Resample real data onto lower resolution grid
+    resamplingCondition = args.lowdv and args.lowdv > qso.dv
     if resamplingCondition:
-        wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
-            qso.error.reshape(1,qso.size), pixel_width)
-        print("Number of pixel in lower resolution (%.2f km/s) for the entire spectrum is %d."\
-            %(pixel_width, len(wave)))
-
-        if np.any(fluxes > 10) or np.any(errors > 10):
-            print("WARNING: Spike occured in resampling!! f: %d, e: %d." \
-                % (np.sum(fluxes > 10), np.sum(errors > 10)))
-        
-        qso.wave  = wave
-        qso.flux  = fluxes[0]
-        qso.error = errors[0]
-        qso.size  = qso.wave.size
-
-        qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
+        print("Resampling from %.2f to %.2f km/s" %(qso.dv, args.lowdv))
+        safeResample(qso, args.lowdv)
     
-    if np.any(qso.flux > 10) or np.any(qso.error > 10):
-        raise ValueError("Spike remained!! f: %d, e: %d." \
-            % (np.sum(qso.flux > 10), np.sum(qso.error > 10)))
+    qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
     
-    if args.compute_mean_flux:
+    return qso
+
+# This function is the main pipeline for reduction
+def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False):
+    qso = cleanup(qso, f1, f2, meanFluxFunc, args)
+
+    # If computing mean flux end the pipeline here.
+    if mean_flux_hist:
         mean_flux_hist.addSpectrum(qso, f1, f2)
+        return
 
     # If computing continuum power, approximate the error as the error on f.
     # Note cont is not touched in applyMask, so use flux
@@ -183,13 +190,12 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
         qso.flux, qso.error = convert2DeltaFlux(qso.wave, qso.flux, qso.error, meanFluxFunc, args)
 
     # Skip short spectrum
+    MAX_NO_PIXELS = int(fid.LIGHT_SPEED * np.log(fid.LYA_LAST_WVL/fid.LYA_FIRST_WVL) / qso.dv)
     isShort = lambda x: (args.skip and len(x) < MAX_NO_PIXELS * args.skip) or len(x)==0
     if isShort(qso.wave):
         raise ValueError("Short spectrum", len(qso.wave), MAX_NO_PIXELS)
 
-    specres_list.add((low_spec_res, pixel_width))
-    # print("Lowest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[0], wave[0]))
-    # print("Highest Obs Wave, data: %.3f - mock: %.3f"%(qso.wave[-1], wave[-1]))
+    specres_list.add((qso.specres, qso.dv))
 
     if not disableChunk and args.chunk_dyn:
         waves, fluxes, errors = so.chunkDynamic(qso.wave, qso.flux, qso.error, MAX_NO_PIXELS)
@@ -210,15 +216,90 @@ def genMocks(qso, f1, f2, meanFluxFunc, specres_list, \
     if len(waves) == 0:
         raise ValueError("Empty chunks", len(waves))
 
-    return waves, fluxes, errors, low_spec_res, pixel_width
+    return waves, fluxes, errors, qso.specres, qso.dv
 
-# This function is wrapper for iterations of each data set
-def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
-    filename_list, meanFluxFunc, settings_txt, args):
+# ------------------------
+# Iterator functions
+# ------------------------
+def readFile(it, dataset, f1, f2, args):
+    if dataset == 'KOD':
+        obs_iter = qio.KODIAQ_OBS_Iterator(it)
+        if args.coadd_kodiaq:
+            # Co-add multiple observations
+            qso = obs_iter.coaddObservations(args.coadd_kodiaq)
+            s2n_this = qso.getS2NLya(f1, f2)
+        else:
+            # Pick highest S2N obs
+            qso, s2n_this = obs_iter.maxLyaObservation(f1, f2)
+        qso.qso_name = qso.qso_name.replace(" ", "")
+        qso.print_details()
+
+    elif dataset == 'XQ':
+        qso = qio.XQ100Fits(it, correctSeeing=True)
+        s2n_this = qso.getS2NLya(f1, f2)
+        qso.qso_name = qso.qso_name.replace(" ", "")+"_"+qso.arm
+        print(qso.qso_name)
+
+    elif dataset == 'UVE':
+        qso = qio.SQUADFits(it, correctSeeing=True, corrError=True)
+        s2n_this = qso.getS2NLya(f1, f2)
+        qso.qso_name = qso.qso_name.replace(" ", "")
+        print(qso.qso_name)
+
+    if s2n_this == -1:
+        raise Exception("SKIP: No Lya or Side Band coverage!")
+
+    if dataset == 'UVE' and qso.flag != '0':
+        raise Exception("SKIP: Spec. status is not 0.")
+
+    if s2n_this/np.sqrt(qso.dv) < args.sn_cut:
+        raise Exception("SKIP: Does not pass S/N cut.")
+
+    qso.s2n_lya = s2n_this
+    return qso
+
+def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
+    print("Calculating the mean flux....")
     mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
+    # Use a fiducial mean flux to ID DLAs.
+    meanFluxFunc = fid.meanFluxFG08
+
+    if dataset == 'KOD':
+        set_iter = qio.KODIAQ_QSO_Iterator(directory, clean_pix=False)
+    else:
+        set_iter = glob.glob(ospath_join(directory, "*.fits"))
+        
+    for it in set_iter:
+        try:
+            qso = readFile(it, dataset, f1, f2, args)
+            pipeline(qso, f1, f2, meanFluxFunc, mf_hist, args)
+        except Exception as e:
+            print(e)
+            continue
+    
+    mf_hist.getMeanFlux()
+    mf_hist.saveHistograms(ospath_join(args.OutputDir, "%s-stats%s"%(dataset, settings_txt)))
+
+    # Fit mean flux
+    finite_indices = np.isfinite(mf_hist.mean_flux)
+
+    fit_F = mf_hist.mean_flux[finite_indices]
+    fit_e = mf_hist.mean_error2[finite_indices]
+    fit_z = mf_hist.hist_redshifts[finite_indices]
+
+    pnew, pcov = fid.fitBecker13MeanFlux(fit_z, fit_F, fit_e)
+    print("Mean flux is fit!")
+
+    return pnew
+
+# This function is wrapper for iterations of each data set
+def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args):
     if args.real_data and args.side_band == 0:
-        if dataset == 'KOD':
+        if args.compute_mean_flux:
+            p_meanf = computeMeanFlux(directory, dataset, f1, f2, settings_txt, args)
+            meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *p_meanf)
+        elif dataset == 'KOD':
             meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.KODIAQ_MFLUX_PARAMS)
         elif dataset == 'XQ':
             meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
@@ -227,76 +308,43 @@ def iterateSpectra(set_iter, dataset, f1, f2, specres_list, record, \
     elif args.real_data and args.side_band != 0:
         meanFluxFunc = lambda z: 1.0
 
+    if dataset == 'KOD':
+        set_iter = qio.KODIAQ_QSO_Iterator(directory, clean_pix=False)
+    else:
+        set_iter = glob.glob(ospath_join(directory, "*.fits"))
+
     for it in set_iter:
         print("********************************************", flush=True)
-        if dataset == 'KOD':
-            obs_iter = qio.KODIAQ_OBS_Iterator(it)
-            if args.coadd_kodiaq:
-                # Co-add multiple observations
-                qso = obs_iter.coaddObservations(args.coadd_kodiaq)
-                s2n_this = qso.getS2NLya(f1, f2)
-            else:
-                # Pick highest S2N obs
-                qso, s2n_this = obs_iter.maxLyaObservation(f1, f2)
-            qso.qso_name = qso.qso_name.replace(" ", "")
-            qso.print_details()
 
-        elif dataset == 'XQ':
-            qso = qio.XQ100Fits(it, correctSeeing=True)
-            s2n_this = qso.getS2NLya(f1, f2)
-            qso.qso_name = qso.qso_name.replace(" ", "")+"_"+qso.arm
-
-        elif dataset == 'UVE':
-            qso = qio.SQUADFits(it, correctSeeing=True, corrError=True)
-            s2n_this = qso.getS2NLya(f1, f2)
-            qso.qso_name = qso.qso_name.replace(" ", "")
-
-        print(qso.qso_name)
-
-        if s2n_this == -1:
-            print("SKIP: No Lya or Side Band coverage!")
-            continue
-
-        if dataset == 'UVE' and qso.flag != '0':
-            print("SKIP: Spec. status is not 0.")
-            continue
-
-        if s2n_this/np.sqrt(qso.dv) < args.sn_cut:
-            print("SKIP: Does not pass S/N cut.")
+        try:
+            qso = readFile(it, dataset, f1, f2, args)
+        except Exception as e:
+            print(e)
             continue
 
         try:
-            wave, fluxes, errors, lspecr, pixw = genMocks(qso, \
-                f1, f2, meanFluxFunc, specres_list, \
-                mf_hist, args)#, disableChunk=(dataset == 'XQ'))
+            wave, fluxes, errors, lspecr, pixw = pipeline(qso, f1, f2, meanFluxFunc, None, args)
         except ValueError as ve:
             print(ve.args)
-            if args.find_dlas:
-                # z_dlas, nhi_dlas, qso_name, set, ra, dec
-                dla_file.write("%s,%s,%.10f,%.10f\n" % (qso.qso_name, dataset, \
-                    qso.coord.icrs.ra.deg, qso.coord.icrs.dec.deg))
             continue
-
+        # finally:
+        #     if args.find_dlas:
+        #         # z_dlas, nhi_dlas, qso_name, set, ra, dec
+        #         dla_file.write("%s,%s,%.10f,%.10f\n" % (qso.qso_name, dataset, \
+        #             qso.coord.icrs.ra.deg, qso.coord.icrs.dec.deg))
+            
         nchunks = len(wave)
-        if args.find_dlas:
-            # z_dlas, nhi_dlas, qso_name, set, ra, dec
-            dla_file.write("%s,%s,%.10f,%.10f\n" % (qso.qso_name, dataset, \
-                qso.coord.icrs.ra.deg, qso.coord.icrs.dec.deg))
 
         temp_fname = ["%s-%s-%d_%dA_%dA%s.dat" % (dataset, qso.qso_name, nc, \
             wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
         
-        record.append(dataset, qso.qso_name, s2n_this/np.sqrt(qso.dv), \
+        spectral_record_list.append(dataset, qso.qso_name, qso.s2n_lya/np.sqrt(qso.dv), \
             qso.coord, temp_fname)
 
         filename_list.extend(temp_fname) 
 
         if not args.nosave:
             saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
-
-    if args.compute_mean_flux:
-        mf_hist.getMeanFlux()
-        mf_hist.saveHistograms(ospath_join(args.OutputDir, "%s-stats%s"%(dataset, settings_txt)))
 
 if __name__ == '__main__':
     # Arguments passed to run the script
@@ -379,7 +427,7 @@ if __name__ == '__main__':
         forest_1 = fid.C4_FIRST_WVL
         forest_2 = fid.C4_LAST_WVL
 
-    # Pick mean flux function
+    # Pick mean flux function for the mocks
     if args.gauss:
         meanFluxFunc = fid.meanFluxFG08
     else:
@@ -400,16 +448,10 @@ if __name__ == '__main__':
     txt_basefilename  = "%s/highres%s" % (args.OutputDir, settings_txt)
 
     saveParameters(txt_basefilename, forest_1, forest_2, args)
-    if args.find_dlas:
-        dla_file = open(txt_basefilename+"_dlas.txt", 'w')
-        dla_file.write("z_dlas,nhi_dlas,qso_name,set,ra,dec\n")
+    # if args.find_dlas:
+    #     dla_file = open(txt_basefilename+"_dlas.txt", 'w')
+    #     dla_file.write("z_dlas,nhi_dlas,qso_name,set,ra,dec\n")
     # ------------------------------
-
-    # Set up initial objects and variables
-    no_lya_quasar_list = []
-    filename_list = []
-    specres_list  = set()
-    spectral_record_list = qio.SpectralRecordList()
 
     if not args.real_data:
         lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
@@ -418,31 +460,25 @@ if __name__ == '__main__':
     # ------------------------------    
     # Start with KODIAQ
     if args.KODIAQDir and not args.continuum_power:
-        print("RUNNING ON KODIAQ.........")
-        qso_iter = qio.KODIAQ_QSO_Iterator(args.KODIAQDir, clean_pix=False)
-        
+        print("RUNNING ON KODIAQ.........")        
         # Start iterating quasars in KODIAQ sample
         # Each quasar has multiple observations
         # Pick the one with highest signal to noise in Ly-alpha region
-        iterateSpectra(qso_iter, 'KOD', forest_1, forest_2, specres_list, spectral_record_list, \
-            filename_list, meanFluxFunc, settings_txt, args)
+        iterateSpectra(args.KODIAQDir, 'KOD', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # XQ-100
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........")
-        iterateSpectra(glob.glob(ospath_join(args.XQ100Dir, "*.fits")), 'XQ', forest_1, forest_2, \
-            specres_list, spectral_record_list, filename_list, meanFluxFunc, settings_txt, args)
+        iterateSpectra(args.XQ100Dir, 'XQ', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # UVES/SQUAD
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
-        iterateSpectra(glob.glob(ospath_join(args.UVESSQUADDir, "*.fits")), 'UVE', forest_1, \
-            forest_2, specres_list, spectral_record_list, filename_list, meanFluxFunc, \
-            settings_txt, args)
+        iterateSpectra(args.UVESSQUADDir, 'UVE', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
 
-    if args.find_dlas:
-        dla_file.close()
+    # if args.find_dlas:
+    #     dla_file.close()
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
