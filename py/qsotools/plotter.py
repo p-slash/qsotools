@@ -115,7 +115,7 @@ def create_tworow_figure(nz, ratio_up2down, majorgrid=True, hspace=0, \
     color_array=[colormap(i) for i in np.linspace(0, 1, nz)]
 
     # Plot top axis
-    set_topax_makeup(top_ax, majorgrid)
+    # set_topax_makeup(top_ax, majorgrid)
     bot_ax.set_xscale("log")
 
     bot_ax.set_ylim(-ylim, ylim)
@@ -280,6 +280,7 @@ class PowerPlotter(object):
         """
         if two_row:
             top_ax, bot_ax = create_tworow_figure(1, 3, ylim=rel_ylim)[:-1]
+            set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
         else:
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
