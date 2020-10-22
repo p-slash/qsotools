@@ -130,9 +130,6 @@ def safeResample(qso, pixel_width):
 def cleanup(qso, f1, f2, meanFluxFunc, args):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
-    
-    # print("Ly-alpha forest central redshift is ", z_center)
-    # print("Number of pixel in original resolution for the entire spectrum is %d."%qso.size)
 
     qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
 
@@ -173,6 +170,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     return qso
 
 # This function is the main pipeline for reduction
+# Pass mean_flux_hist=None to produce chunks
 def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False):
     qso = cleanup(qso, f1, f2, meanFluxFunc, args)
 
@@ -195,8 +193,6 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
     if isShort(qso.wave):
         raise ValueError("Short spectrum", len(qso.wave), MAX_NO_PIXELS)
 
-    specres_list.add((qso.specres, qso.dv))
-
     if not disableChunk and args.chunk_dyn:
         waves, fluxes, errors = so.chunkDynamic(qso.wave, qso.flux, qso.error, MAX_NO_PIXELS)
     elif not disableChunk and args.chunk_fixed:
@@ -216,6 +212,7 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
     if len(waves) == 0:
         raise ValueError("Empty chunks", len(waves))
 
+    specres_list.add((qso.specres, qso.dv))
     return waves, fluxes, errors, qso.specres, qso.dv
 
 # ------------------------
