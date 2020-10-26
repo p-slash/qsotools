@@ -223,13 +223,14 @@ class Spectrum:
             except:
                 pass
 
-            self.mask  = np.ones_like(self.flux, dtype=np.bool)
+            self.mask = self.mask[good_pixels]
             self.size = len(self.wave)
             if self.size == 0:
                 raise ValueError("Empty spectrum")
         else:
             self.flux[~good_pixels]  = 0
             self.error[~good_pixels] = 1e10
+            self.mask[~good_pixels] = False
             try:
                 self.cont[~good_pixels]  = 0
             except:
