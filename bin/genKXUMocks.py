@@ -146,8 +146,9 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
         mock_spec_res = args.const_resolution if args.const_resolution else qso.specres
 
         qso = lya_m.qsoMock(qso, mock_spec_res, args.const_error)
-    
-    qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
+
+    qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
+        removePixels=not args.keep_masked_pix)
 
     # manageDLAs(qso, meanFluxFunc, args)
     if args.mask_dlas:
@@ -164,8 +165,9 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     if resamplingCondition:
         print("Resampling from %.2f to %.2f km/s" %(qso.dv, args.lowdv))
         safeResample(qso, args.lowdv)
-    
-    qso.applyMask(good_pixels=qso.error<10, removePixels=not args.keep_masked_pix)
+
+    qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
+        removePixels=not args.keep_masked_pix)
     
     return qso
 
