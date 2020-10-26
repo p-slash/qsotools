@@ -50,12 +50,12 @@ def resample(wave, flux, error, new_dv_or_edge):
 
         binned_flux,  bin_edges, binnumber = binned_statistic(wave, flux, statistic='sum', bins=new_wave_edges)
         binned_error, bin_edges, binnumber = binned_statistic(wave, error, statistic='sum', bins=new_wave_edges)
-        
-        # Remove empty bins with epsilon error
-        empty_bins = np.logical_or(np.abs(binned_flux[0]) < 1e-5, binned_error[0] < 1e-5)
 
-        binned_flux /= binned_error + 1e-8
-        binned_error = 1./(np.sqrt(binned_error) + 1e-8)
+        binned_flux /= binned_error
+        binned_error = 1./np.sqrt(binned_error)
+
+        # Remove empty bins with epsilon error
+        empty_bins = np.logical_or(np.abs(binned_flux[0]) < 1e-8, binned_error[0] < 1e-8)
         
     # Remove empty bins from resampled data
     finite_bins = np.logical_and(np.isfinite(binned_flux)[0], ~empty_bins)
