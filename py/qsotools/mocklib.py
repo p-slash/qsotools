@@ -336,7 +336,7 @@ class LyaMocks():
         
         # Resample everything back to observed grid 
         # Create wavelength edges for logarithmicly spaced array from obs_wave_centers
-        obs_wave_edges = specops.createEdgesFromCenters(qso.wave)
+        obs_wave_edges = specops.createEdgesFromCenters(qso.wave, qso.dv)
         wave, qso.flux = specops.resample(wave, self.delta_F, None, obs_wave_edges)
         obs_wave_edges = specops.createEdgesFromCenters(wave)
         qso.wave, qso.error = specops.resample(qso.wave, qso.error, None, obs_wave_edges)
