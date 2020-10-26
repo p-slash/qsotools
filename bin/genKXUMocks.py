@@ -326,6 +326,9 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
         except ValueError as ve:
             print(ve.args)
             continue
+        except Exception as e:
+            print(e)
+            continue
         # finally:
         #     if args.find_dlas:
         #         # z_dlas, nhi_dlas, qso_name, set, ra, dec
