@@ -346,7 +346,7 @@ class LyaMocks():
             qso.error = const_error * np.ones_like(qso.flux)
 
         qso.flux += self.generateGaussianNoise(qso.error, qso.flux)
-        
+
         # Break if observed grid does not include the wavelength range
         if qso.size == 0:
             raise ValueError("Empty grid")
