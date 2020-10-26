@@ -123,6 +123,7 @@ def safeResample(qso, args):
     qso.wave  = wave
     qso.flux  = fluxes[0]
     qso.error = errors[0]
+    qso.mask  = np.ones_like(qso.flux)
     qso.size  = qso.wave.size
     
     qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
