@@ -115,16 +115,19 @@ def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
 #     if args.mask_dlas:
 #         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
 
-def safeResample(qso, pixel_width):
+def safeResample(qso, args):
     wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
-            qso.error.reshape(1,qso.size), pixel_width)
+            qso.error.reshape(1,qso.size), args.lowdv)
     
-    qso.dv    = pixel_width
+    qso.dv    = args.lowdv
     qso.wave  = wave
     qso.flux  = fluxes[0]
     qso.error = errors[0]
     qso.size  = qso.wave.size
     
+    qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
+        removePixels=not args.keep_masked_pix)
+
     return qso
 
 def cleanup(qso, f1, f2, meanFluxFunc, args):
@@ -164,10 +167,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     resamplingCondition = args.lowdv and args.lowdv > qso.dv
     if resamplingCondition:
         print("Resampling from %.2f to %.2f km/s" %(qso.dv, args.lowdv))
-        safeResample(qso, args.lowdv)
-
-    qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
-        removePixels=not args.keep_masked_pix)
+        qso = safeResample(qso, args)
     
     return qso
 
