@@ -45,7 +45,7 @@ def resample(wave, flux, error, new_dv_or_edge):
         binned_error = np.zeros_like(binned_flux)
         empty_bins   = np.zeros_like(binned_flux[0], dtype=np.bool)
     else:
-        error = np.power(error+1e-8, -2)
+        error = np.power(error, -2)
         flux *= error
 
         binned_flux,  bin_edges, binnumber = binned_statistic(wave, flux, statistic='sum', bins=new_wave_edges)
