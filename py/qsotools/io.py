@@ -677,7 +677,7 @@ class KODIAQFits(Spectrum):
         self.spec_prefix = spec_prefix
 
         self.subdir = ospath_join(kodiaq_dir, qso_name, pi_date)
-        
+
         flux_fname = ospath_join(self.subdir,"%s_f.fits" % self.spec_prefix)
         erro_fname = ospath_join(self.subdir,"%s_e.fits" % self.spec_prefix)
 
@@ -888,10 +888,9 @@ class KODIAQ_OBS_Iterator:
         self.spectrum = KODIAQFits(self.kqso_iter.kodiaq_dir, \
             self.kqso_iter.qso_name, self.pi_date, self.spec_prefix, \
             self.kqso_iter.z_qso)
-        self.spectrum.setOutliersMask()
 
-        if self.kqso_iter.clean_pix:
-            self.spectrum.applyMask()
+        self.spectrum.setZScoreMask(fsigma=1, esigma=3.5)
+        self.spectrum.applyMask(removePixels=self.kqso_iter.clean_pix)
 
     def maxLyaObservation(self, w1=LYA_FIRST_WVL, w2=LYA_LAST_WVL):
         max_s2n_lya = -1
