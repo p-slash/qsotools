@@ -47,7 +47,7 @@ def qmleBootRunDESI(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_fil
     # getIDno= lambda x: int(id_regex.search(x).group(1))
     
     qso_fname_list.sort(key=getSno) # Sort for groupby
-    no_spectra = len(qso_filename_list)
+    no_spectra = len(qso_fname_list)
     perc = int(no_spectra/20)
 
     # counts shape (no_spectra, bootnum)
@@ -118,14 +118,53 @@ def qmleBootRun(booted_indices, no_spectra, N, inputdir, bootnum, fp_file):
     
     return total_power
 
+def qmleBootQSO(RND, N, inputdir, bootnum, fp_file):
+    total_fisher   = np.zeros((bootnum, N, N))
+    total_power_b4 = np.zeros((bootnum, N))
+    total_power    = np.zeros((bootnum, N))
+
+    qind = 0 
+    fitspath = ospath_join(inputdir, fp_file)
+    print("Reading {:s}...".format(fitspath), flush=True)
+
+    with fitsio.FITS(fitspath) as fitsfile:
+        no_qso = len(fitsfile) - 1
+        booted_indices = RND.randint(no_qso, size=(args.bootnum, no_qso))
+        
+        print("Getting repetitions...", flush=True)
+        counts = getCounts(booted_indices, bootnum, no_qso)
+
+        perc = int(no_qso/20)
+
+        for hdu in fitsfile[1:]:
+            ci = counts[qind]
+            data = hdu.read()
+            
+            total_fisher   += np.sum(data['fisher']*ci[:, None, None, None], axis=1)
+            total_power_b4 += np.sum(data['power']*ci[:, None, None], axis=1)
+            
+            qind+=1
+            if qind%perc==0:
+                print("Progress: {:4.1f}%".format(100*qind/no_qso), flush=True)
+
+    print("Results from {:s} are read and added.".format(fitspath), flush=True)
+
+    print("Calculating bootstrapped inverse Fisher and power...", flush=True)
+    for bi in range(bootnum):
+        inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
+        total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
+    
+    return total_power
+
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
     parser.add_argument("ConfigFile", help="Config file")
+    parser.add_argument("--by-qso", action="store_true")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
     parser.add_argument("--desilite-mocks", action="store_true")
-    parser.add_argument("--fp-file", default="combined_Fp.fits")
+    parser.add_argument("--fp-file", default="combined_Fp.fits.gz")
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
     args = parser.parse_args()
@@ -145,22 +184,26 @@ if __name__ == '__main__':
 
     no_spectra = len(qso_filename_list)
     print("Filenames of {:d} spectra are stored.".format(no_spectra))
-
+        
     # Generate random indices as bootstrap
     RND = np.random.RandomState(args.seed)
-    booted_indices = RND.randint(no_spectra, size=(args.bootnum, no_spectra))
-    print("{:d} bootstrap realisations are generated.".format(args.bootnum))
-    print("Here's the first realisation:", booted_indices[0], flush=True)
-    print("Here's the repetitions for index 0:", \
-        np.count_nonzero(booted_indices==0, axis=1), flush=True)
 
-    print("Running analysis...", flush=True)
-    if args.desilite_mocks:
-        bootresult=qmleBootRunDESI(booted_indices, qso_filename_list, N, \
-            config_qmle.qso_dir, args.bootnum, args.fp_file)
+    if args.by_qso:
+        print("Running analysis...", flush=True)
+        bootresult=qmleBootQSO(RND, N, config_qmle.qso_dir, args.bootnum, args.fp_file)
     else:
-        bootresult=qmleBootRun(booted_indices, no_spectra, N, \
-            config_qmle.qso_dir, args.bootnum, args.fp_file)
+        booted_indices = RND.randint(no_spectra, size=(args.bootnum, no_spectra))
+        print("{:d} bootstrap realisations are generated.".format(args.bootnum))
+        print("Here's the first realisation:", booted_indices[0], flush=True)
+        print("Here's the repetitions for index 0:", \
+            np.count_nonzero(booted_indices==0, axis=1), flush=True)
+
+        if args.desilite_mocks:
+            bootresult=qmleBootRunDESI(booted_indices, qso_filename_list, N, \
+                config_qmle.qso_dir, args.bootnum, args.fp_file)
+        else:
+            bootresult=qmleBootRun(booted_indices, no_spectra, N, \
+                config_qmle.qso_dir, args.bootnum, args.fp_file)
 
     # Save power to a file
     power_filename = ospath_join(output_dir, output_base \
