@@ -342,15 +342,15 @@ class LyaMocks():
         qso.wave, qso.error = specops.resample(qso.wave, qso.error, None, obs_wave_edges)
         qso.size = len(qso.wave)
 
+        # Break if observed grid does not include the wavelength range
+        if qso.size == 0:
+            raise ValueError("Empty grid")
+
         if const_error:
             qso.error = const_error * np.ones_like(qso.flux)
 
         qso.flux += self.generateGaussianNoise(qso.error, qso.flux)
 
-        # Break if observed grid does not include the wavelength range
-        if qso.size == 0:
-            raise ValueError("Empty grid")
-        
         qso.flux = qso.flux.ravel()
         qso.error = qso.error.ravel()
         qso.specres = spectrograph_resolution
