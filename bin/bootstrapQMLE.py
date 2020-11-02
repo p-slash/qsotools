@@ -129,8 +129,8 @@ def qmleBootQSO(RND, N, inputdir, bootnum, fp_file):
 
     with fitsio.FITS(fitspath) as fitsfile:
         no_qso = len(fitsfile) - 1
-        booted_indices = RND.randint(no_qso, size=(args.bootnum, no_qso))
-        
+        booted_indices = RND.randint(no_qso, size=(bootnum, no_qso))
+
         print("Getting repetitions...", flush=True)
         counts = getCounts(booted_indices, bootnum, no_qso)
 
@@ -140,8 +140,8 @@ def qmleBootQSO(RND, N, inputdir, bootnum, fp_file):
             ci = counts[qind]
             data = hdu.read()
             
-            total_fisher   += np.sum(data['fisher']*ci[:, None, None, None], axis=1)
-            total_power_b4 += np.sum(data['power']*ci[:, None, None], axis=1)
+            total_fisher   += np.sum(data['fisher'], axis=0) * ci[:, None, None]
+            total_power_b4 += np.sum(data['power'], axis=0) * ci[:, None]
             
             qind+=1
             if qind%perc==0:
