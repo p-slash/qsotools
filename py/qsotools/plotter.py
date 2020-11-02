@@ -9,11 +9,15 @@ from   astropy.io        import ascii
 TICK_LBL_FONT_SIZE = 18
 AXIS_LBL_FONT_SIZE = 20
 
-def set_topax_makeup(top_ax, majorgrid=True, ymin=1e-4, ymax=0.5):
+def set_topax_makeup(top_ax, majorgrid=True, ymin=None, ymax=None):
     top_ax.grid(majorgrid, which='major')
     top_ax.set_yscale("log")
     top_ax.set_xscale("log")
-    top_ax.set_ylim(ymin=ymin, ymax=ymax)
+    
+    if ymin:
+        top_ax.set_ylim(ymin=ymin)
+    if ymax:
+        top_ax.set_ylim(ymax=ymax)
 
     top_ax.tick_params(which='major', direction='in', length=7, width=1)
     top_ax.tick_params(which='minor', direction='in', length=4, width=0.8)
@@ -250,8 +254,7 @@ class PowerPlotter(object):
             del z_true
 
     def plotRedshiftBin(self, nz, outplot_fname=None, two_row=False, plot_true=True, \
-        plot_dbt=False, \
-        pk_ymax=0.5, pk_ymin=1e-4, rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, \
+        plot_dbt=False, rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, \
         auto_ylim_xmax=1000, ignore_last_k_bins=-1):
         """Plot QMLE results for given redshift bin nz.
 
@@ -267,8 +270,6 @@ class PowerPlotter(object):
             Plot true value if True.
         plot_dbt : bool, optiona
             Plot full power and noise estimate individually.
-        pk_ymax, pk_ymin : float, optional
-            Maximum and minimum y axis limits for kP/pi.
         rel_ylim : float, optional
             Y axis limits for the relative error on the lower panel.
         noise_dom : float, optional
@@ -280,10 +281,10 @@ class PowerPlotter(object):
         """
         if two_row:
             top_ax, bot_ax = create_tworow_figure(1, 3, ylim=rel_ylim)[:-1]
-            set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
+            set_topax_makeup(top_ax)
         else:
             fig, top_ax = plt.subplots()
-            set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
+            set_topax_makeup(top_ax)
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
             top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
 
@@ -338,6 +339,19 @@ class PowerPlotter(object):
                 markersize=3, capsize=0, color='k')
 
             self._autoRelativeYLim(bot_ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
+
+        pkpi = psz*self.k_bins/np.pi
+        ymin = np.min(pkpi[self.k_bins<auto_ylim_xmax])
+        top_ax.set_ylim(ymin=ymin)
+        
+        yticks = []
+        if ymin < 1e-3:
+            yticks.append(1e-3)
+        yticks.append(1e-2)
+        if np.max(pkpi) > 0.1:
+            yticks.append(1e-1)
+
+        top_ax.set_yticks(yticks)
 
         print("z={:.1f} Chi-Square / dof: {:.2f} / {:d}.".format(z_val, chi_sq_zb, ddof))
 
