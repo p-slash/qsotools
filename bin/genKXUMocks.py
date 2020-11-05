@@ -178,7 +178,7 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
 
     # If computing mean flux end the pipeline here.
     if mean_flux_hist:
-        mean_flux_hist.addSpectrum(qso, f1, f2)
+        mean_flux_hist.addSpectrum(qso, weight=qso.s2n_lya/np.sqrt(qso.dv), f1, f2)
         return
 
     # If computing continuum power, approximate the error as the error on f.
