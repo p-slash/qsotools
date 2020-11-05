@@ -143,17 +143,17 @@ class MeanFluxHist():
         self.counts = np.zeros(nz+2)
         self.z_hist = np.zeros(nz)
 
-    def addSpectrum(self, qso, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL):
+    def addSpectrum(self, qso, weight=1, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL):
         lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
 
         ci, zi, fi, ei, e2i = getStats(qso.wave[lya_ind], qso.flux[lya_ind], \
             qso.error[lya_ind], self.hist_redshift_edges)
 
         self.z_hist += zi
-        self.total_flux += fi
-        self.total_error += ei
-        self.total_error2 += e2i
-        self.counts += ci
+        self.total_flux += fi * weight
+        self.total_error += ei * weight
+        self.total_error2 += e2i * weight
+        self.counts += ci * weight
 
     def getMeanFlux(self):
         self.mean_flux = self.total_flux / self.counts[1:-1]
