@@ -19,8 +19,8 @@ def set_topax_makeup(top_ax, majorgrid=True, ymin=None, ymax=None):
     if ymax:
         top_ax.set_ylim(ymax=ymax)
 
-    top_ax.tick_params(which='major', direction='in', length=7, width=1)
-    top_ax.tick_params(which='minor', direction='in', length=4, width=0.8)
+    top_ax.tick_params(which='major', direction='in', length=7, width=1, right=True, top=True)
+    top_ax.tick_params(which='minor', direction='in', length=4, width=0.8, right=True, top=True)
 
     plt.setp(top_ax.get_yticklabels(), fontsize = TICK_LBL_FONT_SIZE)
     top_ax.set_ylabel(r'$kP/\pi$', fontsize = AXIS_LBL_FONT_SIZE)
@@ -124,8 +124,8 @@ def create_tworow_figure(nz, ratio_up2down, majorgrid=True, hspace=0, \
 
     bot_ax.set_ylim(-ylim, ylim)
     
-    bot_ax.tick_params(which='major', direction='in', length=7, width=1)
-    bot_ax.tick_params(which='minor', direction='in', length=4, width=0.8)
+    bot_ax.tick_params(which='major', direction='in', length=7, width=1, right=True, top=True)
+    bot_ax.tick_params(which='minor', direction='in', length=4, width=0.8, right=True, top=True)
 
     bot_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
     bot_ax.set_ylabel(r'$\Delta P/P_{\mathrm{t}}$', fontsize = AXIS_LBL_FONT_SIZE)
@@ -356,7 +356,7 @@ class PowerPlotter(object):
         print("z={:.1f} Chi-Square / dof: {:.2f} / {:d}.".format(z_val, chi_sq_zb, ddof))
 
         if outplot_fname:
-            plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
+            plt.savefig(outplot_fname, dpi=200, bbox_inches='tight')
 
     def plotAll(self, outplot_fname=None, two_row=False, plot_true=True, pk_ymax=0.5, \
         pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
@@ -387,11 +387,11 @@ class PowerPlotter(object):
                 colormap=colormap)
         else:
             fig, top_ax = plt.subplots()
-            set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
             top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
             color_array=[colormap(i) for i in np.linspace(0, 1, self.nz)]
-        
+
+        set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
         chi_sq = 0
 
         if fmt is None:
@@ -413,13 +413,13 @@ class PowerPlotter(object):
             chi_sq += np.sum(chi_sq_zb)
 
             top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, yerr=erz*self.k_bins/np.pi, \
-                fmt=fmt, label="z=%.2f"%z_val, markersize=3, capsize=2, color=ci)
+                fmt=fmt, label="z=%.1f"%z_val, markersize=3, capsize=2, color=ci)
             
             if plot_true:
                 top_ax.errorbar(self.k_bins, ptz*self.k_bins/np.pi, fmt=':', capsize=0, color=ci)
 
             if two_row:
-                bot_ax.errorbar(self.k_bins, psz / ptz  - 1, xerr = 0, yerr = erz/ptz, fmt='s:', \
+                bot_ax.errorbar(self.k_bins, psz / ptz  - 1, xerr = 0, yerr = erz/ptz, fmt='s--', \
                     markersize=3, capsize=0, color=ci)
 
         if two_row:
@@ -427,7 +427,7 @@ class PowerPlotter(object):
             self._autoRelativeYLim(bot_ax, rel_err, self.error, self.power_true, \
                 auto_ylim_xmin, auto_ylim_xmax)
 
-        add_legend_no_error_bars(top_ax, "upper left", bbox_to_anchor=(1.03, 1))
+        add_legend_no_error_bars(top_ax, "upper left", bbox_to_anchor=(1.0, 1.03))
 
         if noise_dom:
             top_ax.set_xlim(xmax=self.k_bins[-1]*1.1)
@@ -443,7 +443,7 @@ class PowerPlotter(object):
         print("Chi-Square / dof: {:.2f} / {:d}.".format(chi_sq, ddof*self.nz))
 
         if outplot_fname:
-            plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
+            plt.savefig(outplot_fname, dpi=200, bbox_inches='tight')
 
     def plotMultiDeviation(self, outplot_fname=None, two_col=False, rel_ylim=0.05, \
         colormap=plt.cm.jet, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000):
@@ -494,7 +494,7 @@ class PowerPlotter(object):
             self._autoRelativeYLim(axs[i], rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
 
         if outplot_fname:
-            plt.savefig(outplot_fname, dpi=300, bbox_inches='tight')
+            plt.savefig(outplot_fname, dpi=200, bbox_inches='tight')
 
 class FisherPlotter(object):
     """FisherPlotter is object to plot the Fisher matrix in its entirety or in individual k & z bins.
