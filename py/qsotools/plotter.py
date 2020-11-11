@@ -9,6 +9,17 @@ from   astropy.io        import ascii
 TICK_LBL_FONT_SIZE = 18
 AXIS_LBL_FONT_SIZE = 20
 
+def save_figure(outplot_fname, dpi=200):
+    if outplot_fname:
+        plt.savefig(outplot_fname, dpi=dpi, bbox_inches='tight')
+
+def ticks_makeup(ax):
+    ax.tick_params(direction='in', which='major', length=7, width=1, right=True,  top=True)
+    ax.tick_params(direction='in', which='minor', length=4, width=1, right=True,  top=True)
+    
+    plt.setp(ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
+    plt.setp(ax.get_yticklabels(), fontsize = TICK_LBL_FONT_SIZE)
+
 def set_topax_makeup(top_ax, majorgrid=True, ymin=None, ymax=None):
     top_ax.grid(majorgrid, which='major')
     top_ax.set_yscale("log")
@@ -19,14 +30,13 @@ def set_topax_makeup(top_ax, majorgrid=True, ymin=None, ymax=None):
     if ymax:
         top_ax.set_ylim(ymax=ymax)
 
-    top_ax.tick_params(which='major', direction='in', length=7, width=1, right=True, top=True)
-    top_ax.tick_params(which='minor', direction='in', length=4, width=0.8, right=True, top=True)
+    ticks_makeup(top_ax)
 
-    plt.setp(top_ax.get_yticklabels(), fontsize = TICK_LBL_FONT_SIZE)
+    plt.setp(top_ax.get_xticklabels(), visible=False)
     top_ax.set_ylabel(r'$kP/\pi$', fontsize = AXIS_LBL_FONT_SIZE)
 
 def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
-    xlab = r'$k$ [s km$^{-1}$]', colormap=plt.cm.jet):
+    xlab = r'$k$ [s$\,$km$^{-1}$]', colormap=plt.cm.jet):
     # Set up plotting env
     fig = plt.figure(figsize=(5, nz))
     gs = gridspec.GridSpec(nz, 1, figure=fig, wspace=0.0, hspace=0.05)
@@ -63,7 +73,7 @@ def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
     return axs, color_array
 
 def two_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
-    xlab = r'$k$ [s km$^{-1}$]', colormap=plt.cm.jet):
+    xlab = r'$k$ [s$\,$km$^{-1}$]', colormap=plt.cm.jet):
     # Set up plotting env
     fig = plt.figure(figsize=(10, nz/2))
     gs = gridspec.GridSpec(int((nz+1)/2), 2, figure=fig, wspace=0.01, hspace=0.05)
@@ -124,14 +134,10 @@ def create_tworow_figure(nz, ratio_up2down, majorgrid=True, hspace=0, \
 
     bot_ax.set_ylim(-ylim, ylim)
     
-    bot_ax.tick_params(which='major', direction='in', length=7, width=1, right=True, top=True)
-    bot_ax.tick_params(which='minor', direction='in', length=4, width=0.8, right=True, top=True)
+    ticks_makeup(bot_ax)
 
-    bot_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
+    bot_ax.set_xlabel(r'$k$ [s$\,$km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
     bot_ax.set_ylabel(r'$\Delta P/P_{\mathrm{t}}$', fontsize = AXIS_LBL_FONT_SIZE)
-
-    plt.setp(bot_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
-    plt.setp(bot_ax.get_yticklabels(), fontsize = TICK_LBL_FONT_SIZE)
 
     return top_ax, bot_ax, color_array
 
@@ -191,6 +197,11 @@ class PowerPlotter(object):
         self.k_bins = np.unique(self.karray)
         self.nz = self.z_bins.size
         self.nk = self.k_bins.size
+
+        # Read k edges
+        k1 = np.unique(np.array(power_table['k1'], dtype=np.double))
+        k2 = np.unique(np.array(power_table['k2'], dtype=np.double))
+        self.k_edges = np.append(k1, k2[-1])
 
         # Find out what kind of table we are reading
         # If it is QE result file
@@ -286,7 +297,7 @@ class PowerPlotter(object):
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax)
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
-            top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
+            top_ax.set_xlabel(r'$k$ [s$\,$km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
 
         if plot_dbt:
             psz = self.power_qmle_full[nz]
@@ -355,8 +366,7 @@ class PowerPlotter(object):
 
         print("z={:.1f} Chi-Square / dof: {:.2f} / {:d}.".format(z_val, chi_sq_zb, ddof))
 
-        if outplot_fname:
-            plt.savefig(outplot_fname, dpi=200, bbox_inches='tight')
+        save_figure(outplot_fname)
 
     def plotAll(self, outplot_fname=None, two_row=False, plot_true=True, pk_ymax=0.5, \
         pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
@@ -388,7 +398,7 @@ class PowerPlotter(object):
         else:
             fig, top_ax = plt.subplots()
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
-            top_ax.set_xlabel(r'$k$ [s km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
+            top_ax.set_xlabel(r'$k$ [s$\,$km$^{-1}$]', fontsize = AXIS_LBL_FONT_SIZE)
             color_array=[colormap(i) for i in np.linspace(0, 1, self.nz)]
 
         set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
@@ -442,8 +452,7 @@ class PowerPlotter(object):
         
         print("Chi-Square / dof: {:.2f} / {:d}.".format(chi_sq, ddof*self.nz))
 
-        if outplot_fname:
-            plt.savefig(outplot_fname, dpi=200, bbox_inches='tight')
+        save_figure(outplot_fname)
 
     def plotMultiDeviation(self, outplot_fname=None, two_col=False, rel_ylim=0.05, \
         colormap=plt.cm.jet, noise_dom=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000):
@@ -493,8 +502,7 @@ class PowerPlotter(object):
 
             self._autoRelativeYLim(axs[i], rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
 
-        if outplot_fname:
-            plt.savefig(outplot_fname, dpi=200, bbox_inches='tight')
+        save_figure(outplot_fname)
 
 class FisherPlotter(object):
     """FisherPlotter is object to plot the Fisher matrix in its entirety or in individual k & z bins.
@@ -526,22 +534,20 @@ class FisherPlotter(object):
     zlabels
 
     """
-    def __init__(self, filename, nz=None, dz=0.2, z1=1.8, skiprows=1):
+    def __init__(self, filename, k_edges, nz, dz=0.2, z1=1.8, skiprows=1):
         self.fisher = np.loadtxt(filename, skiprows=skiprows)
-        
+        self.k_edges = k_edges
+        self.nz = nz
+        self.dz = dz
+        self.z1 = z1
+        self.nk = int(self.fisher.shape[0]/nz)
+        self.zlabels = ["%.1f" % z for z in z1 + np.arange(nz) * dz]
+
         try:
             self.invfisher = np.linalg.inv(self.fisher)
         except Exception as e:
             self.invfisher = None
             print("Cannot invert the Fisher matrix.")
-
-        if nz:
-            self.nz = nz
-            self.nk = int(self.fisher.shape[0]/nz)
-            self.zlabels = ["%.1f" % z for z in z1 + np.arange(nz) * dz]
-        else:
-            self.nz = None
-            self.nk = None
 
     def _setTicks(self, ax):
         if self.nz:
@@ -629,37 +635,40 @@ class FisherPlotter(object):
         cbar = fig.colorbar(im)
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
 
-        if outplot_fname:
-            plt.savefig(outplot_fname, bbox_inches='tight')
+        save_figure(outplot_fname)
 
-    def _plotOneBin(self, data, outplot_fname, cbarlbl, cmap, nticks, tick_lbls, **kwargs):
+    def _plotOneBin(self, x_corners, data, cbarlbl, axis_lbl, cmap, ticks, **kwargs):
         fig, ax = plt.subplots()
-        extent = np.array([0, nticks, nticks, 0]) - 0.5
-        im = ax.imshow(data, cmap=cmap, origin='upper', extent=extent, **kwargs)
 
-        cbar = fig.colorbar(im)
-        cbar.set_label(cbarlbl, fontsize = 20)
-        cbar.ax.tick_params(labelsize = 16)
-
-        plt.xticks(fontsize = 16, rotation=60)
-        plt.yticks(fontsize = 16)
+        im = ax.pcolormesh(x_corners, x_corners, data, cmap=cmap, shading='flat', **kwargs)
+        if x_corners[-1]/x_corners[0] > 10:
+            ax.set_xscale("log")
+            ax.set_yscale("log")
         
-        ax.set_xticks(np.arange(nticks))
-        ax.set_yticks(np.arange(nticks))
+        ax.set_xlim(xmax=x_corners[-1])
+        ax.set_ylim(ymax=x_corners[-1])
 
-        if tick_lbls is not None:
-            ax.set_xticklabels(tick_lbls)
-            ax.set_yticklabels(tick_lbls)
-            plt.setp(ax.get_xticklabels(), visible = True)
-            plt.setp(ax.get_yticklabels(), visible = True)
-        else:
-            plt.setp(ax.get_xticklabels(), visible = False)
-            plt.setp(ax.get_yticklabels(), visible = False)
+        cbar = fig.colorbar(im, ticks=np.linspace(-1, 1, 6))
+        cbar.set_label(cbarlbl, fontsize = AXIS_LBL_FONT_SIZE)
+        cbar.ax.tick_params(labelsize = TICK_LBL_FONT_SIZE)
 
-        if outplot_fname:
-            plt.savefig(outplot_fname, bbox_inches='tight')
+        ax.grid(color='k', alpha=0.3)
+        plt.xticks(fontsize = TICK_LBL_FONT_SIZE)
+        plt.yticks(fontsize = TICK_LBL_FONT_SIZE)
+        
+        ax.set_xlabel(axis_lbl, fontsize=AXIS_LBL_FONT_SIZE)
+        ax.set_ylabel(axis_lbl, fontsize=AXIS_LBL_FONT_SIZE)
+        
+        ticks_makeup(ax)
 
-    def plotKBin(self, kb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic, **kwargs):
+        if ticks is not None:
+            ax.set_xticks(ticks)
+            ax.set_yticks(ticks)
+
+        return ax
+
+    def plotKBin(self, kb, scale="norm", ticks=None, inv=False, outplot_fname=None, \
+        colormap=plt.cm.RdBu_r, **kwargs):
         """Plot Fisher matrix for a given k bin, i.e. redshift correlations.
 
         Parameters
@@ -670,21 +679,40 @@ class FisherPlotter(object):
             To normalize with respect to the diagonal pass "norm". 
             To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
             Default is "norm".
+        ticks : list or np.array
+            Default is None, so automated.
+        inv : bool, optional
+            Plot the inverse instead.
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
-            Colormap to use for scale. Default is seismic.
+            Colormap to use for scale. Default is RdBu_r.
         kwargs: ** for imshow
         """
-        Ftxt = "F"
-        grid, cbarlbl, colormap = self._setScale(self.fisher, scale, Ftxt, Fsub='z')
+        Ftxt = "F" if not inv else "F^{-1}"
+        
+        if self.invfisher is None and inv:
+            print("Fisher is not invertable.")
+            exit(1)
+        if inv:
+            tmp = self.invfisher
+        else:
+            tmp = self.fisher
+
+        grid, cbarlbl, _ = self._setScale(tmp, scale, Ftxt, Fsub='z')
 
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
         
-        self._plotOneBin(zbyz_corr, outplot_fname, cbarlbl, colormap, self.nz, self.zlabels, **kwargs)
+        zcoords = np.arange(self.nz+1) * self.dz + self.z1 - self.dz/2
 
-    def plotZBin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic, **kwargs):
+        ax = self._plotOneBin(zcoords, zbyz_corr, cbarlbl, r"$z$", colormap, \
+            ticks, **kwargs)
+
+        save_figure(outplot_fname)
+
+    def plotZBin(self, zb, scale="norm", ticks=None, inv=False, outplot_fname=None, \
+        tick_lbls=None, colormap=plt.cm.RdBu_r, **kwargs):
         """Plot Fisher matrix for a given z bin, i.e. k correlations.
 
         Parameters
@@ -695,20 +723,37 @@ class FisherPlotter(object):
             To normalize with respect to the diagonal pass "norm". 
             To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
             Default is "norm".
+        ticks : list or np.array
+            Default is None, so automated.
+        inv : bool, optional
+            Plot the inverse instead.
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
-            Colormap to use for scale. Default is seismic.
+            Colormap to use for scale. Default is RdBu_r.
         """
-        Ftxt = "F"
-        grid, cbarlbl, _ = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
+        Ftxt = "F" if not inv else "F^{-1}"
+        
+        if self.invfisher is None and inv:
+            print("Fisher is not invertable.")
+            exit(1)
+        if inv:
+            tmp = self.invfisher
+        else:
+            tmp = self.fisher
+
+        grid, cbarlbl, _ = self._setScale(tmp, scale, Ftxt, Fsub='k')
 
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*zb:self.nk*(zb+1)]
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None, **kwargs)
+        ax = self._plotOneBin(self.k_edges, kbyk_corr, cbarlbl, r"$k$ [s$\,$km$^{-1}$]", \
+            colormap, ticks, **kwargs)
 
-    def plotKCrossZbin(self, zb, scale="norm", outplot_fname=None, colormap=plt.cm.seismic, **kwargs):
+        save_figure(outplot_fname)
+
+    def plotKCrossZbin(self, zb, scale="norm", ticks=None, inv=False, outplot_fname=None, \
+        tick_lbls=None, colormap=plt.cm.RdBu_r, **kwargs):
         """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations cross z bins.
 
         Parameters
@@ -719,14 +764,27 @@ class FisherPlotter(object):
             To normalize with respect to the diagonal pass "norm". 
             To plot log10 pass "log". Anything else leaves the Fisher matrix as it is. 
             Default is "norm".
+        ticks : list or np.array
+            Default is None, so automated.
+        inv : bool, optional
+            Plot the inverse instead.
         outplot_fname : str, optional
             When passed, figure is saved with this filename.
         colormap : plt.cm, optional
-            Colormap to use for scale. Default is seismic.
+            Colormap to use for scale. Default is RdBu_r.
         kwargs: ** for imshow
         """
-        Ftxt = "F"
-        grid, cbarlbl, _ = self._setScale(self.fisher, scale, Ftxt, Fsub='k')
+        Ftxt = "F" if not inv else "F^{-1}"
+        
+        if self.invfisher is None and inv:
+            print("Fisher is not invertable.")
+            exit(1)
+        if inv:
+            tmp = self.invfisher
+        else:
+            tmp = self.fisher
+
+        grid, cbarlbl, _ = self._setScale(tmp, scale, Ftxt, Fsub='k')
 
         next_z_bin = zb+1
         if next_z_bin >= self.nz:
@@ -735,8 +793,13 @@ class FisherPlotter(object):
         kbyk_corr = grid[self.nk*zb:self.nk*(zb+1), :]
         kbyk_corr = kbyk_corr[:, self.nk*next_z_bin:self.nk*(next_z_bin+1)]
 
-        self._plotOneBin(kbyk_corr, outplot_fname, cbarlbl, colormap, self.nk, None, **kwargs)
+        ax = self._plotOneBin(self.k_edges, kbyk_corr, cbarlbl, r"$k$ [s$\,$km$^{-1}$]", \
+            colormap, ticks, **kwargs)
 
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+
+        save_figure(outplot_fname)
 
 
 
