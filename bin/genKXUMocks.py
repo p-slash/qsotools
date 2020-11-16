@@ -160,15 +160,14 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     # If computing continuum power, set F to be C, so that it's resampled.
     # Do not set error here, because later removal relies on error < 10.
     if args.continuum_power:
-        meanC    = np.mean(qso.cont)
-        qso.flux = qso.cont / meanC
+        qso.flux = qso.cont
 
     # Resample real data onto lower resolution grid
     resamplingCondition = args.lowdv and args.lowdv > qso.dv
     if resamplingCondition:
         print("Resampling from %.2f to %.2f km/s" %(qso.dv, args.lowdv))
         qso = safeResample(qso, args)
-    
+
     return qso
 
 # This function is the main pipeline for reduction
@@ -182,8 +181,10 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
         return
 
     # If computing continuum power, approximate the error as the error on f.
-    # Note cont is not touched in applyMask, so use flux
+    # cleanup swapped flux with continuum and resampled already
     if args.continuum_power:
+        meanC     = np.mean(qso.flux)
+        qso.flux /= meanC
         qso.error *= qso.flux
         qso.flux  -= 1
     else:
