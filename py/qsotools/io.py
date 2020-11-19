@@ -192,7 +192,7 @@ class Spectrum:
         
         self.size = len(self.wave)
         self.mask = np.logical_and(error > 0, flux != 0)
-        self.s2n = np.mean(1./error[self.mask])
+        self.s2n = 1/np.sqrt(np.mean(error[self.mask]**2))
         self.s2n_lya = self.getS2NLya()
 
         self.z_dlas = None
@@ -323,12 +323,12 @@ class Spectrum:
         lyman_alpha_ind = np.logical_and(self.wave >= LYA_FIRST_WVL*(1+self.z_qso), \
             self.wave <= LYA_LAST_WVL*(1+self.z_qso))
         
-        temp = 1. / self.error[lyman_alpha_ind & self.mask]
+        temp = self.error[lyman_alpha_ind & self.mask]
 
         if len(temp) == 0:
             return -1
         else:
-            return np.mean(temp)
+            return 1/np.sqrt(np.mean(temp**2))
 
     def saveAsBQ(self, fname):
         tbq = BinaryQSO(fname, 'w')
