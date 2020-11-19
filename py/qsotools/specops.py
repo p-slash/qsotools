@@ -152,13 +152,13 @@ class MeanFluxHist():
         self.z_hist += zi
         self.total_flux += fi * weight
         self.total_error += ei * weight
-        self.total_error2 += e2i * weight
+        self.total_error2 += e2i * weight**2
         self.counts += ci * weight
 
     def getMeanFlux(self):
         self.mean_flux = self.total_flux / self.counts[1:-1]
         self.mean_error = self.total_error / self.counts[1:-1]
-        self.mean_error2 = np.sqrt(self.total_error2 / self.counts[1:-1])
+        self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
     
     def saveHistograms(self, fname_base):
         np.savetxt("%s-redshift_center.txt"%fname_base, self.hist_redshifts)
