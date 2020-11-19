@@ -1188,6 +1188,8 @@ class XQ100Fits(Spectrum):
         else:
             specres = int(hdr0["SPEC_RES"])
 
+        self.resolution_correction_factor = specres / int(hdr0["SPEC_RES"])
+
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), \
             frame=hdr0['RADECSYS'].lower(), unit=deg) 
 
@@ -1337,6 +1339,8 @@ class SQUADFits(Spectrum):
         
         specres = hdr0['SPEC_RES'] * SQUADFits._seeingCorrection(d, correctSeeing)
         specres = int(np.around(specres, decimals=-2))
+
+        self.resolution_correction_factor = specres / int(hdr0['SPEC_RES'])
 
         c = SkyCoord('%s %s'%(hdr0["RA"], hdr0["DEC"]), \
             frame=hdr0['RADECSYS'].lower(), unit=deg) 
