@@ -197,21 +197,21 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
 
-    def addLyaFlucErrors(self):
+    def addLyaFlucErrors(self, log10k1=-6, log10k2=1):
         window_fn = lambda k, dv, R: np.sinc(k*dv/2/np.pi) * np.exp(-k**2 * R**2/2)
         pkpi      = lambda k, z: k * fid.evaluatePD13W17Fit(k,z) / np.pi
 
         R_kms = fid.LIGHT_SPEED / self.specres / fid.ONE_SIGMA_2_FWHM
-        flnk = lambda lnk, z: pkpi(np.exp(lnk), z) * window_fn(np.exp(lnk), self.dv, R_kms)
+        flnk = lambda lnk, z: pkpi(np.exp(lnk), z) * window_fn(np.exp(lnk), self.dv, R_kms)**2
 
         spectrum_z = self.wave / fid.LYA_WAVELENGTH - 1
-        klog = np.linspace(-6*np.log(10), 1*np.log(10), 700)
+        klog = np.linspace(log10k1*np.log(10), log10k2*np.log(10), 700)
 
         ZZ, KK = np.meshgrid(spectrum_z, klog, indexing='ij')
         err_lya = scipy_trapz(flnk(KK, ZZ), KK)
         
-        self.error += err_lya
-        self.s2n = 1/np.sqrt(np.mean(error**2))
+        self.error = np.sqrt(err_lya**2 + self.error**2)
+        self.s2n = 1/np.sqrt(np.mean(self.error**2))
         self.s2n_lya = self.getS2NLya()
 
     def cutForestAnalysisRegion(self, f1, f2, zmin, zmax):

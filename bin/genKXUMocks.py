@@ -274,7 +274,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
         try:
             qso = readFile(it, dataset, f1, f2, args)
             # Add Ly-a fluct as error here
-            qso.addLyaFluctuation()
+            qso.addLyaFlucErrors()
             pipeline(qso, f1, f2, meanFluxFunc, mf_hist, args)
         except Exception as e:
             print(e)
