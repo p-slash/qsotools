@@ -7,6 +7,7 @@ from itertools import groupby
 import numpy as np
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
+from scipy.integrate import trapz as scipy_trapz
 from scipy.stats import zscore as scipy_zscore, norm as scipy_norm, \
     median_abs_deviation as scipy_mad
 from scipy.ndimage import median_filter as scipy_median_filter
@@ -18,9 +19,7 @@ from astropy.table import Table
 from astropy.coordinates import SkyCoord
 from astropy.units import hourangle, deg, arcsec
 
-from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH, \
-    LYA_FIRST_WVL, LYA_LAST_WVL, formBins, equivalentWidthDLA, \
-    getNHIfromEquvalentWidthDLA
+import qsotools.fiducial as fid
 import qsotools.specops as so
 
 from pkg_resources import resource_filename
@@ -198,13 +197,30 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
 
+    def addLyaFlucErrors(self):
+        window_fn = lambda k, dv, R: np.sinc(k*dv/2/np.pi) * np.exp(-k**2 * R**2/2)
+        pkpi      = lambda k, z: k * fid.evaluatePD13W17Fit(k,z) / np.pi
+
+        R_kms = fid.LIGHT_SPEED / self.specres / fid.ONE_SIGMA_2_FWHM
+        flnk = lambda lnk, z: pkpi(np.exp(lnk), z) * window_fn(np.exp(lnk), self.dv, R_kms)
+
+        spectrum_z = self.wave / fid.LYA_WAVELENGTH - 1
+        klog = np.linspace(-6*np.log(10), 1*np.log(10), 700)
+
+        ZZ, KK = np.meshgrid(spectrum_z, klog, indexing='ij')
+        err_lya = scipy_trapz(flnk(KK, ZZ), KK)
+        
+        self.error += err_lya
+        self.s2n = 1/np.sqrt(np.mean(error**2))
+        self.s2n_lya = self.getS2NLya()
+
     def cutForestAnalysisRegion(self, f1, f2, zmin, zmax):
         # Cut Lyman-alpha forest region
         lyman_alpha_ind = np.logical_and(self.wave >= f1 * (1+self.z_qso), \
             self.wave <= f2 * (1+self.z_qso))
         # Cut analysis boundaries
-        forest_boundary = np.logical_and(self.wave >= LYA_WAVELENGTH*(1+zmin), \
-            self.wave <= LYA_WAVELENGTH*(1+zmax))
+        forest_boundary = np.logical_and(self.wave >= fid.LYA_WAVELENGTH*(1+zmin), \
+            self.wave <= fid.LYA_WAVELENGTH*(1+zmax))
         lyman_alpha_ind = np.logical_and(lyman_alpha_ind, forest_boundary)
 
         self.applyMask(lyman_alpha_ind, removePixels=True)
@@ -256,7 +272,7 @@ class Spectrum:
         indices = np.arange(N)
 
         consecutive = lambda x: np.split(x, np.where(np.diff(x) != 1)[0]+1)
-        low_flux_regions = indices[self.flux<mfluxfunc(self.wave/LYA_WAVELENGTH-1)+self.error]
+        low_flux_regions = indices[self.flux<mfluxfunc(self.wave/fid.LYA_WAVELENGTH-1)+self.error]
         low_flux_regions = consecutive(low_flux_regions)
 
         z_dlas   = []
@@ -265,12 +281,12 @@ class Spectrum:
         for lfr in low_flux_regions:
             w1 = self.wave[lfr[0]]
             w2 = self.wave[lfr[-1]]
-            z_dla = (w1+w2)/2./LYA_WAVELENGTH - 1
+            z_dla = (w1+w2)/2./fid.LYA_WAVELENGTH - 1
 
-            thres_w = equivalentWidthDLA(10**NHI_THRES, z_dla) # A
+            thres_w = fid.equivalentWidthDLA(10**NHI_THRES, z_dla) # A
             if w2 - w1 > thres_w:
                 z_dlas.append(z_dla)
-                nhi_dlas.append(np.log10(2*getNHIfromEquvalentWidthDLA(w2-w1, z_dla)))
+                nhi_dlas.append(np.log10(2*fid.getNHIfromEquvalentWidthDLA(w2-w1, z_dla)))
         
         if len(z_dlas) != 0 and self.z_dlas:
             self.z_dlas.extend(z_dlas)
@@ -290,8 +306,8 @@ class Spectrum:
             self.mask_dla = np.ones_like(self.wave, dtype=bool)
 
             for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
-                lobs = (1+zd) * LYA_WAVELENGTH
-                wi = equivalentWidthDLA(10**nhi, zd)*scale
+                lobs = (1+zd) * fid.LYA_WAVELENGTH
+                wi = fid.equivalentWidthDLA(10**nhi, zd)*scale
                 dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
                 self.mask_dla[dla_ind] = 0
 
@@ -319,9 +335,9 @@ class Spectrum:
         # zsc_mask = np.logical_and(zsc_mask, np.abs(scipy_zscore(self.error))<thres)
         self.mask = np.logical_and(zsc_mask, self.mask)
 
-    def getS2NLya(self, lya_lower=LYA_FIRST_WVL, lya_upper=LYA_LAST_WVL):            
-        lyman_alpha_ind = np.logical_and(self.wave >= LYA_FIRST_WVL*(1+self.z_qso), \
-            self.wave <= LYA_LAST_WVL*(1+self.z_qso))
+    def getS2NLya(self, lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL):            
+        lyman_alpha_ind = np.logical_and(self.wave >= fid.LYA_FIRST_WVL*(1+self.z_qso), \
+            self.wave <= fid.LYA_LAST_WVL*(1+self.z_qso))
         
         temp = self.error[lyman_alpha_ind & self.mask]
 
@@ -523,7 +539,7 @@ class ConfigQMLE:
         except Exception as e:
             self.k_ledge = 0
 
-        self.k_edges, self.k_bins = formBins(self.k_nlin, self.k_nlog, self.k_dlin, \
+        self.k_edges, self.k_bins = fid.formBins(self.k_nlin, self.k_nlog, self.k_dlin, \
             self.k_dlog, self.k_0, self.k_ledge)
 
     def _getZBins(self):
@@ -669,7 +685,7 @@ class KODIAQFits(Spectrum):
         self.wave = (np.arange(self.N) + 1.0 - CRPIX1) * CDELT1 + CRVAL1
         self.wave = np.power(10, self.wave)
         
-        self.dv = LIGHT_SPEED * CDELT1 * np.log(10)
+        self.dv = fid.LIGHT_SPEED * CDELT1 * np.log(10)
 
     def __init__(self, kodiaq_dir, qso_name, pi_date, spec_prefix, z_qso):
         self.qso_name    = qso_name
@@ -892,7 +908,7 @@ class KODIAQ_OBS_Iterator:
         self.spectrum.setZScoreMask(fsigma=1, esigma=3.5)
         self.spectrum.applyMask(removePixels=self.kqso_iter.clean_pix)
 
-    def maxLyaObservation(self, w1=LYA_FIRST_WVL, w2=LYA_LAST_WVL):
+    def maxLyaObservation(self, w1=fid.LYA_FIRST_WVL, w2=fid.LYA_LAST_WVL):
         max_s2n_lya = -1
         i     = 0
         max_i = 0
@@ -912,7 +928,7 @@ class KODIAQ_OBS_Iterator:
         return self.spectrum, max_s2n_lya
 
     def coaddObservations(self, dv=3.0):
-        dv_c = dv / LIGHT_SPEED
+        dv_c = dv / fid.LIGHT_SPEED
         new_N = int(np.log(self.kqso_iter.Olam1 / self.kqso_iter.Olam0) / dv_c) + 1
     
         new_wave_centers = self.kqso_iter.Olam0 * np.exp(np.arange(new_N) * dv_c)
@@ -1350,7 +1366,7 @@ class SQUADFits(Spectrum):
         self.cont = data['CONTINUUM']
         err_flux = data['ERR'] * SQUADFits._lowFluxErrorCorrection(data, corrError)
         dv = d['Dispersion']
-        # dv = np.around(np.median(LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
+        # dv = np.around(np.median(fid.LIGHT_SPEED*np.diff(np.log(wave))), decimals=1)
                    
         super(SQUADFits, self).__init__(wave, flux, err_flux, \
             z_qso, specres, dv, c)

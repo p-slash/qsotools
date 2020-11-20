@@ -134,8 +134,6 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     forest_c = (f1+f2)/2
     z_center = (forest_c / fid.LYA_WAVELENGTH) * (1. + qso.z_qso) - 1
 
-    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
-
     if args.mask_sigma_percentile:
         qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
@@ -255,6 +253,8 @@ def readFile(it, dataset, f1, f2, args):
     if s2n_this/np.sqrt(qso.dv) < args.sn_cut:
         raise Exception("SKIP: Does not pass S/N cut.")
 
+    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
+
     qso.s2n_lya = s2n_this
     return qso
 
@@ -273,6 +273,8 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
     for it in set_iter:
         try:
             qso = readFile(it, dataset, f1, f2, args)
+            # Add Ly-a fluct as error here
+            qso.addLyaFluctuation()
             pipeline(qso, f1, f2, meanFluxFunc, mf_hist, args)
         except Exception as e:
             print(e)
