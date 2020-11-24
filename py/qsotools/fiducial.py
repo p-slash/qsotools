@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
+from scipy.integrate import trapz as scipy_trapz
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -218,6 +219,23 @@ def fitBecker13MeanFlux(z, F, e):
 # -----------------------------------------------------
 # Mean flux ends
 # -----------------------------------------------------
+
+"""
+return variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
+"""
+def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000):
+    window_fn = lambda k: np.sinc(k*dv/2/np.pi) * np.exp(-k**2 * R_kms**2/2)
+    kPpi      = lambda k, z1: k * fid.evaluatePD13W17Fit(k,z1) / np.pi
+
+    flnk = lambda lnk, z1: kPpi(np.exp(lnk), z1) * window_fn(np.exp(lnk))**2
+
+    klog = np.linspace(logk1*np.log(10), logk2*np.log(10), npoints)
+    ZZ, KK = np.meshgrid(z, klog, indexing='ij')
+    
+    err2_lya = scipy_trapz(flnk(KK, z), KK) * fid.meanFluxFG08(z)**2
+
+    return err2_lya
+
 # -----------------------------------------------------
 # DLA begins
 # -----------------------------------------------------    
