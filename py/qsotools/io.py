@@ -7,7 +7,6 @@ from itertools import groupby
 import numpy as np
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
-from scipy.integrate import trapz as scipy_trapz
 from scipy.stats import zscore as scipy_zscore, norm as scipy_norm, \
     median_abs_deviation as scipy_mad
 from scipy.ndimage import median_filter as scipy_median_filter
@@ -197,20 +196,13 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
 
-    def addLyaFlucErrors(self, log10k1=-6, log10k2=1):
-        window_fn = lambda k, dv, R: np.sinc(k*dv/2/np.pi) * np.exp(-k**2 * R**2/2)
-        pkpi      = lambda k, z: k * fid.evaluatePD13W17Fit(k,z) / np.pi
-
+    def addLyaFlucErrors(self):
         R_kms = fid.LIGHT_SPEED / self.specres / fid.ONE_SIGMA_2_FWHM
-        flnk = lambda lnk, z: pkpi(np.exp(lnk), z) * window_fn(np.exp(lnk), self.dv, R_kms)**2
+        z = self.wave / fid.LYA_WAVELENGTH - 1
 
-        spectrum_z = self.wave / fid.LYA_WAVELENGTH - 1
-        klog = np.linspace(log10k1*np.log(10), log10k2*np.log(10), 700)
-
-        ZZ, KK = np.meshgrid(spectrum_z, klog, indexing='ij')
-        err_lya = scipy_trapz(flnk(KK, ZZ), KK)
+        err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms)
         
-        self.error = np.sqrt(err_lya**2 + self.error**2)
+        self.error = np.sqrt(err2_lya + self.error**2)
         self.s2n = 1/np.sqrt(np.mean(self.error**2))
         self.s2n_lya = self.getS2NLya()
 
