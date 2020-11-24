@@ -232,7 +232,7 @@ def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000):
     klog = np.linspace(logk1*np.log(10), logk2*np.log(10), npoints)
     ZZ, KK = np.meshgrid(z, klog, indexing='ij')
     
-    err2_lya = scipy_trapz(flnk(KK, z), KK) * meanFluxFG08(z)**2
+    err2_lya = scipy_trapz(flnk(KK, ZZ), KK) * meanFluxFG08(z)**2
 
     return err2_lya
 
