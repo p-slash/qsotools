@@ -225,7 +225,7 @@ class Spectrum:
             self.wave  = self.wave[good_pixels]
             self.flux  = self.flux[good_pixels]
             self.error = self.error[good_pixels]
-            
+
             try:
                 self.cont = self.cont[good_pixels]
             except:
@@ -935,7 +935,7 @@ class KODIAQ_OBS_Iterator:
         for obs in self:
             weights = obs.spectrum.mask * self.exp_time
             flux    = weights * obs.spectrum.flux
-            error   = weights * obs.spectrum.error**2
+            error   = weights**2 * obs.spectrum.error**2
             
             new_specres    += self.exp_time * obs.spectrum.specres
             total_exp_time += self.exp_time 
@@ -953,8 +953,8 @@ class KODIAQ_OBS_Iterator:
 
         # Divide by weights
         coadded_flux  /= coadded_weight + 1e-8
-        coadded_error /= coadded_weight + 1e-8
-        coadded_error  = np.sqrt(coadded_error)
+        coadded_error  = np.sqrt(coadded_error) / (coadded_weight + 1e-8)
+        # coadded_error  = np.sqrt(coadded_error)
         
         coadded_flux[coadded_weight<1e-6]  = 0
         coadded_error[coadded_weight<1e-6] = 0
