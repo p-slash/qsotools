@@ -345,7 +345,7 @@ class Spectrum:
             self.specres, self.dv)
         tbq.close()
 
-class BinaryQSO:
+class BinaryQSO(Spectrum):
     """
     Read and write in binary format for quadratic estimator.
 
@@ -421,6 +421,13 @@ class BinaryQSO:
 
     def __init__(self, fname, rw):
         self.file  = open(fname, mode=rw + 'b')
+        self.qso_name = fname[:10]
+
+        if rw == 'r':
+            self.read()
+            c = SkyCoord(self.ra*180/np.pi, self.dec*180/np.pi, frame='fk5', unit=deg)
+            super(BinaryQSO, self).__init__(self.wave, self.flux, self.error, \
+                self.z_qso, self.specres, self.dv, c)
     
     def close(self):
         self.file.close()
@@ -475,11 +482,11 @@ class BinaryQSO:
 
         d = self.file.read(header_size)
 
-        self.N, self.z_qso, self.dec, self.ra, \
+        self.size, self.z_qso, self.dec, self.ra, \
         self.specres, self.s2n, self.dv, \
         low_ob_l, upp_ob_l, low_re_l, upp_re_l  = struct.unpack(header_fmt, d)
 
-        array_fmt  = 'd' * self.N
+        array_fmt  = 'd' * self.size
         array_size = struct.calcsize(array_fmt)
 
         d           = self.file.read(array_size)
