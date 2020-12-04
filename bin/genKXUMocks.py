@@ -219,6 +219,16 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
 # ------------------------
 # Iterator functions
 # ------------------------
+def getFileIterator(dataset):
+    if dataset == 'KOD':
+        set_iter = qio.KODIAQ_QSO_Iterator(directory, clean_pix=False)
+    elif dataset == 'MOCK':
+        set_iter = glob.glob(ospath_join(directory, "*.dat"))
+    else:
+        set_iter = glob.glob(ospath_join(directory, "*.fits"))
+
+    return set_iter
+
 def readFile(it, dataset, f1, f2, args):
     if dataset == 'KOD':
         obs_iter = qio.KODIAQ_OBS_Iterator(it)
@@ -244,6 +254,12 @@ def readFile(it, dataset, f1, f2, args):
         qso.qso_name = qso.qso_name.replace(" ", "")
         print(qso.qso_name)
 
+    elif dataset == "MOCK":
+        qso = qio.BinaryQSO(it, 'r')
+        s2n_this = qso.getS2NLya(f1, f2)
+        qso.qso_name = qso.qso_name.replace(" ", "")
+        print(qso.qso_name)
+
     if s2n_this == -1:
         raise Exception("SKIP: No Lya or Side Band coverage!")
 
@@ -264,13 +280,8 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
 
     # Use a fiducial mean flux to ID DLAs.
     meanFluxFunc = fid.meanFluxFG08
-
-    if dataset == 'KOD':
-        set_iter = qio.KODIAQ_QSO_Iterator(directory, clean_pix=False)
-    else:
-        set_iter = glob.glob(ospath_join(directory, "*.fits"))
         
-    for it in set_iter:
+    for it in getFileIterator(dataset):
         try:
             qso = readFile(it, dataset, f1, f2, args)
             # Add Ly-a fluct as error here
@@ -310,12 +321,7 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
     elif args.real_data and args.side_band != 0:
         meanFluxFunc = lambda z: 1.0
 
-    if dataset == 'KOD':
-        set_iter = qio.KODIAQ_QSO_Iterator(directory, clean_pix=False)
-    else:
-        set_iter = glob.glob(ospath_join(directory, "*.fits"))
-
-    for it in set_iter:
+    for it in getFileIterator(dataset):
         print("********************************************", flush=True)
 
         try:
@@ -332,11 +338,6 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
         except Exception as e:
             print(e)
             continue
-        # finally:
-        #     if args.find_dlas:
-        #         # z_dlas, nhi_dlas, qso_name, set, ra, dec
-        #         dla_file.write("%s,%s,%.10f,%.10f\n" % (qso.qso_name, dataset, \
-        #             qso.coord.icrs.ra.deg, qso.coord.icrs.dec.deg))
             
         nchunks = len(wave)
 
@@ -363,7 +364,8 @@ if __name__ == '__main__':
 
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
     parser.add_argument("--UVESSQUADDir", help="Directory of SQUAD/UVES")
-    
+    parser.add_argument("--MockDir", help="Directory for full flux mocks to READ.")
+
     parser.add_argument("--separation", type=float, default=2.5, \
         help="Maximum separation in arc sec. Default: %(default)s")
     
