@@ -304,8 +304,7 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
             meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
         elif dataset == 'UVE':
             meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
-        else:
-            meanFluxFunc = fid.meanFluxFG08
+        # no need for else, meanFluxFunc is already set anyway
 
     elif args.real_data and args.side_band != 0:
         meanFluxFunc = lambda z: 1.0
@@ -475,6 +474,11 @@ if __name__ == '__main__':
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........")
         iterateSpectra(args.UVESSQUADDir, 'UVE', forest_1, forest_2, meanFluxFunc, settings_txt, args)
+    # ------------------------------
+    # MOCKS
+    if args.MockDir:
+        print("RUNNING ON MOCKS.........")
+        iterateSpectra(args.MockDir, 'MOCK', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
 
     # if args.find_dlas:
