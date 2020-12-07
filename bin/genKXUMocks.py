@@ -200,7 +200,7 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
 # ------------------------
 # Iterator functions
 # ------------------------
-def getFileIterator(dataset):
+def getFileIterator(dataset, directory):
     if dataset == 'KOD':
         set_iter = qio.KODIAQ_QSO_Iterator(directory, clean_pix=False)
     elif dataset == 'MOCK':
@@ -264,7 +264,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
     # Use a fiducial mean flux to ID DLAs.
     meanFluxFunc = fid.meanFluxFG08
         
-    for it in getFileIterator(dataset):
+    for it in getFileIterator(dataset, directory):
         try:
             qso = readFile(it, dataset, f1, f2, args)
             if args.mean_flux_lowdv:
