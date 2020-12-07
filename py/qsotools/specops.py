@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.stats import binned_statistic, norm
 
+from astropy.io import ascii
+from astropy.table import Table
+
 from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL, LYA_WAVELENGTH, ONE_SIGMA_2_FWHM
 
 # dv should be in km/s, which is defined as c*dln(lambda)
@@ -125,7 +128,6 @@ class MeanFluxHist():
         self.hist_redshift_edges = z1 + dz * (np.arange(nz+1)-0.5)
 
         self.total_flux = np.zeros(nz)
-        self.total_error = np.zeros(nz)
         self.total_error2 = np.zeros(nz)
         self.counts = np.zeros(nz+2)
         self.z_hist = np.zeros(nz)
@@ -142,7 +144,6 @@ class MeanFluxHist():
         fi, _, binnumber = binned_statistic(z, flux, statistic='sum', bins=self.hist_redshift_edges)
         ci = np.bincount(binnumber, minlength=len(self.hist_redshift_edges)+1)
         
-        ei  = binned_statistic(z, error, statistic='sum', bins=self.hist_redshift_edges)[0]
         e2i = binned_statistic(z, error**2, statistic='sum', bins=self.hist_redshift_edges)[0]
 
         # Pixel statistics: Pixel redshift Histogram
@@ -150,7 +151,6 @@ class MeanFluxHist():
 
         self.z_hist += zi
         self.total_flux += fi * weight
-        self.total_error += ei * weight
         self.total_error2 += e2i * weight**2
         self.counts += ci * weight
 
@@ -158,7 +158,6 @@ class MeanFluxHist():
 
     def getMeanStatistics(self):
         self.mean_flux = self.total_flux / self.counts[1:-1]
-        self.mean_error = self.total_error / self.counts[1:-1]
         self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
 
         for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
@@ -167,15 +166,13 @@ class MeanFluxHist():
         self.scatter_error = np.zeros(self.nz)
         for i in range(self.nz):
             mi = np.mean(self.all_flux_values[i])
-            self.scatter_error = np.sum((self.all_flux_values[i]-mi)**2)
+            self.scatter_error[i] = np.sum((self.all_flux_values[i]-mi)**2)
 
     def saveHistograms(self, fname_base):
-        np.savetxt("%s-redshift_center.txt"%fname_base, self.hist_redshifts)
-        np.savetxt("%s-pixel_hist_redshift.txt"%fname_base, self.z_hist)
-        np.savetxt("%s-mean_flux.txt"%fname_base, self.mean_flux)
-        np.savetxt("%s-mean_error.txt"%fname_base, self.mean_error)
-        np.savetxt("%s-mean_error2.txt"%fname_base, self.mean_error2)
-        np.savetxt("%s-scatter_error.txt"%fname_base, self.scatter_error)
+        data = Table([self.hist_redshifts, self.z_hist, self.mean_flux, \
+            self.mean_error2, self.scatter_error], \
+            names=['z', 'Ncount', 'F-bar', 'sigma_prop', 'sigma_scatter'])
+        ascii.write(data, "%s.csv"%fname_base, format='csv', overwrite=True)
 
 
 
