@@ -310,7 +310,7 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
     elif args.real_data and args.side_band != 0:
         meanFluxFunc = lambda z: 1.0
 
-    for it in getFileIterator(dataset):
+    for it in getFileIterator(dataset, directory):
         print("********************************************", flush=True)
         try:
             qso = readFile(it, dataset, f1, f2, args)
