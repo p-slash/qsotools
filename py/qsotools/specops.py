@@ -154,18 +154,18 @@ class MeanFluxHist():
         self.total_error2 += e2i * weight**2
         self.counts += ci * weight
 
-        for i in range(nz): self.all_flux_values[i].extend(flux[binnumber==i+1] * weight)
+        for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1] * weight)
 
     def getMeanStatistics(self):
         self.mean_flux = self.total_flux / self.counts[1:-1]
         self.mean_error = self.total_error / self.counts[1:-1]
         self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
 
-        for i in range(nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
+        for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
         self.all_flux_values /= self.counts[1:-1]
         # Now the mean_flux[i] is sum(all_flux_values[i])
-        self.scatter_error = np.zeros(nz)
-        for i in range(nz):
+        self.scatter_error = np.zeros(self.nz)
+        for i in range(self.nz):
             mi = np.mean(self.all_flux_values[i])
             self.scatter_error = np.sum((self.all_flux_values[i]-mi)**2)
 
