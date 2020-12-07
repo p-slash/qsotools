@@ -105,20 +105,6 @@ def chunkDynamic(wave, flux, error, no_forest_pixels):
 
     return wave, flux, error
 
-def getStats(wave, flux, error, z_edges):
-    z = wave / LYA_WAVELENGTH - 1.
-    
-    tot_flux_hist, binedges, binnumber = binned_statistic(z, flux, statistic='sum', bins=z_edges)
-    counts = np.bincount(binnumber, minlength=len(z_edges)+1)
-    
-    tot_error_hist = binned_statistic(z, error, statistic='sum', bins=z_edges)[0]
-    tot_err2_hist  = binned_statistic(z, error**2, statistic='sum', bins=z_edges)[0]
-
-    # Pixel statistics: Pixel redshift Histogram
-    z_hist, temp_z_bins = np.histogram(z, bins=z_edges)
-
-    return counts, z_hist, tot_flux_hist, tot_error_hist, tot_err2_hist
-
 # Assuming R is integer resolution power
 # dv in km/s and k in s/km
 def getSpectResWindow(k, R, dv):
@@ -134,6 +120,7 @@ class MeanFluxHist():
 
     def __init__(self, z1, z2, dz=0.1):
         nz = int(np.round((z2-z1)/dz+1))
+        self.nz = nz
         self.hist_redshifts = z1 + dz * np.arange(nz)
         self.hist_redshift_edges = z1 + dz * (np.arange(nz+1)-0.5)
 
@@ -143,11 +130,23 @@ class MeanFluxHist():
         self.counts = np.zeros(nz+2)
         self.z_hist = np.zeros(nz)
 
+        self.all_flux_values = np.empty((nz,), dtype=list)
+        for i in range(nz): self.all_flux_values[i] = []
+
     def addSpectrum(self, qso, weight=1, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL):
         lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
+        z     = qso.wave[lya_ind] / LYA_WAVELENGTH - 1
+        flux  = qso.flux[lya_ind]
+        error = qso.flux[lya_ind]
 
-        ci, zi, fi, ei, e2i = getStats(qso.wave[lya_ind], qso.flux[lya_ind], \
-            qso.error[lya_ind], self.hist_redshift_edges)
+        fi, _, binnumber = binned_statistic(z, flux, statistic='sum', bins=self.hist_redshift_edges)
+        ci = np.bincount(binnumber, minlength=len(self.hist_redshift_edges)+1)
+        
+        ei  = binned_statistic(z, error, statistic='sum', bins=self.hist_redshift_edges)[0]
+        e2i = binned_statistic(z, error**2, statistic='sum', bins=self.hist_redshift_edges)[0]
+
+        # Pixel statistics: Pixel redshift Histogram
+        zi, _= np.histogram(z, bins=self.hist_redshift_edges)
 
         self.z_hist += zi
         self.total_flux += fi * weight
@@ -155,17 +154,28 @@ class MeanFluxHist():
         self.total_error2 += e2i * weight**2
         self.counts += ci * weight
 
-    def getMeanFlux(self):
+        for i in range(nz): self.all_flux_values[i].extend(flux[binnumber==i+1] * weight)
+
+    def getMeanStatistics(self):
         self.mean_flux = self.total_flux / self.counts[1:-1]
         self.mean_error = self.total_error / self.counts[1:-1]
         self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
-    
+
+        for i in range(nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
+        self.all_flux_values /= self.counts[1:-1]
+        # Now the mean_flux[i] is sum(all_flux_values[i])
+        self.scatter_error = np.zeros(nz)
+        for i in range(nz):
+            mi = np.mean(self.all_flux_values[i])
+            self.scatter_error = np.sum((self.all_flux_values[i]-mi)**2)
+
     def saveHistograms(self, fname_base):
         np.savetxt("%s-redshift_center.txt"%fname_base, self.hist_redshifts)
         np.savetxt("%s-pixel_hist_redshift.txt"%fname_base, self.z_hist)
         np.savetxt("%s-mean_flux.txt"%fname_base, self.mean_flux)
         np.savetxt("%s-mean_error.txt"%fname_base, self.mean_error)
         np.savetxt("%s-mean_error2.txt"%fname_base, self.mean_error2)
+        np.savetxt("%s-scatter_error.txt"%fname_base, self.scatter_error)
 
 
 
