@@ -96,37 +96,18 @@ def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
 
     return fluxes, errors
 
-# def manageDLAs(qso, meanFluxFunc, args):
-#     if args.find_dlas:
-#         qso.findDLAs(meanFluxFunc)
-#         # Save to file
-#         # dla_file.write("# qso_name, set, ra, dec, z_dlas, nhi_dlas\n")
-#         # write qso_name, set, ra and dec in iterateSpectra function
-#         if qso.z_dlas:
-#             ztxt = "%.4f"%qso.z_dlas[0] if len(qso.z_dlas)==1 else \
-#                 '"%s"' % ",".join(format(x, ".4f") for x in qso.z_dlas)
-
-#             ntxt = "%.4f"%qso.nhi_dlas[0] if len(qso.nhi_dlas)==1 else \
-#                 '"%s"' % ",".join(format(x, ".4f") for x in qso.nhi_dlas)
-#             dla_file.write('%s,%s,'%(ztxt, ntxt))
-#         else:
-#             dla_file.write("nan,nan,")
-
-#     if args.mask_dlas:
-#         qso.applyMaskDLAs(removePixels=not args.keep_masked_pix)
-
-def safeResample(qso, args):
+def safeResample(qso, lowdv, keep_masked_pix=False):
     wave, fluxes, errors = so.resample(qso.wave, qso.flux.reshape(1,qso.size), \
-            qso.error.reshape(1,qso.size), args.lowdv)
+            qso.error.reshape(1,qso.size), lowdv)
     
-    qso.dv    = args.lowdv
+    qso.dv    = lowdv
     qso.wave  = wave
     qso.flux  = fluxes[0]
     qso.error = errors[0]
     qso.mask  = np.logical_and(qso.error>1e-5, qso.error<10)
     qso.size  = qso.wave.size
     
-    qso.applyMask(removePixels=not args.keep_masked_pix)
+    qso.applyMask(removePixels=not keep_masked_pix)
 
     return qso
 
@@ -164,7 +145,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     resamplingCondition = args.lowdv and args.lowdv > qso.dv
     if resamplingCondition:
         print("Resampling from %.2f to %.2f km/s" %(qso.dv, args.lowdv))
-        qso = safeResample(qso, args)
+        qso = safeResample(qso, args.lowdv, args.keep_masked_pix)
 
     return qso
 
@@ -269,7 +250,9 @@ def readFile(it, dataset, f1, f2, args):
     if s2n_this/np.sqrt(qso.dv) < args.sn_cut:
         raise Exception("SKIP: Does not pass S/N cut.")
 
-    qso.cutForestAnalysisRegion(f1, f2, args.z_forest_min, args.z_forest_max)
+    zmin = max(2.9, args.z_forest_min) if dataset=='XQ' else args.z_forest_min
+    zmax = min(4.3, args.z_forest_max) if dataset=='XQ' else args.z_forest_max
+    qso.cutForestAnalysisRegion(f1, f2, zmin, zmax)
 
     qso.s2n_lya = s2n_this
     return qso
@@ -284,6 +267,9 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
     for it in getFileIterator(dataset):
         try:
             qso = readFile(it, dataset, f1, f2, args)
+            if args.mean_flux_lowdv:
+                safeResample(qso, args.mean_flux_lowdv)
+
             # Add Ly-a fluct as error here
             qso.addLyaFlucErrors()
             pipeline(qso, f1, f2, meanFluxFunc, mf_hist, args)
@@ -291,7 +277,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
             print(e)
             continue
     
-    mf_hist.getMeanFlux()
+    mf_hist.getMeanStatistics()
     mf_hist.saveHistograms(ospath_join(args.OutputDir, "%s-stats%s"%(dataset, settings_txt)))
 
     # Fit mean flux
@@ -318,12 +304,14 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
             meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.XQ100_MFLUX_PARAMS)
         elif dataset == 'UVE':
             meanFluxFunc = lambda z: fid.evaluateBecker13MeanFlux(z, *fid.UVES_MFLUX_PARAMS)
+        else:
+            meanFluxFunc = fid.meanFluxFG08
+
     elif args.real_data and args.side_band != 0:
         meanFluxFunc = lambda z: 1.0
 
     for it in getFileIterator(dataset):
         print("********************************************", flush=True)
-
         try:
             qso = readFile(it, dataset, f1, f2, args)
         except Exception as e:
@@ -410,7 +398,12 @@ if __name__ == '__main__':
     parser.add_argument("--real-data", action="store_true")
     parser.add_argument("--continuum-power", action="store_true", \
         help="Use continuum instead of flux. Compute dC/C-bar, C-bar is the full forest average.")
+   
     parser.add_argument("--compute-mean-flux", action="store_true")
+    parser.add_argument("--mean-flux-lowdv", type=float, \
+        help="Resample the grid using inverse variance without LSS fluctuations for mean flux" \
+        " calculation. 300 is recommended.")
+
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
     
