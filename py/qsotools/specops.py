@@ -154,19 +154,17 @@ class MeanFluxHist():
         self.total_error2 += e2i * weight**2
         self.counts += ci * weight
 
-        for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1] * weight)
+        for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1])
 
     def getMeanStatistics(self):
         self.mean_flux = self.total_flux / self.counts[1:-1]
         self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
 
         for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
-        self.all_flux_values /= self.counts[1:-1]
-        # Now the mean_flux[i] is sum(all_flux_values[i])
         self.scatter_error = np.zeros(self.nz)
         for i in range(self.nz):
-            mi = np.mean(self.all_flux_values[i])
-            self.scatter_error[i] = np.sum((self.all_flux_values[i]-mi)**2)
+            self.scatter_error[i] = np.std(self.all_flux_values[i], ddof=1) \
+                / np.sqrt(self.all_flux_values[i].size)
 
     def saveHistograms(self, fname_base):
         data = Table([self.hist_redshifts, self.z_hist, self.mean_flux, \
