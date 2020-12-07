@@ -56,7 +56,6 @@ if __name__ == '__main__':
         print("Reading", fl.rstrip())
         f = ospath_join(config_qmle.qso_dir, fl.rstrip())
         bq = qio.BinaryQSO(f, 'r')
-        bq.read()
 
         z_med = bq.wave[int(bq.N/2)] / fid.LYA_WAVELENGTH - 1
         z_bin_no = int((z_med - config_qmle.z_0) / config_qmle.z_d)
