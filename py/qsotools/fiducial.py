@@ -2,6 +2,7 @@ import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.integrate import trapz as scipy_trapz
+from scipy.interpolate import interp2d as scipy_interp2d
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -235,6 +236,42 @@ def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000):
     err2_lya = scipy_trapz(flnk(KK, ZZ), KK) * meanFluxFG08(z)**2
 
     return err2_lya
+
+# Assumes qso only has Lya region
+def getLyaCovariance(qso, finecoeff=3, Nzinterp=5):
+    R_kms = LIGHT_SPEED / qso.specres / ONE_SIGMA_2_FWHM
+    z = qso.wave / fid.LYA_WAVELENGTH - 1
+
+    Lv = LIGHT_SPEED * np.log(qso.wave[-1]/qso.wave[0])
+
+    # Perfoem FFT on a finer grid
+    dvfine = qso.dv / finecoeff
+    Nfine = int(Lv / dvfine) + 1
+    vfine_arr = np.arange(Nfine) * dvfine
+    karr = 2*np.pi*np.fft.rfftfreq(Nfine*2, d=dvfine)
+    zinp_arr = np.linspace(z[0], z[-1], Nzinterp)
+
+    xi_v_z = np.zeros((Nzinterp, Nfine))
+    window_fn = lambda k: np.sinc(k*qso.dv/2/np.pi) * np.exp(-k**2 * R_kms**2/2)
+
+    for i, z1 in enumerate(zinp_arr):
+        p1d_k = evaluatePD13W17Fit(karr,z1) * window_fn(karr)**2
+        xi_v = np.fft.irfft(p1d_k) / dvfine
+        xi_v_z[i] = xi_v[:Nfine]
+
+    xivz = scipy_interp2d(vfine_arr, zinp_arr, xi_v_z, copy=False)
+
+    covariance = np.zeros((qso.size, qso.size))
+
+    for i in range(qso.size):
+        for j in range(qso.size):
+            zij = np.sqrt((1+z[i])*(1+z[j]))-1
+            vij = LIGHT_SPEED * np.abs(np.log(qso.wave[j]/qso.wave[i]))
+            covariance[i][j] = xivz(vij, zij) * meanFluxFG08(z[i]) * meanFluxFG08(z[j])
+    
+    covariance += np.diag(qso.error**2)
+
+    return covariance
 
 # -----------------------------------------------------
 # DLA begins
