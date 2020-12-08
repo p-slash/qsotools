@@ -129,6 +129,7 @@ class MeanFluxHist():
 
         self.total_flux = np.zeros(nz)
         self.total_error2 = np.zeros(nz)
+        self.scatter_error = np.zeros(self.nz)
         self.counts = np.zeros(nz+2)
         self.z_hist = np.zeros(nz)
 
@@ -163,7 +164,6 @@ class MeanFluxHist():
 
         if compute_scatter:
             for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
-            self.scatter_error = np.zeros(self.nz)
             for i in range(self.nz):
                 self.scatter_error[i] = np.std(self.all_flux_values[i], ddof=1) \
                     / np.sqrt(self.all_flux_values[i].size)
