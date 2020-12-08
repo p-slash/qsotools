@@ -135,7 +135,7 @@ class MeanFluxHist():
         self.all_flux_values = np.empty((nz,), dtype=list)
         for i in range(nz): self.all_flux_values[i] = []
 
-    def addSpectrum(self, qso, weight=1, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL):
+    def addSpectrum(self, qso, weight=1, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL, compute_scatter=False):
         lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
         z     = qso.wave[lya_ind] / LYA_WAVELENGTH - 1
         flux  = qso.flux[lya_ind]
@@ -154,17 +154,19 @@ class MeanFluxHist():
         self.total_error2 += e2i * weight**2
         self.counts += ci * weight
 
-        for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1])
+        if compute_scatter:
+            for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1])
 
-    def getMeanStatistics(self):
+    def getMeanStatistics(self, compute_scatter=False):
         self.mean_flux = self.total_flux / self.counts[1:-1]
         self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
 
-        for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
-        self.scatter_error = np.zeros(self.nz)
-        for i in range(self.nz):
-            self.scatter_error[i] = np.std(self.all_flux_values[i], ddof=1) \
-                / np.sqrt(self.all_flux_values[i].size)
+        if compute_scatter:
+            for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
+            self.scatter_error = np.zeros(self.nz)
+            for i in range(self.nz):
+                self.scatter_error[i] = np.std(self.all_flux_values[i], ddof=1) \
+                    / np.sqrt(self.all_flux_values[i].size)
 
     def saveHistograms(self, fname_base):
         data = Table([self.hist_redshifts, self.z_hist, self.mean_flux, \

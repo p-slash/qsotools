@@ -393,7 +393,7 @@ class BinaryQSO(Spectrum):
 
     read()
         Reads the file. Saves as attributes.
-        N : int
+        size : int
             Number of pixels
         z_qso : double
             Emission redshift of the quasar.
