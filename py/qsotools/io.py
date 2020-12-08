@@ -421,7 +421,7 @@ class BinaryQSO(Spectrum):
 
     def __init__(self, fname, rw):
         self.file  = open(fname, mode=rw + 'b')
-        self.qso_name = fname[:10]
+        self.qso_name = fname.split("/")[-1][:10]
 
         if rw == 'r':
             self.read()
