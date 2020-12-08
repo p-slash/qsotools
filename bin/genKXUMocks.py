@@ -156,7 +156,7 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
 
     # If computing mean flux end the pipeline here.
     if mean_flux_hist:
-        mean_flux_hist.addSpectrum(qso, qso.s2n_lya**2/qso.dv, f1, f2)
+        mean_flux_hist.addSpectrum(qso, qso.s2n_lya**2/qso.dv, f1, f2, args.compute_scatter_error)
         return
 
     # If computing continuum power, approximate the error as the error on f.
@@ -276,7 +276,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
             print(e)
             continue
     
-    mf_hist.getMeanStatistics()
+    mf_hist.getMeanStatistics(args.compute_scatter_error)
     mf_hist.saveHistograms(ospath_join(args.OutputDir, "%s-stats%s"%(dataset, settings_txt)))
 
     # Fit mean flux
@@ -401,6 +401,7 @@ if __name__ == '__main__':
     parser.add_argument("--mean-flux-lowdv", type=float, \
         help="Resample the grid using inverse variance without LSS fluctuations for mean flux" \
         " calculation. 300 is recommended.")
+    parser.add_argument("--compute-scatter-error", action="store_true")
 
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")

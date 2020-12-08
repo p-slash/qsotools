@@ -57,7 +57,7 @@ if __name__ == '__main__':
         f = ospath_join(config_qmle.qso_dir, fl.rstrip())
         bq = qio.BinaryQSO(f, 'r')
 
-        z_med = bq.wave[int(bq.N/2)] / fid.LYA_WAVELENGTH - 1
+        z_med = bq.wave[int(bq.size/2)] / fid.LYA_WAVELENGTH - 1
         z_bin_no = int((z_med - config_qmle.z_0) / config_qmle.z_d)
         print("Median redshift:", z_med)
 
