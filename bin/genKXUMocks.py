@@ -267,11 +267,10 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
     for it in getFileIterator(dataset, directory):
         try:
             qso = readFile(it, dataset, f1, f2, args)
-            if args.mean_flux_lowdv:
-                safeResample(qso, args.mean_flux_lowdv)
-
             # Add Ly-a fluct as error here
             qso.addLyaFlucErrors()
+            if args.mean_flux_lowdv:
+                safeResample(qso, args.mean_flux_lowdv)
             pipeline(qso, f1, f2, meanFluxFunc, mf_hist, args)
         except Exception as e:
             print(e)
