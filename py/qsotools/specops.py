@@ -77,6 +77,9 @@ def resample(wave, flux, error, new_dv_or_edge):
     else:
         return new_wave_centers, binned_flux    
 
+def optimalCoarseGraining(qso, newdv):
+    covariance = fid.getLyaCovariance(qso)
+
 def divideIntoChunks(wave, flux, error, z_qso, restwave_chunk_edges):
     chunk_indices = np.searchsorted(wave/(1.+z_qso), restwave_chunk_edges)
     
