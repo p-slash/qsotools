@@ -140,7 +140,7 @@ class MeanFluxHist():
         lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
         z     = qso.wave[lya_ind] / LYA_WAVELENGTH - 1
         flux  = qso.flux[lya_ind]
-        error = qso.flux[lya_ind]
+        error = qso.error[lya_ind]
 
         fi, _, binnumber = binned_statistic(z, flux, statistic='sum', bins=self.hist_redshift_edges)
         ci = np.bincount(binnumber, minlength=len(self.hist_redshift_edges)+1)
