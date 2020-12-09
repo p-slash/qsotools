@@ -235,13 +235,13 @@ def readFile(it, dataset, f1, f2, args):
         qso = qio.SQUADFits(it, correctSeeing=True, corrError=True)
         s2n_this = qso.getS2NLya(f1, f2)
         qso.qso_name = qso.qso_name.replace(" ", "")
-        print(qso.qso_name)
+        print(qso.qso_name, flush=True)
 
     elif dataset == "MOCK":
         qso = qio.BinaryQSO(it, 'r')
         s2n_this = qso.getS2NLya(f1, f2)
         qso.qso_name = qso.qso_name.replace(" ", "")
-        print(qso.qso_name)
+        print(qso.qso_name, flush=True)
 
     if s2n_this == -1:
         raise Exception("SKIP: No Lya or Side Band coverage!")
@@ -461,7 +461,7 @@ if __name__ == '__main__':
     # ------------------------------    
     # Start with KODIAQ
     if args.KODIAQDir and not args.continuum_power:
-        print("RUNNING ON KODIAQ.........")        
+        print("RUNNING ON KODIAQ.........", flush=True)        
         # Start iterating quasars in KODIAQ sample
         # Each quasar has multiple observations
         # Pick the one with highest signal to noise in Ly-alpha region
@@ -469,17 +469,17 @@ if __name__ == '__main__':
     # ------------------------------
     # XQ-100
     if args.XQ100Dir:
-        print("RUNNING ON XQ-100.........")
+        print("RUNNING ON XQ-100.........", flush=True)
         iterateSpectra(args.XQ100Dir, 'XQ', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # UVES/SQUAD
     if args.UVESSQUADDir:
-        print("RUNNING ON SQUAD/UVES.........")
+        print("RUNNING ON SQUAD/UVES.........", flush=True)
         iterateSpectra(args.UVESSQUADDir, 'UVE', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # MOCKS
     if args.MockDir:
-        print("RUNNING ON MOCKS.........")
+        print("RUNNING ON MOCKS.........", flush=True)
         iterateSpectra(args.MockDir, 'MOCK', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
 

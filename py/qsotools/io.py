@@ -750,7 +750,7 @@ class KODIAQFits(Spectrum):
         return np.searchsorted(self.wave/(1.+self.z_qso), rest_frame_edges)
 
     def print_details(self):
-        print(self.qso_name, self.pi_date, self.spec_prefix, "at", self.z_qso)
+        print(self.qso_name, self.pi_date, self.spec_prefix, "at", self.z_qso, , flush=True)
 
 class KODIAQ_QSO_Iterator:
     """
