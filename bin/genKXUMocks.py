@@ -22,6 +22,8 @@ filename_list = []
 specres_list  = set()
 spectral_record_list = qio.SpectralRecordList()
 
+ERROR_EPS_CUT = 1e-6
+
 # Define Saving Functions
 # ------------------------------
 def saveParameters(txt_basefilename, f1, f2, args):
@@ -104,7 +106,7 @@ def safeResample(qso, lowdv, keep_masked_pix=False):
     qso.wave  = wave
     qso.flux  = fluxes[0]
     qso.error = errors[0]
-    qso.mask  = np.logical_and(qso.error>1e-5, qso.error<10)
+    qso.mask  = np.logical_and(qso.error>ERROR_EPS_CUT, qso.error<10)
     qso.size  = qso.wave.size
     
     qso.applyMask(removePixels=not keep_masked_pix)
@@ -129,7 +131,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
 
         qso = lya_m.qsoMock(qso, mock_spec_res, args.const_error)
 
-    qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
+    qso.applyMask(good_pixels=np.logical_and(qso.error>ERROR_EPS_CUT, qso.error<10), \
         removePixels=not args.keep_masked_pix)
 
     # manageDLAs(qso, meanFluxFunc, args)
