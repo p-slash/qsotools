@@ -190,7 +190,7 @@ class Spectrum:
         
         self.size = len(self.wave)
         self.mask = np.logical_and(error > 0, flux != 0)
-        self.s2n = 1/np.sqrt(np.mean(error[self.mask]**2))
+        self.s2n = 1/np.mean(error[self.mask])
         self.s2n_lya = self.getS2NLya()
 
         self.z_dlas = None
@@ -203,7 +203,7 @@ class Spectrum:
         err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms)
         
         self.error = np.sqrt(err2_lya + self.error**2)
-        self.s2n = 1/np.sqrt(np.mean(self.error**2))
+        self.s2n = 1/np.mean(self.error)
         self.s2n_lya = self.getS2NLya()
 
     def cutForestAnalysisRegion(self, f1, f2, zmin, zmax):
@@ -336,7 +336,7 @@ class Spectrum:
         if len(temp) == 0:
             return -1
         else:
-            return 1/np.sqrt(np.mean(temp**2))
+            return 1/np.mean(temp)
 
     def saveAsBQ(self, fname):
         tbq = BinaryQSO(fname, 'w')
