@@ -62,7 +62,7 @@ def saveParameters(txt_basefilename, f1, f2, args):
         "ON" if not args.without_z_evo else "OFF")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
-    print("Saving parameteres to", temp_fname)
+    print("Saving parameteres to", temp_fname, flush=True)
     toWrite = open(temp_fname, 'w')
     toWrite.write(Parameters_txt)
     toWrite.close()
@@ -342,6 +342,7 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
 
 if __name__ == '__main__':
     # Arguments passed to run the script
+    print("Parsing arguments....", flush=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("OutputDir", help="Output directory")
     parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
