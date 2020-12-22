@@ -1299,7 +1299,7 @@ class SQUADFits(Spectrum):
     
     """
 
-    dr1_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
+    dr1_csv = ascii.read(TABLE_SQUAD_DR1)
     dla_csv = ascii.read(TABLE_SQUAD_VI_DLA, format='csv')
     dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
         frame='fk5', unit=deg)
