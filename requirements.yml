@@ -1,0 +1,13 @@
+name: science
+channels:
+  - conda-forge
+dependencies:
+  - numpy
+  - scipy
+  - matplotlib
+  - astropy
+  - ipython
+  - plotly
+  - setuptools
+  - jupyter
+  - fitsio
