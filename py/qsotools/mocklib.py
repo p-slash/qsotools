@@ -146,7 +146,7 @@ class LyaMocks():
         Generate Gaussian mocks instead of log-normal mocks. 
         Default is False, i.e. generating log-normal mocks.
 
-    __init__(SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, GAUSSIAN_MOCKS=False, USE_LOG_V=False)
+    __init__(SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, GAUSSIAN_MOCKS=False, USE_LOG_V=True)
         Creates a grid, equal spacing in velocity DV_KMS. Computes redshift values, 
         the power spectrum for this array.
 
@@ -234,7 +234,7 @@ class LyaMocks():
         self.delta_F = np.fft.irfft(delta_k, axis=1) / self.DV_KMS
 
     def __init__(self, SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, \
-        GAUSSIAN_MOCKS=False, USE_LOG_V=False):
+        GAUSSIAN_MOCKS=False, USE_LOG_V=True):
         self.RNST           = np.random.RandomState(SEED)
         self.N_CELLS        = N_CELLS
         self.DV_KMS         = DV_KMS

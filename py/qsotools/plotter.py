@@ -32,7 +32,6 @@ def set_topax_makeup(top_ax, majorgrid=True, ymin=None, ymax=None):
 
     ticks_makeup(top_ax)
 
-    plt.setp(top_ax.get_xticklabels(), visible=False)
     top_ax.set_ylabel(r'$kP/\pi$', fontsize = AXIS_LBL_FONT_SIZE)
 
 def one_col_n_row_grid(nz, z_bins, ylab, ymin, ymax, scale="log", \
@@ -293,6 +292,7 @@ class PowerPlotter(object):
         if two_row:
             top_ax, bot_ax = create_tworow_figure(1, 3, ylim=rel_ylim)[:-1]
             set_topax_makeup(top_ax)
+            plt.setp(top_ax.get_xticklabels(), visible=False)
         else:
             fig, top_ax = plt.subplots()
             set_topax_makeup(top_ax)
@@ -395,6 +395,7 @@ class PowerPlotter(object):
         if two_row:
             top_ax, bot_ax, color_array = create_tworow_figure(self.nz, 3, ylim=rel_ylim, \
                 colormap=colormap)
+            plt.setp(top_ax.get_xticklabels(), visible=False)
         else:
             fig, top_ax = plt.subplots()
             plt.setp(top_ax.get_xticklabels(), fontsize = TICK_LBL_FONT_SIZE)
