@@ -115,12 +115,14 @@ if __name__ == '__main__':
 
     zarr_repeated = np.repeat(config_qmle.z_bins, config_qmle.k_bins.size)
     karr_repeated = np.tile(config_qmle.k_bins, config_qmle.z_n)
-    rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
     power_table = Table([zarr_repeated, karr_repeated, power.ravel()], names=('z', 'k', 'P1D'))
     power_table.write(p1d_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
     print("P1D saved as ", p1d_filename)
+
+    zarr_repeated = np.repeat(config_qmle.z_bins, r_bins.size)
+    rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
     corr_table = Table([zarr_repeated, rarr_repeated, corr_fn.ravel()], names=('z', 'r', 'Xi1D'))
     corr_table.write(corr_filename, format='ascii.fixed_width', \
