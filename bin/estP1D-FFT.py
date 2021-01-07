@@ -99,7 +99,7 @@ if __name__ == '__main__':
         c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
 
         corr_fn[z_bin_no] += c
-        counts_corr[z_bin_no] += cc
+        counts_corr[z_bin_no] += cc[1:-1]
 
     power /= counts
     corr_fn /= counts_corr
