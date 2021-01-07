@@ -94,8 +94,8 @@ if __name__ == '__main__':
         counts[z_bin_no] += c[1:-1]
 
         # Compute and bin correlations
-        new_varr = np.arange(delta_f.size)*dv
         corr1d_f = np.abs(np.fft.irfft(p1d_f)) / dv
+        new_varr = np.arange(corr1d_f.size)*dv
         try:
             c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
 
