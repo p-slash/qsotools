@@ -96,20 +96,16 @@ if __name__ == '__main__':
         # Compute and bin correlations
         corr1d_f = np.abs(np.fft.irfft(p1d_f)) / dv
         new_varr = np.arange(corr1d_f.size)*dv
-        try:
-            c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
+        c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
 
-            corr_fn[z_bin_no] += c
-            counts_corr[z_bin_no] += cc[1:-1]
-        except:
-            print("ERROR!")
-            print("v:", new_varr.shape)
-            print("cshape:", corr1d_f.shape)
+        corr_fn[z_bin_no] += c
+        counts_corr[z_bin_no] += cc[1:-1]
 
-
+    # Loop is done. Now average results
     power /= counts
     corr_fn /= counts_corr
 
+    # Save power spectrum
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
     corr_filename = ospath_join(output_dir, output_base+"-corr1d-fft-estimate.txt")
 
@@ -121,6 +117,7 @@ if __name__ == '__main__':
         formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
     print("P1D saved as ", p1d_filename)
 
+    # Save correlation fn
     zarr_repeated = np.repeat(config_qmle.z_bins, r_bins.size)
     rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
