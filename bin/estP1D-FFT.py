@@ -103,7 +103,7 @@ if __name__ == '__main__':
             counts_corr[z_bin_no] += cc[1:-1]
         except:
             print("ERROR!")
-            print("v:", new_varr[:5])
+            print("v:", new_varr.shape)
             print("cshape:", corr1d_f.shape)
 
 
