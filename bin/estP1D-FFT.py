@@ -27,6 +27,12 @@ def binPowerSpectra(raw_k, raw_p, k_edges):
 
     return binned_power, counts
 
+def binCorrelations(raw_v, raw_c, r_edges):
+    binned_corr,  _, binnumber = binned_statistic(raw_v, raw_c, statistic='sum', bins=r_edges)
+    counts = np.bincount(binnumber, minlength=len(r_edges)+1)
+
+    return binned_corr, counts
+
 def getSpectographWindow2(k, Rint, dv):
     Rv = fid.LIGHT_SPEED / Rint / fid.ONE_SIGMA_2_FWHM
     x = k*dv/2/np.pi # numpy sinc convention multiplies x with pi
@@ -40,6 +46,9 @@ if __name__ == '__main__':
     parser.add_argument("ConfigFile", help="Config file")
     parser.add_argument("--deconv-window", help="Deconvolve window function", \
         action="store_true")
+    # parser.add_argument("--correlation", help="Compute correlation fn instead.")
+    parser.add_argument("--dr", type=float, default=30.0)
+    parser.add_argument("--nrbins", type=int, default=100)
     args = parser.parse_args()
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
@@ -51,6 +60,11 @@ if __name__ == '__main__':
 
     power = np.zeros((config_qmle.z_n, config_qmle.k_bins.size))
     counts = np.zeros_like(power)
+
+    r_edges = np.arange(args.nrbins+1) * args.dr
+    r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
+    corr_fn = np.zeros((config_qmle.z_n, args.nrbins))
+    counts_corr = np.zeros_like(corr_fn)
 
     for fl in file_list:
         print("Reading", fl.rstrip())
@@ -67,6 +81,7 @@ if __name__ == '__main__':
         v_arr = fid.LIGHT_SPEED * np.log(bq.wave)
         delta_f, dv = interpolate2Grid(v_arr, bq.flux)
 
+        # Compute & bin power
         p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
         if args.deconv_window:
@@ -78,19 +93,33 @@ if __name__ == '__main__':
         power[z_bin_no] += p
         counts[z_bin_no] += c[1:-1]
 
+        # Compute and bin correlations
+        new_varr = np.arange(delta_f.size)*dv
+        corr1d_f = np.fft.irrft(p1d_f) / dv
+        c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
+
+        corr_fn[z_bin_no] += c
+        counts_corr[z_bin_no] += cc
+
     power /= counts
+    corr_fn /= counts_corr
 
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
+    corr_filename = ospath_join(output_dir, output_base+"-corr1d-fft-estimate.txt")
 
     zarr_repeated = np.repeat(config_qmle.z_bins, config_qmle.k_bins.size)
     karr_repeated = np.tile(config_qmle.k_bins, config_qmle.z_n)
+    rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
     power_table = Table([zarr_repeated, karr_repeated, power.ravel()], names=('z', 'k', 'P1D'))
-
     power_table.write(p1d_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
-
     print("P1D saved as ", p1d_filename)
+
+    corr_table = Table([zarr_repeated, rarr_repeated, corr_fn.ravel()], names=('z', 'r', 'Xi1D'))
+    corr_table.write(corr_filename, format='ascii.fixed_width', \
+        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e'}, overwrite=True)
+    print("Corr fn saved as ", corr_filename)
 
 
 
