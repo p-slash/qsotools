@@ -96,11 +96,15 @@ if __name__ == '__main__':
         # Compute and bin correlations
         new_varr = np.arange(delta_f.size)*dv
         corr1d_f = np.abs(np.fft.irfft(p1d_f)) / dv
-        print(corr1d_f.shape)
-        c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
+        try:
+            c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
 
-        corr_fn[z_bin_no] += c
-        counts_corr[z_bin_no] += cc[1:-1]
+            corr_fn[z_bin_no] += c
+            counts_corr[z_bin_no] += cc[1:-1]
+        except:
+            print("ERROR!")
+            print("v:", new_varr[:5])
+            print("cshape:", corr1d_f.shape)
 
 
     power /= counts
