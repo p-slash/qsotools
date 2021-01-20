@@ -61,6 +61,9 @@ if __name__ == '__main__':
     power = np.zeros((config_qmle.z_n, config_qmle.k_bins.size))
     counts = np.zeros_like(power)
 
+    mean_resolution = np.zeros(config_qmle.z_n)
+    counts_meanreso = np.zeros_like(mean_resolution)
+
     r_edges = np.arange(args.nrbins+1) * args.dr
     r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
     corr_fn = np.zeros((config_qmle.z_n, args.nrbins))
@@ -80,6 +83,10 @@ if __name__ == '__main__':
 
         v_arr = fid.LIGHT_SPEED * np.log(bq.wave)
         delta_f, dv = interpolate2Grid(v_arr, bq.flux)
+
+        # Add to mean resolution
+        mean_resolution[z_bin_no] += bq.specres
+        counts_meanreso[z_bin_no] += 1
 
         # Compute & bin power
         p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
@@ -104,6 +111,14 @@ if __name__ == '__main__':
     # Loop is done. Now average results
     power /= counts
     corr_fn /= counts_corr
+
+    # Mean resolution
+    mean_resolution /= counts_meanreso
+    meanres_filename = ospath_join(output_dir, output_base+"-mean-resolution.txt")
+    meanres_table = Table([config_qmle.z_bins, mean_resolution], names=('z', 'R'))
+    meanres_table.write(meanres_filename, format='ascii.fixed_width', \
+        formats={'z':'%.1f', 'R':'%d'}, overwrite=True)
+    print("Mean R saved as ", meanres_filename)
 
     # Save power spectrum
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
