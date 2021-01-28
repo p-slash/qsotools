@@ -2,6 +2,7 @@
 import argparse
 import struct
 import fitsio
+from os.path import join as ospath_join
 
 import qsotools.io as qio
 
