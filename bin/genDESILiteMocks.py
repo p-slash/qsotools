@@ -69,19 +69,19 @@ if __name__ == '__main__':
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
         type=int, default=332298)
         
-    parser.add_argument("--sigma_per_pixel", help=("Add Gaussian error to mocks with given sigma. "\
+    parser.add_argument("--sigma-per-pixel", help=("Add Gaussian error to mocks with given sigma. "\
         "Default: %(default)s"), type=float, default=0.7)
     parser.add_argument("--specres", help="Spectral resolution. Default: %(default)s", type=int, \
         default=3200)
-    parser.add_argument("--pixel_dv", help=("Pixel size (km/s) of the log-spaced wave grid. "\
+    parser.add_argument("--pixel-dv", help=("Pixel size (km/s) of the log-spaced wave grid. "\
         "Default: %(default)s"), type=float, default=30.)
 
-    parser.add_argument("--desi_w1", help=("Lower wavelength of DESI wave grid in A. "\
+    parser.add_argument("--desi-w1", help=("Lower wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=3600.)
-    parser.add_argument("--desi_w2", help=("Higher wavelength of DESI wave grid in A. "\
+    parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
 
-    parser.add_argument("--invcdf_nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
+    parser.add_argument("--invcdf-nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
         default=PKG_ICDF_Z_TABLE)
     
     parser.add_argument("--chunk-dyn", help=("Dynamic chunking splits a spectrum into "\
@@ -91,11 +91,11 @@ if __name__ == '__main__':
     parser.add_argument("--plot", help="Saves plots to output when passed", action="store_true")
 
     parser.add_argument("--gauss", help="Generate Gaussian mocks", action="store_true")
-    parser.add_argument("--without_z_evo", help="Turn off redshift evolution", action="store_true")
-    parser.add_argument("--save_full_flux", action="store_true", \
+    parser.add_argument("--without-z-evo", help="Turn off redshift evolution", action="store_true")
+    parser.add_argument("--save-full-flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
-    parser.add_argument("--use_eds_v", \
+    parser.add_argument("--use-eds-v", \
         help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
         action="store_true")
     parser.add_argument("--ngrid", help="Number of grid points. Default is 2^16", type=int, \
