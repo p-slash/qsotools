@@ -392,7 +392,7 @@ if __name__ == '__main__':
     parser.add_argument("--keep-masked-pix", help="Assign large errors.", action="store_true")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
-    parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
+    parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
         type=float, default=4.3)
     
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
