@@ -280,7 +280,7 @@ class LyaMocks():
             self.smoothGaussian(fid.LIGHT_SPEED / spectrograph_resolution / fid.ONE_SIGMA_2_FWHM)
 
     def redshiftEvolutionGaussian(self):
-        a_z = np.power((1 + self.evo_redshifts) / 4, fid.PD13_fiducial_parameters[3] / 2)
+        a_z = np.power((1 + self.evo_redshifts) / 4, fid.PDW_FIT_B / 2)
         self.delta_F *= a_z
 
     def lognTransform(self, R_tau=None):
