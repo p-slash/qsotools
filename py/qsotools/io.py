@@ -1198,7 +1198,7 @@ class XQ100Fits(Spectrum):
         
         if correctSeeing:
             seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
-            seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
+            seeing_ave = d['SEEING_MIN'] if np.isnan(seeing_ave) else seeing_ave
             specres = XQ100Fits._seeingCorrectedResolution(self.arm, seeing_ave)
         else:
             specres = int(hdr0["SPEC_RES"])
