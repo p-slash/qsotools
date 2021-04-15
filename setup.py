@@ -17,7 +17,7 @@ setup(
     author = "Naim Goksel Karacayli",
     author_email = "naimgoksel.karacayli@yale.edu",
     description=("Python scripts to generate mock Lyman-alpha forest,"
-    " read & reduce quasar spectra from KODIAQ, XQ-100 & UVES."),
+    " read & reduce quasar spectra from KODIAQ, XQ-100 & SQUAD."),
     url="https://bitbucket.org/naimgk/qsotools",   # project home page, if any
 
     # could also include long_description, download_url, etc.
