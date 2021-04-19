@@ -328,8 +328,8 @@ class Spectrum:
         self.mask = np.logical_and(zsc_mask, self.mask)
 
     def getS2NLya(self, lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL):            
-        lyman_alpha_ind = np.logical_and(self.wave >= fid.LYA_FIRST_WVL*(1+self.z_qso), \
-            self.wave <= fid.LYA_LAST_WVL*(1+self.z_qso))
+        lyman_alpha_ind = np.logical_and(self.wave >= lya_lower*(1+self.z_qso), \
+            self.wave <= lya_upper*(1+self.z_qso))
         
         temp = self.error[lyman_alpha_ind & self.mask]
 
