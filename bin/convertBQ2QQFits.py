@@ -88,7 +88,7 @@ if __name__ == '__main__':
                 continue
 
         qqfile.writeAll(meta1, wavelength, fluxes)
-        qqfile.close()
+
 
 
 
