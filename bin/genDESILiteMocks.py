@@ -61,6 +61,18 @@ def save_data(wave, fmocks, emocks, fnames, args):
         mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
         mfile.save(w, f, e, len(w), 0., 0., 0., 0., args.specres, args.pixel_dv)
 
+def getDESIwavegrid(args):
+    # Set up DESI observed wavelength grid
+    if args.use_logspaced_wave:
+        base            = np.exp(args.pixel_dv / fid.LIGHT_SPEED)
+        npix_desi       = int(np.log(args.desi_w2 / args.desi_w1) / args.pixel_dv * fid.LIGHT_SPEED)+1
+        DESI_WAVEGRID   = args.desi_w1 * np.power(base, np.arange(npix_desi))
+    else:
+        npix_desi = int((args.desi_w2 - args.desi_w1) / args.pixel_dlambda) + 1
+        DESI_WAVEGRID = args.desi_w1 + np.arange(npix_desi) * args.pixel_dlambda
+
+    return DESI_WAVEGRID
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Outputdir", help="Output directory")
@@ -75,6 +87,10 @@ if __name__ == '__main__':
         default=3200)
     parser.add_argument("--pixel-dv", help=("Pixel size (km/s) of the log-spaced wave grid. "\
         "Default: %(default)s"), type=float, default=30.)
+    parser.add_argument("--pixel-dlambda", help=("Pixel size (A) of the linearly-spaced wave grid. "\
+        "Default: %(default)s"), type=float, default=0.5)
+    parser.add_argument("--use-logspaced-wave", help=("Use log spaced array as final grid. "\
+        "Default: %(default)s"), action="store_true")
 
     parser.add_argument("--desi-w1", help=("Lower wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=3600.)
@@ -84,8 +100,11 @@ if __name__ == '__main__':
     parser.add_argument("--invcdf-nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
         default=PKG_ICDF_Z_TABLE)
     
-    parser.add_argument("--chunk-dyn", help=("Dynamic chunking splits a spectrum into "\
-        "three chunks if l>L/2 or into two chunks if l>L/3."), action="store_true")
+    parser.add_argument("--chunk-dyn",  action="store_true", \
+        help="Splits spectrum into three chunks if n>2N/3 or into two chunks if n>N/3.")
+    parser.add_argument("--chunk-fixed",  action="store_true", \
+        help="Splits spectrum into 3 chunks at fixed rest frame wavelengths")
+
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
     parser.add_argument("--plot", help="Saves plots to output when passed", action="store_true")
@@ -128,9 +147,7 @@ if __name__ == '__main__':
         mean_flux_function = lm.lognMeanFluxGH
 
     # Set up DESI observed wavelength grid
-    base            = np.exp(args.pixel_dv / fid.LIGHT_SPEED)
-    npix_desi       = int(np.log(args.desi_w2 / args.desi_w1) / args.pixel_dv * fid.LIGHT_SPEED)+1
-    DESI_WAVEGRID   = args.desi_w1 * np.power(base, np.arange(npix_desi))
+    DESI_WAVEGRID   = getDESIwavegrid(args)
 
     # Read inveser cumulative distribution function
     # Generate uniform random numbers
@@ -144,7 +161,8 @@ if __name__ == '__main__':
         lya_m.setCentralRedshift(z_center)
 
         wave, fluxes, errors = lya_m.resampledMocks(1, err_per_final_pixel=args.sigma_per_pixel, \
-            spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID)
+            spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID, \
+            logspacing_obswave=args.use_logspaced_wave)
         
         # Cut Lyman-alpha forest region
         lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
@@ -165,14 +183,21 @@ if __name__ == '__main__':
             errors /= true_mean_flux
 
         if args.chunk_dyn:
-            wave, fluxes, errors, nchunks = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
-
-            fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
-            % (args.seed, nid, nc, z_qso, settings_txt) for nc in range(nchunks)]
+            waves, fluxes, errors = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
+        elif args.chunk_fixed:
+            NUMBER_OF_CHUNKS = 3
+            FIXED_CHUNK_EDGES = np.linspace(fid.LYA_FIRST_WVL, fid.LYA_LAST_WVL, num=NUMBER_OF_CHUNKS+1)
+            waves, fluxes, errors = so.divideIntoChunks(wave, fluxes[0], errors[0], \
+                z_qso, FIXED_CHUNK_EDGES)
         else:
-            wave  = [wave]
-            fname = ["desilite_seed%d_id%d_z%.1f%s.dat" % (args.seed, nid, z_qso, settings_txt)]
-        
+            waves  = [qso.wave]
+            fluxes = [qso.flux]
+            errors = [qso.error]
+
+        nchunks = len(waves)
+        fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
+            % (args.seed, nid, nc, z_qso, settings_txt) for nc in range(nchunks)]
+
         filename_list.extend(fname)
 
         if not args.nosave:
