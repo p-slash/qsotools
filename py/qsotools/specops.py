@@ -7,33 +7,33 @@ from astropy.table import Table
 from qsotools.fiducial import LIGHT_SPEED, LYA_FIRST_WVL, LYA_LAST_WVL, LYA_WAVELENGTH, ONE_SIGMA_2_FWHM
 
 # dv should be in km/s, which is defined as c*dln(lambda)
-def createEdgesFromCenters(wave_centers, dv=None):
+def createEdgesFromCenters(wave_centers, dv=None, logspacing=True):
     npix = len(wave_centers)
     
-    if dv is None:
-        dv = LIGHT_SPEED * np.mean(np.log(wave_centers[1:]/wave_centers[0]) / np.arange(1, npix))
+    if logspacing:
+        if dv is None:
+            dv = LIGHT_SPEED * np.min(np.log(wave_centers[1:]/wave_centers[0]) / np.arange(1, npix))
     
-    exp_pix = np.exp(dv / LIGHT_SPEED)
+        exp_pix = np.exp(dv / LIGHT_SPEED)
     
-    wave_edges = 2. / (1. + exp_pix) * wave_centers[0] * np.power(exp_pix, np.arange(npix + 1))
-
-    # This test gives new edges are correct to 4e-6
-    # test_centers = (wave_edges[1:] + wave_edges[:-1]) / 2.
-    # max_rel_diff = np.max(np.fabs((wave_centers - test_centers) / wave_centers))
-
-    # assert max_rel_diff < 1e-5
+        wave_edges = 2. / (1. + exp_pix) * wave_centers[0] * np.power(exp_pix, np.arange(npix + 1))
+    else:
+        dlambda = np.min(wave_centers[1:]-wave_centers[:-1])
+        wave_edges = (wave_centers[0] - dlambda/2) + np.arange(npix+1) * dlambda
 
     return wave_edges
 
 # if new_dv_or_edge is float, then a wavelength grid with given pixel size constructed.
 # if new_dv_or_edge is a np.array, then it is used to resample
 def resample(wave, flux, error, new_dv_or_edge):
+    # if new_dv_or_edge is dv
     if isinstance(new_dv_or_edge, float) and new_dv_or_edge > 0:
         dv_c = new_dv_or_edge / LIGHT_SPEED
         new_N = int(np.log(wave[-1] / wave[0]) / dv_c) + 1
     
         new_wave_centers = wave[0] * np.exp(np.arange(new_N) * dv_c)
         new_wave_edges   = createEdgesFromCenters(new_wave_centers, new_dv_or_edge)
+    # if new_dv_or_edge is edge array, then logspacing not needed
     elif isinstance(new_dv_or_edge, np.ndarray):
         new_wave_edges   = new_dv_or_edge
         new_wave_centers = (new_wave_edges[1:] + new_wave_edges[:-1]) / 2.
