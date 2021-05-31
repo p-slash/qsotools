@@ -1392,7 +1392,67 @@ class SQUADFits(Spectrum):
 
 
 
+# ------------------------------------------
+# ---------- DESI MOCK FILE ----------------
+# ------------------------------------------
 
+class QQFile():
+    """docstring for filename
+    MOCKDIR/master.fits
+    MOCKDIR/P/PIXNUM/lya-transmission-N-PIXNUM.fits
+    
+    N : nside of healpix sphere tiling method
+    PIXNUM : healpix pixel number
+    P=int(PIXNUM/100)
+    master.fits (or any other fits filename) contains a binary table in HDU 1 
+        with all the skewers from the mock with (at least) RA,DEC,Z,MOCKID,PIXNUM
+    MOCKID is a integer number, it is a unique identifier of a skewer
+    RA DEC are floating point number in degrees, with sufficient precision
+    Z is the QSO redshift, floating point number
+    PIXNUM is a function of RA,DEC and N, so it's a duplication of information, 
+        but it is convenient to find the transmission files without calls to healpix.
+    lya-transmission-N-PIXNUM.fits contains the lyman-alpha transmission of 
+        all the skewers in the healpix PIXNUM as a function of 
+        observer-frame wavelength (in vacuum).
+
+    0  PRIMARY      PrimaryHDU       7   ()
+    1  METADATA     BinTableHDU     17   1864R x 4C   [E, E, E, 10A]
+            The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
+    2  WAVELENGTH   ImageHDU         7   (571,)   float32
+    3  TRANSMISSION ImageHDU         8   (1864, 571)   float32
+    4  DLA          BinTableHDU      17 1864R x 4C [long, double, double, double]
+    """
+    def __init__(self, fname, rw='rw'):
+        self.fname = fname
+        self.rw = rw
+
+        self.fitsfile = fitsio.FITS(fname, rw)
+
+    def writeMetadata(self, metadata):
+        self.fitsfile.write(metadata, extname='METADATA')
+
+    def writeWavelength(self, wave):
+        data = np.array(wave, dtype='float32')
+        self.fitsfile.write(data, extname='WAVELENGTH')
+
+    def writeTransmission(self, fluxes):
+        data = np.array(fluxes, dtype='float32')
+        self.fitsfile.write(data, extname='TRANSMISSION')
+
+    def writeAll(self, metadata, wave, fluxes):
+        self.writeMetadata(metadata)
+        self.writeWavelength(wave)
+        self.writeTransmission(fluxes)
+        self.close()
+
+    def close(self):
+        self.fitsfile.close()
+
+
+
+
+
+        
 
 
 
