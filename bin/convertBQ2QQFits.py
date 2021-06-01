@@ -18,11 +18,11 @@ if __name__ == '__main__':
         help="Relative directory to fnames in filelist.")
     parser.add_argument("--nside", help="Heal pixel nside. Default: %(default)s", type=int, default=8)
     parser.add_argument("--read-coords", help="Reads coords from file. If not randomly generated.")
-    parser.add_argument("--seed", default=3434672, type=int)
+    parser.add_argument("--seed", --help="Default: %(default)s", default=3434672, type=int)
     args = parser.parse_args()
 
     npixels = healpy.nside2npix(args.nside)
-    RNST = np.random.default_rng(SEED)
+    RNST = np.random.default_rng(args.seed)
 
     with open(args.filelist, 'r') as file_qsolist:
         no_qsos = int(file_qsolist.readline())
