@@ -98,7 +98,7 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=9800.)
 
     parser.add_argument("--keep-nolya-pixels", action="store_true", \
-        help="Instead of removing pixels, set flux=1")
+        help="Instead of removing pixels, set flux=1 for lambda>L_lya")
     parser.add_argument("--invcdf-nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
         default=PKG_ICDF_Z_TABLE)
     
@@ -168,10 +168,10 @@ if __name__ == '__main__':
         fluxes = np.array(fluxes[0])
         errors = np.array(errors[0])
         
-        lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
-                wave <= fid.LYA_LAST_WVL * (1+z_qso))
         # Cut Lyman-alpha forest region
         if not args.keep_nolya_pixels:
+            lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
+                wave <= fid.LYA_LAST_WVL * (1+z_qso))
             wave = wave[lyman_alpha_ind]
             fluxes = fluxes[lyman_alpha_ind]
             errors = errors[lyman_alpha_ind]
@@ -188,8 +188,10 @@ if __name__ == '__main__':
             errors /= true_mean_flux
 
         if args.keep_nolya_pixels:
-            fluxes[~lyman_alpha_ind] = 1
-            errors[~lyman_alpha_ind] = 1
+            # mark only lambda > lambda_lya, i.e. absorptions for < 1216 A
+            nonlya_ind = wave > fid.LYA_WAVELENGTH * (1+z_qso)
+            fluxes[nonlya_ind] = 1
+            errors[nonlya_ind] = 1
 
         if args.chunk_dyn:
             waves, fluxes, errors = so.chunkDynamic(wave, fluxes, errors, MAX_NO_PIXELS)
