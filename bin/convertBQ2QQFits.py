@@ -57,7 +57,7 @@ if __name__ == '__main__':
             metadata['RA'][imock] = ra
             metadata['DEC'][imock] = dec
 
-        ipix = ang2pix(args.nside, -metadata['DEC'][imock]+np.pi/2, metadata['RA'][imock])
+        ipix = healpy.ang2pix(args.nside, -metadata['DEC'][imock]+np.pi/2, metadata['RA'][imock])
         metadata['IPIX'][imock] = ipix
 
     # MOCKDIR/P/PIXNUM/lya-transmission-N-PIXNUM.fits
