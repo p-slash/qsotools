@@ -1422,7 +1422,7 @@ class QQFile():
     3  TRANSMISSION ImageHDU         8   (1864, 571)   float32
     4  DLA          BinTableHDU      17 1864R x 4C [long, double, double, double]
     """
-    def __init__(self, fname, rw='rw'):
+    def __init__(self, fname, rw='r'):
         self.fname = fname
         self.rw = rw
 
@@ -1432,7 +1432,7 @@ class QQFile():
         self.fitsfile.write(metadata, extname='METADATA')
 
     def writeWavelength(self, wave):
-        data = np.array(wave, dtype='float32').T
+        data = np.array(wave, dtype='float32')
         self.fitsfile.write(data, extname='WAVELENGTH')
 
     def writeTransmission(self, fluxes):
@@ -1443,6 +1443,14 @@ class QQFile():
         self.writeMetadata(metadata)
         self.writeWavelength(wave)
         self.writeTransmission(fluxes)
+        self.close()
+
+    def read(self):
+        self.metadata = self.fitsfile['METADATA'].read()
+        self.nqso = len(metadata['RA'])
+
+        self.wave = self.fitsfile['WAVELENGTH'].read()
+        self.fluxes = self.fitsfile['TRANSMISSION'].read().T
         self.close()
 
     def close(self):
