@@ -40,7 +40,6 @@ if __name__ == '__main__':
 
         try:
             spectrum = qio.BinaryQSO(fl, 'r')
-            print(spectrum.wave.size)
             if imock == 0:
                 wavelength = np.array(spectrum.wave, dtype='float32')
         except Exception as e:
@@ -75,7 +74,7 @@ if __name__ == '__main__':
         dir2 = ospath_join(dir1, f"{ipix}")
         os_makedirs(dir1, exist_ok=True)
         os_makedirs(dir2, exist_ok=True)
-        fname = ospath_join(dir2, f"lya-transmission-{args.nside}-{ipix}.fits")
+        fname = ospath_join(dir2, f"lya-transmission-{args.nside}-{ipix}.fits.gz")
         
         qqfile = qio.QQFile(fname)
         fluxes = np.zeros((ntemp, wavelength.size))
