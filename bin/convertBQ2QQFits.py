@@ -39,7 +39,7 @@ if __name__ == '__main__':
         fl = bq_fname_list[imock]
 
         try:
-            spectrum = BinaryQSO(fl, 'r')
+            spectrum = qio.BinaryQSO(fl, 'r')
             spectrum.read()
             if imock == 0:
                 wavelength = spectrum.wave
