@@ -64,27 +64,30 @@ if __name__ == '__main__':
     os_makedirs(args.OutputDir, exist_ok=True)
     for ipix in range(npixels):
         P = int(ipix/100)
+        meta1 = metadata[metadata['IPIX'] == ipix]
+        ntemp = len(meta1['MOCKID'])
+        
+        if ntemp == 0:
+            continue
+
         dir1 = ospath_join(args.OutputDir, P)
         dir2 = ospath_join(dir1, ipix)
         os_makedirs(dir1, exist_ok=True)
         os_makedirs(dir2, exist_ok=True)
-        fname = ospath_join(dir2, "lya-transmission-{:d}-{:d}.fits".format(args.nside, ipix))
+        fname = ospath_join(dir2, f"lya-transmission-{args.nside}-{ipix}.fits")
         
         qqfile = qio.QQFile(fname)
-        
-        meta1 = metadata[metadata['IPIX'] == ipix]
-        ntemp = len(meta1['MOCKID'])
         fluxes = np.zeros((wavelength.size, ntemp))
         
         for i1, imock in enumerate(meta1['MOCKID']):
             fl = bq_fname_list[imock]
 
             try:
-                spectrum = BinaryQSO(fl, 'r')
-                spectrum.read()
+                spectrum = qio.BinaryQSO(fl, 'r')
                 fluxes[i1] = spectrum.flux
-            except:
+            except Exception as e:
                 print("Problem reading ", fl, flush=True)
+                print(e)
                 continue
 
         qqfile.writeAll(meta1, wavelength, fluxes)
