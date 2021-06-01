@@ -76,7 +76,7 @@ if __name__ == '__main__':
         os_makedirs(dir2, exist_ok=True)
         fname = ospath_join(dir2, f"lya-transmission-{args.nside}-{ipix}.fits.gz")
         
-        qqfile = qio.QQFile(fname)
+        qqfile = qio.QQFile(fname, 'rw')
         fluxes = np.zeros((ntemp, wavelength.size))
         
         for i1, imock in enumerate(meta1['MOCKID']):
