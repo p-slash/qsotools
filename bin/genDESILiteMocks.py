@@ -209,10 +209,10 @@ if __name__ == '__main__':
         filename_list.extend(fname)
 
         if not args.nosave:
-            save_data(wave, fluxes, errors, fname, z_qso, args)
+            save_data(waves, fluxes, errors, fname, z_qso, args)
 
         if args.plot:
-            save_plots(wave, fluxes, errors, fname, args)
+            save_plots(waves, fluxes, errors, fname, args)
 
 
     # Save the list of files in a txt
