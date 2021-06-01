@@ -1432,11 +1432,11 @@ class QQFile():
         self.fitsfile.write(metadata, extname='METADATA')
 
     def writeWavelength(self, wave):
-        data = np.array(wave, dtype='float32')
+        data = np.array(wave, dtype='float32').T
         self.fitsfile.write(data, extname='WAVELENGTH')
 
     def writeTransmission(self, fluxes):
-        data = np.array(fluxes, dtype='float32')
+        data = np.array(fluxes, dtype='float32').T
         self.fitsfile.write(data, extname='TRANSMISSION')
 
     def writeAll(self, metadata, wave, fluxes):

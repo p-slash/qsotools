@@ -56,10 +56,10 @@ def save_plots(wch, fch, ech, fnames, args):
         plt.plot(wch, e, 'r-')
         plt.savefig(ospath_join(args.Outputdir, fname[:-3]+"png"), bbox_inches='tight', dpi=300)
 
-def save_data(wave, fmocks, emocks, fnames, args):
+def save_data(wave, fmocks, emocks, fnames, z_qso, args):
     for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
         mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
-        mfile.save(w, f, e, len(w), 0., 0., 0., 0., args.specres, args.pixel_dv)
+        mfile.save(w, f, e, len(w), z_qso, 0., 0., 0., args.specres, args.pixel_dv)
 
 def getDESIwavegrid(args):
     # Set up DESI observed wavelength grid
@@ -201,7 +201,7 @@ if __name__ == '__main__':
         filename_list.extend(fname)
 
         if not args.nosave:
-            save_data(wave, fluxes, errors, fname, args)
+            save_data(wave, fluxes, errors, fname, z_qso, args)
 
         if args.plot:
             save_plots(wave, fluxes, errors, fname, args)
