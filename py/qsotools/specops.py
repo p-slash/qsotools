@@ -25,7 +25,7 @@ def createEdgesFromCenters(wave_centers, dv=None, logspacing=True):
 
 # if new_dv_or_edge is float, then a wavelength grid with given pixel size constructed.
 # if new_dv_or_edge is a np.array, then it is used to resample
-def resample(wave, flux, error, new_dv_or_edge):
+def resample(wave, flux, error, new_dv_or_edge, keep_empty_bins=False):
     # if new_dv_or_edge is dv
     if isinstance(new_dv_or_edge, float) and new_dv_or_edge > 0:
         dv_c = new_dv_or_edge / LIGHT_SPEED
@@ -61,7 +61,7 @@ def resample(wave, flux, error, new_dv_or_edge):
         empty_bins = np.logical_or(np.abs(binned_flux[0]) < 1e-8, binned_error[0] < 1e-8)
         
     # Remove empty bins from resampled data
-    finite_bins = np.logical_and(np.isfinite(binned_flux)[0], ~empty_bins)
+    finite_bins = np.logical_and(np.isfinite(binned_flux)[0], ~empty_bins) | keep_empty_bins
     
     new_wave_centers = new_wave_centers[finite_bins]
     binned_flux      = np.array([b[finite_bins] for b in binned_flux])
@@ -75,7 +75,7 @@ def resample(wave, flux, error, new_dv_or_edge):
 
         return new_wave_centers, binned_flux, binned_error
     else:
-        return new_wave_centers, binned_flux    
+        return new_wave_centers, binned_flux
 
 def divideIntoChunks(wave, flux, error, z_qso, restwave_chunk_edges):
     chunk_indices = np.searchsorted(wave/(1.+z_qso), restwave_chunk_edges)

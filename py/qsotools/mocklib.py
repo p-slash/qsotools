@@ -358,7 +358,8 @@ class LyaMocks():
         return qso
 
     def resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
-        resample_dv=None, obs_wave_centers=None, delta_z=None, logspacing_obswave=True):
+        resample_dv=None, obs_wave_centers=None, delta_z=None, logspacing_obswave=True, \
+        keep_empty_bins=False):
         wave   = fid.LYA_WAVELENGTH * (1. + self.z_values)
 
         self.generateMocks(howmany, spectrograph_resolution)
@@ -369,14 +370,14 @@ class LyaMocks():
             # Create wavelength edges for logarithmicly spaced array from obs_wave_centers
             # or linearly spaced array if logspacing_obswave=False
             obs_wave_edges = specops.createEdgesFromCenters(obs_wave_centers, logspacing=logspacing_obswave)
-            wave, fluxes = specops.resample(wave, fluxes, None, obs_wave_edges)
+            wave, fluxes = specops.resample(wave, fluxes, None, obs_wave_edges, keep_empty_bins)
 
             # Break if observed grid does not include the wavelength range
             if len(wave) == 0:
                 return wave, 0, 0
 
         if resample_dv:
-            wave, fluxes = specops.resample(wave, fluxes, None, resample_dv)
+            wave, fluxes = specops.resample(wave, fluxes, None, resample_dv, keep_empty_bins)
 
         # Add Gaussian noise on every pixel with respect to its error
         if err_per_final_pixel:

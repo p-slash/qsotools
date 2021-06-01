@@ -120,9 +120,9 @@ if __name__ == '__main__':
         help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
         action="store_true")
     parser.add_argument("--ngrid", help="Number of grid points. Default is 2^16", type=int, \
-        default=2**16)
+        default=2**18)
     parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
-        type=float, default=3.)
+        type=float, default=1.)
     args = parser.parse_args()
 
     # Create/Check directory
@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
         wave, fluxes, errors = lya_m.resampledMocks(1, err_per_final_pixel=args.sigma_per_pixel, \
             spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID, \
-            logspacing_obswave=args.use_logspaced_wave)
+            logspacing_obswave=args.use_logspaced_wave, keep_empty_bins=args.keep_nolya_pixels)
         fluxes = np.array(fluxes[0])
         errors = np.array(errors[0])
         
