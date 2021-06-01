@@ -70,8 +70,8 @@ if __name__ == '__main__':
         if ntemp == 0:
             continue
 
-        dir1 = ospath_join(args.OutputDir, P)
-        dir2 = ospath_join(dir1, ipix)
+        dir1 = ospath_join(args.OutputDir, f"{P}")
+        dir2 = ospath_join(dir1, f"{ipix}")
         os_makedirs(dir1, exist_ok=True)
         os_makedirs(dir2, exist_ok=True)
         fname = ospath_join(dir2, f"lya-transmission-{args.nside}-{ipix}.fits")
