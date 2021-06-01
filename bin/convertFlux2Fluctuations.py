@@ -70,7 +70,6 @@ if __name__ == '__main__':
     for fl in file_list:
         try:
             spectrum = BinaryQSO(ospath_join(args.InputDir, fl.rstrip()), 'r')
-            spectrum.read()
         except:
             print("Problem reading ", ospath_join(args.InputDir, fl.rstrip()), flush=True)
             continue

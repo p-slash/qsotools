@@ -40,7 +40,6 @@ if __name__ == '__main__':
 
         try:
             spectrum = qio.BinaryQSO(fl, 'r')
-            spectrum.read()
             if imock == 0:
                 wavelength = spectrum.wave
         except Exception as e:
