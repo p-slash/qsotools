@@ -43,8 +43,9 @@ if __name__ == '__main__':
             spectrum.read()
             if imock == 0:
                 wavelength = spectrum.wave
-        except:
+        except Exception as e:
             print("Problem reading ", fl, flush=True)
+            print(e)
             continue
 
         metadata['Z'][imock] = spectrum.z_qso
