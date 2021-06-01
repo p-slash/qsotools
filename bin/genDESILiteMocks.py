@@ -97,6 +97,8 @@ if __name__ == '__main__':
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
 
+    parser.add_argument("--keep-nolya-pixels", action="store_true", \
+        help="Instead of removing pixels, set flux=1")
     parser.add_argument("--invcdf-nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
         default=PKG_ICDF_Z_TABLE)
     
@@ -163,13 +165,16 @@ if __name__ == '__main__':
         wave, fluxes, errors = lya_m.resampledMocks(1, err_per_final_pixel=args.sigma_per_pixel, \
             spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID, \
             logspacing_obswave=args.use_logspaced_wave)
+        fluxes = np.array(fluxes[0])
+        errors = np.array(errors[0])
         
-        # Cut Lyman-alpha forest region
         lyman_alpha_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
-            wave <= fid.LYA_LAST_WVL * (1+z_qso))
-        wave = wave[lyman_alpha_ind]
-        fluxes = np.array([f[lyman_alpha_ind] for f in fluxes])
-        errors = np.array([e[lyman_alpha_ind] for e in errors])
+                wave <= fid.LYA_LAST_WVL * (1+z_qso))
+        # Cut Lyman-alpha forest region
+        if not args.keep_nolya_pixels:
+            wave = wave[lyman_alpha_ind]
+            fluxes = fluxes[lyman_alpha_ind]
+            errors = errors[lyman_alpha_ind]
 
         if not args.save_full_flux:
             if args.without_z_evo:
@@ -182,17 +187,20 @@ if __name__ == '__main__':
             fluxes  = fluxes / true_mean_flux - 1
             errors /= true_mean_flux
 
+        if args.keep_nolya_pixels:
+            fluxes[lyman_alpha_ind] = 1
+            errors[lyman_alpha_ind] = 1
+
         if args.chunk_dyn:
-            waves, fluxes, errors = so.chunkDynamic(wave, fluxes[0], errors[0], MAX_NO_PIXELS)
+            waves, fluxes, errors = so.chunkDynamic(wave, fluxes, errors, MAX_NO_PIXELS)
         elif args.chunk_fixed:
             NUMBER_OF_CHUNKS = 3
             FIXED_CHUNK_EDGES = np.linspace(fid.LYA_FIRST_WVL, fid.LYA_LAST_WVL, num=NUMBER_OF_CHUNKS+1)
-            waves, fluxes, errors = so.divideIntoChunks(wave, fluxes[0], errors[0], \
-                z_qso, FIXED_CHUNK_EDGES)
+            waves, fluxes, errors = so.divideIntoChunks(wave, fluxes, errors, z_qso, FIXED_CHUNK_EDGES)
         else:
-            waves  = [qso.wave]
-            fluxes = [qso.flux]
-            errors = [qso.error]
+            waves  = [wave]
+            fluxes = [fluxes]
+            errors = [errors]
 
         nchunks = len(waves)
         fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
