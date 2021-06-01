@@ -48,7 +48,7 @@ if __name__ == '__main__':
             continue
 
         metadata['Z'][imock] = spectrum.z_qso
-        if read_coords:
+        if args.read_coords:
             metadata['RA'][imock] = spectrum.coord.ra.rad
             metadata['DEC'][imock] = spectrum.coord.dec.rad
         else:
