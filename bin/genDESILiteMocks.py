@@ -188,8 +188,8 @@ if __name__ == '__main__':
             errors /= true_mean_flux
 
         if args.keep_nolya_pixels:
-            fluxes[lyman_alpha_ind] = 1
-            errors[lyman_alpha_ind] = 1
+            fluxes[~lyman_alpha_ind] = 1
+            errors[~lyman_alpha_ind] = 1
 
         if args.chunk_dyn:
             waves, fluxes, errors = so.chunkDynamic(wave, fluxes, errors, MAX_NO_PIXELS)
