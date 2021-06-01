@@ -52,7 +52,7 @@ if __name__ == '__main__':
             metadata['RA'][imock] = spectrum.coord.ra.rad
             metadata['DEC'][imock] = spectrum.coord.dec.rad
         else:
-            ra, dec = default_rng.random(2) * [2, 1] * np.pi
+            ra, dec = RNST.random(2) * [2, 1] * np.pi
             dec -= np.pi/2
             metadata['RA'][imock] = ra
             metadata['DEC'][imock] = dec
