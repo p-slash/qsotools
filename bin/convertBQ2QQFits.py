@@ -40,8 +40,8 @@ if __name__ == '__main__':
 
         try:
             spectrum = qio.BinaryQSO(fl, 'r')
+            print(spectrum.wave.size)
             if imock == 0:
-                print(spectrum.wave.size)
                 wavelength = np.array(spectrum.wave, dtype='float32')
         except Exception as e:
             print("Problem reading ", fl, flush=True)
