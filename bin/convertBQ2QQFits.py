@@ -41,7 +41,8 @@ if __name__ == '__main__':
         try:
             spectrum = qio.BinaryQSO(fl, 'r')
             if imock == 0:
-                wavelength = spectrum.wave
+                print(spectrum.wave.size)
+                wavelength = np.array(spectrum.wave, dtype='float32')
         except Exception as e:
             print("Problem reading ", fl, flush=True)
             print(e)
@@ -77,7 +78,7 @@ if __name__ == '__main__':
         fname = ospath_join(dir2, f"lya-transmission-{args.nside}-{ipix}.fits")
         
         qqfile = qio.QQFile(fname)
-        fluxes = np.zeros((wavelength.size, ntemp))
+        fluxes = np.zeros((ntemp, wavelength.size))
         
         for i1, imock in enumerate(meta1['MOCKID']):
             fl = bq_fname_list[imock]
