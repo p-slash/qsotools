@@ -1447,7 +1447,7 @@ class QQFile():
 
     def readAll(self):
         self.metadata = self.fitsfile['METADATA'].read()
-        self.nqso = len(metadata['RA'])
+        self.nqso = len(self.metadata['RA'])
 
         self.wave = self.fitsfile['WAVELENGTH'].read()
         self.fluxes = self.fitsfile['TRANSMISSION'].read().T
@@ -1455,7 +1455,7 @@ class QQFile():
 
     def readMetada(self):
         self.metadata = self.fitsfile['METADATA'].read()
-        self.nqso = len(metadata['RA'])
+        self.nqso = len(self.metadata['RA'])
 
     def close(self):
         self.fitsfile.close()
