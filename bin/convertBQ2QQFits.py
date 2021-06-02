@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
     metadata = np.zeros(no_qsos, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
-        ('Z', 'f8'), ('MOCKID', 'i8'), ('IPIX', 'i4')])
+        ('Z', 'f8'), ('MOCKID', 'i8'), ('PIXNUM', 'i4')])
     metadata['MOCKID'] = np.arange(no_qsos)
     wavelength = []
 
@@ -58,13 +58,13 @@ if __name__ == '__main__':
             metadata['DEC'][imock] = dec
 
         ipix = healpy.ang2pix(args.nside, -metadata['DEC'][imock]+np.pi/2, metadata['RA'][imock])
-        metadata['IPIX'][imock] = ipix
+        metadata['PIXNUM'][imock] = ipix
 
     # MOCKDIR/P/PIXNUM/lya-transmission-N-PIXNUM.fits
     os_makedirs(args.OutputDir, exist_ok=True)
     for ipix in range(npixels):
         P = int(ipix/100)
-        meta1 = metadata[metadata['IPIX'] == ipix]
+        meta1 = metadata[metadata['PIXNUM'] == ipix]
         ntemp = len(meta1['MOCKID'])
         
         if ntemp == 0:
