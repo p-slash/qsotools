@@ -1445,13 +1445,17 @@ class QQFile():
         self.writeTransmission(fluxes)
         self.close()
 
-    def read(self):
+    def readAll(self):
         self.metadata = self.fitsfile['METADATA'].read()
         self.nqso = len(metadata['RA'])
 
         self.wave = self.fitsfile['WAVELENGTH'].read()
         self.fluxes = self.fitsfile['TRANSMISSION'].read().T
         self.close()
+
+    def readMetada(self):
+        self.metadata = self.fitsfile['METADATA'].read()
+        self.nqso = len(metadata['RA'])
 
     def close(self):
         self.fitsfile.close()
