@@ -111,7 +111,7 @@ def getMetadata(args):
 
     print("Number of nside for heal pixels:", args.hp_nside)
     if args.hp_nside:
-        npixels = healpy.nside2npix(args.nside)
+        npixels = healpy.nside2npix(args.hp_nside)
         metadata['PIXNUM'] = healpy.ang2pix(args.hp_nside, -metadata['DEC']+np.pi/2, metadata['RA'])
     else:
         npixels = 1
@@ -171,7 +171,7 @@ if __name__ == '__main__':
     # parser.add_argument("--use-eds-v", \
     #     help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
     #     action="store_true")
-    parser.add_argument("--ngrid", help="Number of grid points. Default is 2^16", type=int, \
+    parser.add_argument("--ngrid", help="Number of grid points. Default is 2^18", type=int, \
         default=2**18)
     parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
         type=float, default=2.)
@@ -256,6 +256,8 @@ if __name__ == '__main__':
             fluxes  = fluxes / true_mean_flux - 1
             errors /= true_mean_flux
 
+        # If save-qqfile option is passed, do not save as BinaryQSO files
+        # This also means no chunking or removing pixels
         if not args.nosave and args.save_qqfile:
             assert args.keep_nolya_pixels
             # assert not args.chunk_fixed
