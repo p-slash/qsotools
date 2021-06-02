@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # TODO: 
 # Add reading a master file. 
-# finish BinaryQSO support
-
+# Load balancing for parallel computing
 
 # This script generates DESI-lite mocks
 # Creates mocks in log-space wave grid with 30 km/s size
@@ -38,14 +37,15 @@ def save_parameters(txt_basefilename, args):
         "GridPixelSize        : %f\n"
         "Redshift Evolution   : %s\n") % ( 
     "Gaussian Mocks" if args.gauss else "Lognormal Mocks", \
-    "Logarithmic" if not args.use_eds_v else "EdS", \
+    "Logarithmic", \
+    # if not args.use_eds_v else "EdS", \
     args.sigma_per_pixel, \
     args.specres, \
     args.pixel_dv, \
     args.seed, \
     args.ngrid, \
     args.griddv, \
-    "ON" if not args.without_z_evo else "OFF")
+    "OFF") # "ON" if not args.without_z_evo else "OFF")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
     print("Saving parameteres to", temp_fname)
@@ -54,56 +54,80 @@ def save_parameters(txt_basefilename, args):
     toWrite.close()
 
 def save_plots(wch, fch, ech, fnames, args):
-    for (f, e, fname) in zip(fch, ech, fnames):
+    for (w, f, e, fname) in zip(wch, fch, ech, fnames):
         plt.cla()
-        plt.plot(wch, f, 'b-')
+        plt.plot(w, f, 'b-')
         plt.grid(True, "major")
-        plt.plot(wch, e, 'r-')
-        plt.savefig(ospath_join(args.Outputdir, fname[:-3]+"png"), bbox_inches='tight', dpi=300)
+        plt.plot(w, e, 'r-')
+        plt.savefig(ospath_join(args.OutputDir, fname[:-3]+"png"), bbox_inches='tight', dpi=150)
 
 def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args):
     for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
-        mfile = BinaryQSO(ospath_join(args.Outputdir, fname), 'w')
+        mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
         mfile.save(w, f, e, len(w), z_qso, dec, ra, 0., args.specres, args.pixel_dv)
 
 def getDESIwavegrid(args):
     # Set up DESI observed wavelength grid
     if args.use_logspaced_wave:
+        print(f"Using logspaced wavelength grid with dv={args.pixel_dv} km/s.")
         base            = np.exp(args.pixel_dv / fid.LIGHT_SPEED)
         npix_desi       = int(np.log(args.desi_w2 / args.desi_w1) / args.pixel_dv * fid.LIGHT_SPEED)+1
         DESI_WAVEGRID   = args.desi_w1 * np.power(base, np.arange(npix_desi))
     else:
+        print(f"Using linear wavelength grid with dlambda={args.pixel_dlambda} A.")
         npix_desi = int((args.desi_w2 - args.desi_w1) / args.pixel_dlambda) + 1
         DESI_WAVEGRID = args.desi_w1 + np.arange(npix_desi) * args.pixel_dlambda
 
     return DESI_WAVEGRID
 
-def getMetadata(args, RNST):
+def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
-    metadata = np.zeros(args.nmocks, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
-        ('Z', 'f8'), ('MOCKID', 'i8'), ('IPIX', 'i4')])
-    metadata['MOCKID'] = np.arange(args.nmocks)
+    if args.master_file:
+        print("Reading master file:", args.master_file)
+        master_file = QQFile(args.master_file)
+        master_file.readMetada()
+        master_file.close()
 
-    # Read inverse cumulative distribution function
-    # Generate uniform random numbers
-    # Use inverse CDF to map these to QSO redshifts
-    invcdf, zcdf    = np.genfromtxt(args.invcdf_nz, unpack=True)
-    inv_cdf_interp  = interp1d(invcdf, zcdf)
-    metadata['Z']   = inv_cdf_interp(RNST.uniform(size=args.nmocks))
-    metadata['RA']  = RNST.random(args.nmocks) * 2 * np.pi
-    metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * np.pi
+        args.nmocks = master_file.nqso
+        metadata = master_file.metadata
+        print("Number of mocks to generate:", args.nmocks)
+    else:
+        print("Generating random metadata.")
+        metadata = np.zeros(args.nmocks, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
+            ('Z', 'f8'), ('MOCKID', 'i8'), ('PIXNUM', 'i4')])
+        metadata['MOCKID'] = np.arange(args.nmocks)
 
+        # Read inverse cumulative distribution function
+        # Generate uniform random numbers
+        # Use inverse CDF to map these to QSO redshifts
+        invcdf, zcdf    = np.genfromtxt(args.invcdf_nz, unpack=True)
+        inv_cdf_interp  = interp1d(invcdf, zcdf)
+
+        # Use the same seed for all process to generate the same metadata
+        RNST = np.random.default_rng(args.seed)
+        metadata['Z']   = inv_cdf_interp(RNST.uniform(size=args.nmocks))
+        metadata['RA']  = RNST.random(args.nmocks) * 2 * np.pi
+        metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * np.pi
+
+    print("Number of nside for heal pixels:", args.hp_nside)
     if args.hp_nside:
         npixels = healpy.nside2npix(args.nside)
-        metadata['IPIX'] = healpy.ang2pix(args.hp_nside, -metadata['DEC']+np.pi/2, metadata['RA'])
+        metadata['PIXNUM'] = healpy.ang2pix(args.hp_nside, -metadata['DEC']+np.pi/2, metadata['RA'])
     else:
         npixels = 1
+        metadata['PIXNUM'] = 0
+
+    qqfile = QQFile(ospath_join(args.OutputDir, "master.fits"), 'rw')
+    qqfile.writeMetadata(metadata)
+    qqfile.close()
+    print("Saved master metadata to", ospath_join(args.OutputDir, "master.fits"))
 
     return metadata, npixels
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("Outputdir", help="Output directory")
+    parser.add_argument("OutputDir", help="Output directory")
+    parser.add_argument("--master-file")
     parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
         "Redshift of qso picked at random given n(z). Default: %(default)s"), type=int, default=1)
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
@@ -140,13 +164,13 @@ if __name__ == '__main__':
     parser.add_argument("--plot", help="Saves plots to output when passed", action="store_true")
 
     parser.add_argument("--gauss", help="Generate Gaussian mocks", action="store_true")
-    parser.add_argument("--without-z-evo", help="Turn off redshift evolution", action="store_true")
+    # parser.add_argument("--without-z-evo", help="Turn off redshift evolution", action="store_true")
     parser.add_argument("--save-full-flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
-    parser.add_argument("--use-eds-v", \
-        help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
-        action="store_true")
+    # parser.add_argument("--use-eds-v", \
+    #     help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
+    #     action="store_true")
     parser.add_argument("--ngrid", help="Number of grid points. Default is 2^16", type=int, \
         default=2**18)
     parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
@@ -154,43 +178,48 @@ if __name__ == '__main__':
 
     # healpix support
     parser.add_argument("--hp-nside", type=int, default=0)
-    # parallel support
-    parser.add_argument("--nthreads", type=int, default=1)
-    parser.add_argument("--ithread", type=int, default=0)
-    parser.add_argument("--save-qqfile", action="store_true")
-    args = parser.parse_args()
 
-    # Change the seed with thread no for different randoms across processes
-    RNST = np.random.default_rng(args.seed + args.ithread)
-    metadata, npixels = getMetadata(args, RNST)
+    # parallel support
+    parser.add_argument("--nthreads", type=int, default=1, \
+        help="Must be < # heal pixels. Default: %(default)s")
+    parser.add_argument("--ithread", type=int, default=0, \
+        help="Must be < nthreads. Default: %(default)s")
+    parser.add_argument("--save-qqfile", action="store_true", \
+        help="When saving quickquasar files, spectra are not chunked and all pixels are kept.")
+    args = parser.parse_args()
     
+    # Create/Check directory
+    os_makedirs(args.OutputDir, exist_ok=True)
+
+    metadata, npixels = getMetadata(args)
+    # Set up DESI observed wavelength grid
+    DESI_WAVEGRID = getDESIwavegrid(args)
+
     assert args.ithread < args.nthreads
     assert args.nthreads <= npixels
 
-    # Create/Check directory
-    os_makedirs(args.Outputdir, exist_ok=True)
-    
     settings_txt  = '_gaussian' if args.gauss else '_lognormal' 
-    settings_txt += '_noz' if args.without_z_evo else ''
+    # settings_txt += '_noz' if args.without_z_evo else ''
 
-    txt_basefilename  = "%s/desilite_seed%d%s" % (args.Outputdir, args.seed, settings_txt)
-
-    save_parameters(txt_basefilename, args)
+    txt_basefilename  = "%s/desilite_seed%d%s" % (args.OutputDir, args.seed, settings_txt)
 
     # ------------------------------
     # Iteration
     filename_list = []
 
-    lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
-        REDSHIFT_ON=not args.without_z_evo, GAUSSIAN_MOCKS=args.gauss, USE_LOG_V=not args.use_eds_v)
+    # Change the seed with thread no for different randoms across processes
+    lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
+        GAUSSIAN_MOCKS=args.gauss)
+    # REDSHIFT_ON=not args.without_z_evo, USE_LOG_V=not args.use_eds_v)
 
     if args.gauss:
+        print("Generating Gaussian mocks.")
         mean_flux_function = fid.meanFluxFG08
     else:
+        print("Generating lognormal mocks.")
         mean_flux_function = lm.lognMeanFluxGH
 
-    # Set up DESI observed wavelength grid
-    DESI_WAVEGRID   = getDESIwavegrid(args)
+    save_parameters(txt_basefilename, args)
 
     # parallel support
     dithr = int(npixels/args.nthreads)
@@ -198,7 +227,7 @@ if __name__ == '__main__':
     i2 = npixels if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
 
     for ipix in range(i1, i2):
-        meta1 = metadata[metadata['IPIX'] == ipix]
+        meta1 = metadata[metadata['PIXNUM'] == ipix]
         ntemp = len(meta1['MOCKID'])
         z_qso = meta1['Z'][:, None]
 
@@ -214,17 +243,14 @@ if __name__ == '__main__':
 
         # Remove absorption above Lya
         nonlya_ind = wave > fid.LYA_WAVELENGTH * (1+z_qso)
-
         for i in range(ntemp):
             fluxes[i][nonlya_ind[i]] = 1
-            errors[i][nonlya_ind[i]] = 1
 
         if not args.save_full_flux:
-            if args.without_z_evo:
-                spectrum_z = z_qso * np.ones_like(wave)
-            else:
-                spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
-
+            # if args.without_z_evo:
+            #     spectrum_z = z_qso * np.ones_like(fluxes)
+            # else:
+            spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
             true_mean_flux = mean_flux_function(spectrum_z)
 
             fluxes  = fluxes / true_mean_flux - 1
@@ -235,7 +261,7 @@ if __name__ == '__main__':
             # assert not args.chunk_fixed
 
             P = int(ipix/100)
-            dir1 = ospath_join(args.Outputdir, f"{P}")
+            dir1 = ospath_join(args.OutputDir, f"{P}")
             dir2 = ospath_join(dir1, f"{ipix}")
             os_makedirs(dir1, exist_ok=True)
             os_makedirs(dir2, exist_ok=True)
@@ -243,11 +269,9 @@ if __name__ == '__main__':
             
             qqfile = QQFile(fname, 'rw')
             qqfile.writeAll(meta1, wave, fluxes)
-
+            filename_list.extend([fname])
             continue
 
-        ############
-        ### CONTINUE DEVELOPEMENT HERE ON
         # Cut Lyman-alpha forest region
         if not args.keep_nolya_pixels:
             lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
@@ -259,34 +283,40 @@ if __name__ == '__main__':
             waves = [wave for i in range(ntemp)]
 
         for i in range(ntemp):
+            wave_c, flux_c, err_c = waves[i], fluxes[i], errors[i]
             if args.chunk_dyn:
-                waves, fluxes, errors = so.chunkDynamic(wave, fluxes, errors, len(wave))
+                wave_c, flux_c, err_c = so.chunkDynamic(wave_c, flux_c, err_c, len(wave_c))
             if args.chunk_fixed:
                 NUMBER_OF_CHUNKS = 3
                 FIXED_CHUNK_EDGES = np.linspace(fid.LYA_FIRST_WVL, fid.LYA_LAST_WVL, num=NUMBER_OF_CHUNKS+1)
-                waves, fluxes, errors = so.divideIntoChunks(waves, fluxes, errors, z_qso, FIXED_CHUNK_EDGES)
+                wave_c, flux_c, err_c = so.divideIntoChunks(wave_c, flux_c, err_c, z_qso[i], FIXED_CHUNK_EDGES)
+            else:
+                wave_c = [wave_c]
+                flux_c = [flux_c]
+                err_c  = [err_c]
 
-            nchunks = len(waves)
-            nid = meta1['MOCKID']
+            nchunks = len(wave_c)
+            nid = meta1['MOCKID'][i]
             fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
-                % (args.seed, nid[nc], nc, z_qso[nc], settings_txt) for nc in range(nchunks)]
+                % (args.seed, nid, nc, z_qso[i], settings_txt) for nc in range(nchunks)]
 
             filename_list.extend(fname)
-            elif not args.nosave:
-                save_data(waves, fluxes, errors, fname, z_qso, meta1['DEC'], ra, args)
+            if not args.nosave:
+                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], meta1['RA'][i], args)
 
             if args.plot:
-                save_plots(waves, fluxes, errors, fname, args)
-
+                save_plots(wave_c, flux_c, err_c, fname, args)
 
     # Save the list of files in a txt
-    temp_fname = ospath_join(args.Outputdir, "file_list_qso.txt") # "%s_filelist.txt" % txt_basefilename
+    temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt") # "%s_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname)
     toWrite = open(temp_fname, 'w')
     toWrite.write("%d\n" % len(filename_list))
     for f in filename_list:
         toWrite.write(f +"\n")
     toWrite.close()
+
+    print("DONE!")
 
 
 
