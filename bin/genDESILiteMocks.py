@@ -233,8 +233,14 @@ if __name__ == '__main__':
     i1 = dithr * args.ithread
     i2 = npixels if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
 
+    last_progress = 0
     for ipix in range(i1, i2):
-        print("Progress: ")
+
+        curr_progress = int(100*(ipix-i1)/(i2-i1))
+        if last_progress - curr_progress>10:
+            print(f"Progress: {curr_progress}%")
+            last_progress = curr_progress
+
         meta1 = metadata[metadata['PIXNUM'] == ipix]
         ntemp = len(meta1['MOCKID'])
         z_qso = meta1['Z'][:, None]
