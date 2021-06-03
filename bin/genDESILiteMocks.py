@@ -43,7 +43,7 @@ def save_parameters(txt_basefilename, args):
     args.specres, \
     args.pixel_dv, \
     args.seed, \
-    args.ngrid, \
+    args.log2ngrid, \
     args.griddv, \
     "OFF") # "ON" if not args.without_z_evo else "OFF")
             
@@ -117,19 +117,24 @@ def getMetadata(args):
         npixels = 1
         metadata['PIXNUM'] = 0
 
-    qqfile = QQFile(ospath_join(args.OutputDir, "master.fits"), 'rw')
-    qqfile.writeMetadata(metadata)
-    qqfile.close()
-    print("Saved master metadata to", ospath_join(args.OutputDir, "master.fits"))
+    if args.ithread == 0:
+        qqfile = QQFile(ospath_join(args.OutputDir, "master.fits"), 'rw')
+        qqfile.writeMetadata(metadata)
+        qqfile.close()
+        print("Saved master metadata to", ospath_join(args.OutputDir, "master.fits"))
 
     return metadata, npixels
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("OutputDir", help="Output directory")
-    parser.add_argument("--master-file")
+    parser.add_argument("--master-file", help="Master file location. Generate mocks with "\
+        "the exact RA, DEC & Z distribution. nmocks option is ignored when this passed.")
     parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
         "Redshift of qso picked at random given n(z). Default: %(default)s"), type=int, default=1)
+    parser.add_argument("--save-qqfile", action="store_true", \
+        help="Saves in quickquasar fileformat. Spectra are not chunked and all pixels are kept."\
+        " Sets sigma-per-pixel=0, specres=0, keep-nolya-pixels=True and save-full-flux=True")
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
         type=int, default=332298)
         
@@ -140,7 +145,7 @@ if __name__ == '__main__':
     parser.add_argument("--pixel-dv", help=("Pixel size (km/s) of the log-spaced wave grid. "\
         "Default: %(default)s"), type=float, default=30.)
     parser.add_argument("--pixel-dlambda", help=("Pixel size (A) of the linearly-spaced wave grid. "\
-        "Default: %(default)s"), type=float, default=0.5)
+        "Default: %(default)s"), type=float, default=0.2)
     parser.add_argument("--use-logspaced-wave", help=("Use log spaced array as final grid. "\
         "Default: %(default)s"), action="store_true")
 
@@ -168,11 +173,8 @@ if __name__ == '__main__':
     parser.add_argument("--save-full-flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
-    # parser.add_argument("--use-eds-v", \
-    #     help="Use EdS wavelength grid. Default is False (i.e. Logarithmic spacing).", \
-    #     action="store_true")
-    parser.add_argument("--ngrid", help="Number of grid points. Default is 2^18", type=int, \
-        default=2**18)
+    parser.add_argument("--log2ngrid", help="Number of grid points. Default: %(default)s", \
+        type=int, default=18)
     parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
         type=float, default=2.)
 
@@ -184,8 +186,6 @@ if __name__ == '__main__':
         help="Must be < # heal pixels. Default: %(default)s")
     parser.add_argument("--ithread", type=int, default=0, \
         help="Must be < nthreads. Default: %(default)s")
-    parser.add_argument("--save-qqfile", action="store_true", \
-        help="When saving quickquasar files, spectra are not chunked and all pixels are kept.")
     args = parser.parse_args()
     
     # Create/Check directory
@@ -198,6 +198,12 @@ if __name__ == '__main__':
     assert args.ithread < args.nthreads
     assert args.nthreads <= npixels
 
+    if args.save_qqfile:
+        args.sigma_per_pixel = 0
+        args.specres = 0
+        args.keep_nolya_pixels = True
+        args.save_full_flux = True
+
     settings_txt  = '_gaussian' if args.gauss else '_lognormal' 
     # settings_txt += '_noz' if args.without_z_evo else ''
 
@@ -208,9 +214,9 @@ if __name__ == '__main__':
     filename_list = []
 
     # Change the seed with thread no for different randoms across processes
-    lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
+    lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=2**args.log2ngrid, DV_KMS=args.griddv, \
         GAUSSIAN_MOCKS=args.gauss)
-    # REDSHIFT_ON=not args.without_z_evo, USE_LOG_V=not args.use_eds_v)
+    # REDSHIFT_ON=not args.without_z_evo)
 
     if args.gauss:
         print("Generating Gaussian mocks.")
@@ -219,7 +225,8 @@ if __name__ == '__main__':
         print("Generating lognormal mocks.")
         mean_flux_function = lm.lognMeanFluxGH
 
-    save_parameters(txt_basefilename, args)
+    if args.ithread == 0:
+        save_parameters(txt_basefilename, args)
 
     # parallel support
     dithr = int(npixels/args.nthreads)
@@ -227,6 +234,7 @@ if __name__ == '__main__':
     i2 = npixels if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
 
     for ipix in range(i1, i2):
+        print("Progress: ")
         meta1 = metadata[metadata['PIXNUM'] == ipix]
         ntemp = len(meta1['MOCKID'])
         z_qso = meta1['Z'][:, None]
@@ -259,9 +267,6 @@ if __name__ == '__main__':
         # If save-qqfile option is passed, do not save as BinaryQSO files
         # This also means no chunking or removing pixels
         if not args.nosave and args.save_qqfile:
-            assert args.keep_nolya_pixels
-            # assert not args.chunk_fixed
-
             P = int(ipix/100)
             dir1 = ospath_join(args.OutputDir, f"{P}")
             dir2 = ospath_join(dir1, f"{ipix}")
