@@ -42,7 +42,8 @@ if __name__ == '__main__':
     dtype_fp = np.dtype([('fisher', np.double, (N,N)), ('power', np.double, N)])
     data = np.zeros(1, dtype=dtype_fp)
 
-    fits = fitsio.FITS(ospath_join(config_qmle.qso_dir,"combined_Fp.fits.gz"), 'rw')
+    fits = fitsio.FITS(ospath_join(config_qmle.qso_dir,"combined_Fp.fits.gz"), 'rw', \
+        clobber=True)
 
     for f in qso_filename_list:
         fisher, power = readFPBinFile(f)
