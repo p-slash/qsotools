@@ -1422,11 +1422,11 @@ class QQFile():
     3  TRANSMISSION ImageHDU         8   (1864, 571)   float32
     4  DLA          BinTableHDU      17 1864R x 4C [long, double, double, double]
     """
-    def __init__(self, fname, rw='r'):
+    def __init__(self, fname, rw='r', clobber=True):
         self.fname = fname
         self.rw = rw
 
-        self.fitsfile = fitsio.FITS(fname, rw)
+        self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
 
     def writeMetadata(self, metadata):
         self.fitsfile.write(metadata, extname='METADATA')
