@@ -238,7 +238,7 @@ if __name__ == '__main__':
 
         curr_progress = int(100*(ipix-i1)/(i2-i1))
         if last_progress - curr_progress>10:
-            print(f"Progress: {curr_progress}%")
+            print(f"Progress: {curr_progress}%", flush=True)
             last_progress = curr_progress
 
         meta1 = metadata[metadata['PIXNUM'] == ipix]
@@ -322,7 +322,7 @@ if __name__ == '__main__':
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt") # "%s_filelist.txt" % txt_basefilename
-    print("Saving chunk spectra file list as ", temp_fname)
+    print("Saving chunk spectra file list as ", temp_fname, flush=True)
     toWrite = open(temp_fname, 'w')
     toWrite.write("%d\n" % len(filename_list))
     for f in filename_list:
