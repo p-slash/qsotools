@@ -9,6 +9,7 @@
 # Adds gaussian noise with sigma=0.25 such that s/n is ~1 per pixel.
 from os.path import join as ospath_join
 from os      import makedirs as os_makedirs
+import time
 import argparse
 
 import numpy as np
@@ -188,6 +189,8 @@ if __name__ == '__main__':
         help="Must be < nthreads. Default: %(default)s")
     args = parser.parse_args()
     
+    start_time = time.time()
+
     # Create/Check directory
     os_makedirs(args.OutputDir, exist_ok=True)
 
@@ -242,14 +245,17 @@ if __name__ == '__main__':
     i1 = dithr * args.ithread
     i2 = len(u_pix) if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
 
+    last_progress = 0
     for ui in range(i1, i2):
         ipix = u_pix[ui]
         curr_progress = int(100*(ui-i1)/(i2-i1))
-        print_condition = curr_progress%5 == 0
+        print_condition = curr_progress-last_progress > 4
 
         if print_condition:
             print(f"Working on pixel {ipix}.")
-            print(f"Progress: {curr_progress}%", flush=True)
+            etime = (time.time()-start_time)/60 #min
+            print(f"Progress: {curr_progress}%. Elapsed time {etime} mins.", flush=True)
+            last_progress = curr_progress
 
         meta1 = split_meta[ui]
         ntemp = meta1['MOCKID'].size
