@@ -232,6 +232,13 @@ if __name__ == '__main__':
     dithr = int(npixels/args.nthreads)
     i1 = dithr * args.ithread
     i2 = npixels if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
+    
+    metadata.sort(order='PIXNUM')
+    print("Metadata sorted.", flush=True)
+
+    u, s = np.unique(metadata['PIXNUM'], return_index=True)
+    split_meta = np.split(metadata, s[1:])
+    print(f"Length of split metadata {len(split_meta)} vs npixels {npixels}.", flush=True)
 
     last_progress = 0
     for ipix in range(i1, i2):
@@ -241,8 +248,8 @@ if __name__ == '__main__':
             print(f"Progress: {curr_progress}%", flush=True)
             last_progress = curr_progress
 
-        meta1 = metadata[metadata['PIXNUM'] == ipix]
-        ntemp = len(meta1['MOCKID'])
+        meta1 = split_meta['ipix']
+        ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
 
         if ntemp == 0:
