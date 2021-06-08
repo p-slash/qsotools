@@ -254,7 +254,7 @@ if __name__ == '__main__':
         if print_condition:
             print(f"Working on pixel {ipix}.")
             etime = (time.time()-start_time)/60 #min
-            print(f"Progress: {curr_progress}%. Elapsed time {etime} mins.", flush=True)
+            print(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.", flush=True)
             last_progress = curr_progress
 
         meta1 = split_meta[ui]
