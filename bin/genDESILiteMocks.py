@@ -237,7 +237,7 @@ if __name__ == '__main__':
     for ipix in range(i1, i2):
 
         curr_progress = int(100*(ipix-i1)/(i2-i1))
-        if last_progress - curr_progress>10:
+        if curr_progress-last_progress>10:
             print(f"Progress: {curr_progress}%", flush=True)
             last_progress = curr_progress
 
