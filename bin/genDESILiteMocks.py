@@ -248,7 +248,7 @@ if __name__ == '__main__':
             print(f"Progress: {curr_progress}%", flush=True)
             last_progress = curr_progress
 
-        meta1 = split_meta['ipix']
+        meta1 = split_meta[ipix]
         ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
 
