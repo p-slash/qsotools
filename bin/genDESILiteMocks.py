@@ -242,17 +242,21 @@ if __name__ == '__main__':
     i1 = dithr * args.ithread
     i2 = len(u_pix) if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
 
-    last_progress = 0
     for ui in range(i1, i2):
         ipix = u_pix[ui]
         curr_progress = int(100*(ui-i1)/(i2-i1))
-        if curr_progress-last_progress>9:
+        print_condition = curr_progress%5 == 0
+
+        if print_condition:
+            print(f"Working on pixel {ipix}.")
             print(f"Progress: {curr_progress}%", flush=True)
-            last_progress = curr_progress
 
         meta1 = split_meta[ui]
         ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
+        
+        if print_condition:
+            print(f"Number of qsos in pixel {ipix} is {ntemp}.", flush=True)
 
         if ntemp == 0:
             continue
@@ -286,6 +290,9 @@ if __name__ == '__main__':
             os_makedirs(dir2, exist_ok=True)
             fname = ospath_join(dir2, f"lya-transmission-{args.hp_nside}-{ipix}.fits.gz")
             
+            if print_condition:
+                print(f"Saving file {fname}.", flush=True)
+
             qqfile = QQFile(fname, 'rw')
             qqfile.writeAll(meta1, wave, fluxes)
             filename_list.extend([fname])
