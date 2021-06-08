@@ -227,28 +227,28 @@ if __name__ == '__main__':
 
     if args.ithread == 0:
         save_parameters(txt_basefilename, args)
-
-    # parallel support
-    dithr = int(npixels/args.nthreads)
-    i1 = dithr * args.ithread
-    i2 = npixels if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
     
     metadata.sort(order='PIXNUM')
     print("Metadata sorted.", flush=True)
 
-    u, s = np.unique(metadata['PIXNUM'], return_index=True)
+    u_pix, s = np.unique(metadata['PIXNUM'], return_index=True)
     split_meta = np.split(metadata, s[1:])
     print(f"Length of split metadata {len(split_meta)} vs npixels {npixels}.", flush=True)
 
-    last_progress = 0
-    for ipix in range(i1, i2):
+    # parallel support
+    dithr = int(len(u_pix)/args.nthreads)
+    i1 = dithr * args.ithread
+    i2 = len(u_pix) if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
 
-        curr_progress = int(100*(ipix-i1)/(i2-i1))
-        if curr_progress-last_progress>10:
+    last_progress = 0
+    for ui in range(i1, i2):
+        ipix = u_pix[ui]
+        curr_progress = int(100*(ui-i1)/(i2-i1))
+        if curr_progress-last_progress>9:
             print(f"Progress: {curr_progress}%", flush=True)
             last_progress = curr_progress
 
-        meta1 = split_meta[ipix]
+        meta1 = split_meta[ui]
         ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
 
