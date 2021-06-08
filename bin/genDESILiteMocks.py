@@ -193,8 +193,9 @@ if __name__ == '__main__':
 
     metadata, npixels = getMetadata(args)
     # Set up DESI observed wavelength grid
-    DESI_WAVEGRID = getDESIwavegrid(args)
-
+    DESI_WAVEGRID  = getDESIwavegrid(args)
+    DESI_WAVEEDGES = so.createEdgesFromCenters(DESI_WAVEGRID, logspacing=args.use_logspaced_wave)
+    
     assert args.ithread < args.nthreads
     assert args.nthreads <= npixels
 
@@ -256,10 +257,9 @@ if __name__ == '__main__':
         if ntemp == 0:
             continue
 
-        # optimize obs_wave_centers to edges
         wave, fluxes, errors = lya_m.resampledMocks(ntemp, err_per_final_pixel=args.sigma_per_pixel, \
-            spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID, \
-            logspacing_obswave=args.use_logspaced_wave, keep_empty_bins=args.keep_nolya_pixels)
+            spectrograph_resolution=args.specres, obs_wave_edges=DESI_WAVEEDGES, \
+            keep_empty_bins=args.keep_nolya_pixels)
 
         # Remove absorption above Lya
         nonlya_ind = wave > fid.LYA_WAVELENGTH * (1+z_qso)

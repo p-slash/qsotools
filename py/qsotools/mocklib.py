@@ -214,9 +214,9 @@ class LyaMocks():
         Does not resample onto another grid.
     
     resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
-        resample_dv=None, obs_wave_centers=None, delta_z=None)
+        resample_dv=None, obs_wave_edges=None, delta_z=None)
         Generates howmany number of mocks.
-        Resamples onto the observed grid if obs_wave_centers is given.
+        Resamples onto the observed grid if obs_wave_edges is given.
         Also resamples onto fixed resample_dv pixel sized grid if resample_dv is given. 
         Adds gaussian noise using per kms estimate after resampling and smoothing 
         so that s/n per pixel is known.
@@ -358,7 +358,7 @@ class LyaMocks():
         return qso
 
     def resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
-        resample_dv=None, obs_wave_centers=None, delta_z=None, logspacing_obswave=True, \
+        resample_dv=None, obs_wave_edges=None, delta_z=None, \
         keep_empty_bins=False):
         wave   = fid.LYA_WAVELENGTH * (1. + self.z_values)
 
@@ -366,10 +366,10 @@ class LyaMocks():
         fluxes = self.delta_F
 
         # Resample onto an observed grid if obs_wave_centers given
-        if obs_wave_centers is not None:
+        if obs_wave_edges is not None:
             # Create wavelength edges for logarithmicly spaced array from obs_wave_centers
             # or linearly spaced array if logspacing_obswave=False
-            obs_wave_edges = specops.createEdgesFromCenters(obs_wave_centers, logspacing=logspacing_obswave)
+            # obs_wave_edges = specops.createEdgesFromCenters(obs_wave_centers, logspacing=logspacing_obswave)
             wave, fluxes = specops.resample(wave, fluxes, None, obs_wave_edges, keep_empty_bins)
 
             # Break if observed grid does not include the wavelength range
