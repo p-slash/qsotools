@@ -321,7 +321,7 @@ if __name__ == '__main__':
                 save_plots(wave_c, flux_c, err_c, fname, args)
 
     # Save the list of files in a txt
-    temp_fname = ospath_join(args.OutputDir, "file_list_qso-{args.ithread}.txt") # "%s_filelist.txt" % txt_basefilename
+    temp_fname = ospath_join(args.OutputDir, f"file_list_qso-{args.ithread}.txt") # "%s_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname, flush=True)
     toWrite = open(temp_fname, 'w')
     toWrite.write("%d\n" % len(filename_list))
