@@ -45,7 +45,7 @@ def save_parameters(txt_basefilename, args):
     args.seed, \
     args.log2ngrid, \
     args.griddv, \
-    "OFF") # "ON" if not args.without_z_evo else "OFF")
+    "ON") # "ON" if not args.without_z_evo else "OFF")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
     print("Saving parameteres to", temp_fname)
