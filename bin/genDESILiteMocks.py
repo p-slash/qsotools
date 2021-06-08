@@ -83,16 +83,16 @@ def getDESIwavegrid(args):
 def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
     if args.master_file:
-        print("Reading master file:", args.master_file)
+        print("Reading master file:", args.master_file, flush=True)
         master_file = QQFile(args.master_file)
         master_file.readMetada()
         master_file.close()
 
         args.nmocks = master_file.nqso
         metadata = master_file.metadata
-        print("Number of mocks to generate:", args.nmocks)
+        print("Number of mocks to generate:", args.nmocks, flush=True)
     else:
-        print("Generating random metadata.")
+        print("Generating random metadata.", flush=True)
         metadata = np.zeros(args.nmocks, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
             ('Z', 'f8'), ('MOCKID', 'i8'), ('PIXNUM', 'i4')])
         metadata['MOCKID'] = np.arange(args.nmocks)
@@ -109,7 +109,7 @@ def getMetadata(args):
         metadata['RA']  = RNST.random(args.nmocks) * 2 * np.pi
         metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * np.pi
 
-    print("Number of nside for heal pixels:", args.hp_nside)
+    print("Number of nside for heal pixels:", args.hp_nside, flush=True)
     if args.hp_nside:
         npixels = healpy.nside2npix(args.hp_nside)
         metadata['PIXNUM'] = healpy.ang2pix(args.hp_nside, -metadata['DEC']+np.pi/2, metadata['RA'])
@@ -121,7 +121,7 @@ def getMetadata(args):
         qqfile = QQFile(ospath_join(args.OutputDir, "master.fits"), 'rw')
         qqfile.writeMetadata(metadata)
         qqfile.close()
-        print("Saved master metadata to", ospath_join(args.OutputDir, "master.fits"))
+        print("Saved master metadata to", ospath_join(args.OutputDir, "master.fits"), flush=True)
 
     return metadata, npixels
 
@@ -219,10 +219,10 @@ if __name__ == '__main__':
     # REDSHIFT_ON=not args.without_z_evo)
 
     if args.gauss:
-        print("Generating Gaussian mocks.")
+        print("Generating Gaussian mocks.", flush=True)
         mean_flux_function = fid.meanFluxFG08
     else:
-        print("Generating lognormal mocks.")
+        print("Generating lognormal mocks.", flush=True)
         mean_flux_function = lm.lognMeanFluxGH
 
     if args.ithread == 0:
