@@ -216,6 +216,7 @@ if __name__ == '__main__':
     # Change the seed with thread no for different randoms across processes
     lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=2**args.log2ngrid, DV_KMS=args.griddv, \
         GAUSSIAN_MOCKS=args.gauss)
+    lya_m.setCentralRedshift(3.0)
     # REDSHIFT_ON=not args.without_z_evo)
 
     if args.gauss:
@@ -255,9 +256,7 @@ if __name__ == '__main__':
         if ntemp == 0:
             continue
 
-        # z_center = (fid.LYA_CENTER_WVL / fid.LYA_WAVELENGTH) * (1. + z_qso) - 1
-        lya_m.setCentralRedshift(3.0)
-
+        # optimize obs_wave_centers to edges
         wave, fluxes, errors = lya_m.resampledMocks(ntemp, err_per_final_pixel=args.sigma_per_pixel, \
             spectrograph_resolution=args.specres, obs_wave_centers=DESI_WAVEGRID, \
             logspacing_obswave=args.use_logspaced_wave, keep_empty_bins=args.keep_nolya_pixels)
