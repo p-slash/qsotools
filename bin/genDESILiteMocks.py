@@ -249,20 +249,17 @@ if __name__ == '__main__':
     for ui in range(i1, i2):
         ipix = u_pix[ui]
         curr_progress = int(100*(ui-i1)/(i2-i1))
-        print_condition = curr_progress-last_progress > 4
-
-        if print_condition:
-            print(f"Working on pixel {ipix}.")
-            etime = (time.time()-start_time)/60 #min
-            print(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.", flush=True)
-            last_progress = curr_progress
+        print_condition = (curr_progress-last_progress > 4) or (curr_progress == 0)            
 
         meta1 = split_meta[ui]
         ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
         
         if print_condition:
-            print(f"Number of qsos in pixel {ipix} is {ntemp}.", flush=True)
+            print(f"Working on pixel {ipix}. Number of qsos is {ntemp}.")
+            etime = (time.time()-start_time)/60 # min
+            print(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.", flush=True)
+            last_progress = curr_progress
 
         if ntemp == 0:
             continue
