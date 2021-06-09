@@ -67,20 +67,37 @@ def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args):
         mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
         mfile.save(w, f, e, len(w), z_qso, dec, ra, 0., args.specres, args.pixel_dv)
 
+def saveQQFile(ipix, meta1, wave, fluxes, args):
+    P = int(ipix/100)
+    dir1 = ospath_join(args.OutputDir, f"{P}")
+    dir2 = ospath_join(dir1, f"{ipix}")
+    os_makedirs(dir1, exist_ok=True)
+    os_makedirs(dir2, exist_ok=True)
+    fname = ospath_join(dir2, f"lya-transmission-{args.hp_nside}-{ipix}.fits.gz")
+
+    qqfile = QQFile(fname, 'rw')
+    qqfile.writeAll(meta1, wave, fluxes)
+
+    return fname
+
+# Returns observed wavelength centers
 def getDESIwavegrid(args):
     # Set up DESI observed wavelength grid
     if args.use_logspaced_wave:
         print(f"Using logspaced wavelength grid with dv={args.pixel_dv} km/s.")
-        base            = np.exp(args.pixel_dv / fid.LIGHT_SPEED)
-        npix_desi       = int(np.log(args.desi_w2 / args.desi_w1) / args.pixel_dv * fid.LIGHT_SPEED)+1
-        DESI_WAVEGRID   = args.desi_w1 * np.power(base, np.arange(npix_desi))
+        base          = np.exp(args.pixel_dv / fid.LIGHT_SPEED)
+        npix_desi     = int(np.log(args.desi_w2 / args.desi_w1) / args.pixel_dv * fid.LIGHT_SPEED)+1
+        DESI_WAVEGRID = args.desi_w1 * np.power(base, np.arange(npix_desi))
     else:
         print(f"Using linear wavelength grid with dlambda={args.pixel_dlambda} A.")
         npix_desi = int((args.desi_w2 - args.desi_w1) / args.pixel_dlambda) + 1
         DESI_WAVEGRID = args.desi_w1 + np.arange(npix_desi) * args.pixel_dlambda
 
-    return DESI_WAVEGRID
+    DESI_WAVEEDGES = so.createEdgesFromCenters(DESI_WAVEGRID, logspacing=args.use_logspaced_wave)
 
+    return DESI_WAVEGRID, DESI_WAVEEDGES
+
+# Returns metadata array and number of pixels
 def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
     if args.master_file:
@@ -119,10 +136,11 @@ def getMetadata(args):
         metadata['PIXNUM'] = 0
 
     if args.ithread == 0:
-        qqfile = QQFile(ospath_join(args.OutputDir, "master.fits"), 'rw')
+        mstrfname = ospath_join(args.OutputDir, "master.fits")
+        qqfile = QQFile(mstrfname, 'rw')
         qqfile.writeMetadata(metadata)
         qqfile.close()
-        print("Saved master metadata to", ospath_join(args.OutputDir, "master.fits"), flush=True)
+        print("Saved master metadata to", mstrfname, flush=True)
 
     return metadata, npixels
 
@@ -196,9 +214,8 @@ if __name__ == '__main__':
 
     metadata, npixels = getMetadata(args)
     # Set up DESI observed wavelength grid
-    DESI_WAVEGRID  = getDESIwavegrid(args)
-    DESI_WAVEEDGES = so.createEdgesFromCenters(DESI_WAVEGRID, logspacing=args.use_logspaced_wave)
-    
+    DESI_WAVEGRID, DESI_WAVEEDGES = getDESIwavegrid(args)
+
     assert args.ithread < args.nthreads
     assert args.nthreads <= npixels
 
@@ -232,7 +249,7 @@ if __name__ == '__main__':
 
     if args.ithread == 0:
         save_parameters(txt_basefilename, args)
-    
+
     metadata.sort(order='PIXNUM')
     print("Metadata sorted.", flush=True)
 
@@ -254,7 +271,7 @@ if __name__ == '__main__':
         meta1 = split_meta[ui]
         ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
-        
+
         if print_condition:
             print(f"Working on pixel {ipix}. Number of qsos is {ntemp}.")
             etime = (time.time()-start_time)/60 # min
@@ -286,19 +303,12 @@ if __name__ == '__main__':
         # If save-qqfile option is passed, do not save as BinaryQSO files
         # This also means no chunking or removing pixels
         if not args.nosave and args.save_qqfile:
-            P = int(ipix/100)
-            dir1 = ospath_join(args.OutputDir, f"{P}")
-            dir2 = ospath_join(dir1, f"{ipix}")
-            os_makedirs(dir1, exist_ok=True)
-            os_makedirs(dir2, exist_ok=True)
-            fname = ospath_join(dir2, f"lya-transmission-{args.hp_nside}-{ipix}.fits.gz")
-            
-            if print_condition:
-                print(f"Saving file {fname}.", flush=True)
-
-            qqfile = QQFile(fname, 'rw')
-            qqfile.writeAll(meta1, wave, fluxes)
+            fname = saveQQFile(ipix, meta1, wave, fluxes, args)
             filename_list.extend([fname])
+
+            if print_condition:
+                print(f"Saved file {fname}.", flush=True)
+
             continue
 
         # Cut Lyman-alpha forest region
