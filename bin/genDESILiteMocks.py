@@ -124,13 +124,17 @@ def getMetadata(args):
         # Use the same seed for all process to generate the same metadata
         RNST = np.random.default_rng(args.seed)
         metadata['Z']   = inv_cdf_interp(RNST.uniform(size=args.nmocks))
-        metadata['RA']  = RNST.random(args.nmocks) * 2 * np.pi
-        metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * np.pi
+        # Generate coords in degrees
+        metadata['RA']  = RNST.random(args.nmocks) * 360.
+        metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
 
     print("Number of nside for heal pixels:", args.hp_nside, flush=True)
     if args.hp_nside:
         npixels = healpy.nside2npix(args.hp_nside)
-        metadata['PIXNUM'] = healpy.ang2pix(args.hp_nside, -metadata['DEC']+np.pi/2, metadata['RA'])
+        # when lonlat=True: RA first, Dec later
+        # when lonlat=False (Default): Dec first, RA later
+        metadata['PIXNUM'] = healpy.ang2pix(args.hp_nside, \
+            metadata['RA'], metadata['DEC'], nest=not args.hp_ring, lonlat=True)
     else:
         npixels = 1
         metadata['PIXNUM'] = 0
@@ -199,6 +203,8 @@ if __name__ == '__main__':
 
     # healpix support
     parser.add_argument("--hp-nside", type=int, default=0)
+    parser.add_argument("--hp-ring", action="store_true", \
+        help="Use RING pixel ordering. Default is NESTED.")
 
     # parallel support
     parser.add_argument("--nthreads", type=int, default=1, \
@@ -231,7 +237,6 @@ if __name__ == '__main__':
     txt_basefilename  = "%s/desilite_seed%d%s" % (args.OutputDir, args.seed, settings_txt)
 
     # ------------------------------
-    # Iteration
     filename_list = []
 
     # Change the seed with thread no for different randoms across processes
