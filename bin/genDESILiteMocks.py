@@ -127,6 +127,7 @@ def getMetadata(args):
         # Generate coords in degrees
         metadata['RA']  = RNST.random(args.nmocks) * 360.
         metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
+        #? metadata['DEC'] = np.arcsin(2*RNST.random(args.nmocks)-1) * 180./np.pi
 
     print("Number of nside for heal pixels:", args.hp_nside, flush=True)
     if args.hp_nside:
