@@ -1,4 +1,4 @@
-name: science
+name: lya
 channels:
   - conda-forge
 dependencies:

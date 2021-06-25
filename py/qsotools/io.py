@@ -186,7 +186,10 @@ class Spectrum:
         self.z_qso = z_qso
         self.specres = specres
         self.dv = dv
-        self.coord = coord
+        if isinstance(coord, SkyCoord):
+            self.coord = coord
+        else:
+            self.coord = SkyCoord(coord['RA'], coord['DEC'], unit=deg)
         
         self.size = len(self.wave)
         self.mask = np.logical_and(error > 0, flux != 0)
@@ -1462,9 +1465,37 @@ class QQFile():
 
 
 
+# ------------------------------------------
+# ---------- DESI PICCA FILE ---------------
+# ------------------------------------------
 
+class PiccaFile():
+    """docstring for PiccaFile
+    BinaryTable: LOGLAM, DELTA, IVAR, RESOMAT"""
+    def __init__(self, fname, rw='r', clobber=True):
+        self.fname = fname
+        self.rw = rw
+        self.no_spectra = 0
+        self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
+    
+    def writeSpectrum(self, wave, delta, error, specres, z_qso):
+        R_kms = fid.LIGHT_SPEED/specres/fid.ONE_SIGMA_2_FWHM
+        data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
+                              ('RESOMAT','f4',11)])
 
-        
+        data['LOGLAM'] = np.log10(wave)
+        data['DELTA']  = delta
+        data['IVAR']   = 1/error**2
+        hdr_dict = {'Z': float(z_qso), 'MEANRESO': R_kms, 'MEANSNR': np.mean(data['IVAR']), 
+            'DLL':np.median(np.diff(data['LOGLAM']))}
+
+        self.fitsfile.write(data, header=hdr_dict)
+        self.no_spectra += 1
+
+        return f"{self.fname}[{self.no_spectra}]"
+
+    def close(self):
+        self.fitsfile.close()
 
 
 
