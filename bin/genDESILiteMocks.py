@@ -21,10 +21,12 @@ from pkg_resources import resource_filename
 
 import qsotools.mocklib  as lm
 import qsotools.specops  as so
-from qsotools.io import BinaryQSO, QQFile
+from qsotools.io import BinaryQSO, QQFile, PiccaFile
 import qsotools.fiducial as fid
 
 PKG_ICDF_Z_TABLE = resource_filename('qsotools', 'tables/invcdf_nz_qso_zmin2.1_zmax4.4.dat')
+
+filename_list = []
 
 def save_parameters(txt_basefilename, args):
     Parameters_txt = ("Parameters for these mocks\n"
@@ -62,10 +64,15 @@ def save_plots(wch, fch, ech, fnames, args):
         plt.plot(w, e, 'r-')
         plt.savefig(ospath_join(args.OutputDir, fname[:-3]+"png"), bbox_inches='tight', dpi=150)
 
-def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args):
-    for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
-        mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
-        mfile.save(w, f, e, len(w), z_qso, dec, ra, 0., args.specres, args.pixel_dv)
+def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args, picca=None):
+    if picca:
+        for (w, f, e) in zip(wave, fmocks, emocks):
+            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso)
+            filename_list.append(fname)
+    else:
+        for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
+            mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
+            mfile.save(w, f, e, len(w), z_qso, dec, ra, 0., args.specres, args.pixel_dv)
 
 def saveQQFile(ipix, meta1, wave, fluxes, args):
     P = int(ipix/100)
@@ -79,6 +86,22 @@ def saveQQFile(ipix, meta1, wave, fluxes, args):
     qqfile.writeAll(meta1, wave, fluxes)
 
     return fname
+
+def chunkHelper(i, waves, fluxes, errors, z_qso):
+    wave_c, flux_c, err_c = waves[i], fluxes[i], errors[i]
+
+    if args.chunk_dyn:
+        wave_c, flux_c, err_c = so.chunkDynamic(wave_c, flux_c, err_c, len(wave_c))
+    if args.chunk_fixed:
+        NUMBER_OF_CHUNKS = 3
+        FIXED_CHUNK_EDGES = np.linspace(fid.LYA_FIRST_WVL, fid.LYA_LAST_WVL, num=NUMBER_OF_CHUNKS+1)
+        wave_c, flux_c, err_c = so.divideIntoChunks(wave_c, flux_c, err_c, z_qso[i], FIXED_CHUNK_EDGES)
+    else:
+        wave_c = [wave_c]
+        flux_c = [flux_c]
+        err_c  = [err_c]
+
+    return wave_c, flux_c, err_c
 
 # Returns observed wavelength centers
 def getDESIwavegrid(args):
@@ -159,6 +182,8 @@ if __name__ == '__main__':
     parser.add_argument("--save-qqfile", action="store_true", \
         help="Saves in quickquasar fileformat. Spectra are not chunked and all pixels are kept."\
         " Sets sigma-per-pixel=0, specres=0, keep-nolya-pixels=True and save-full-flux=True")
+    parser.add_argument("--save-picca", action="store_true", \
+        help="Saves in picca fileformat.")
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
         type=int, default=332298)
         
@@ -238,8 +263,6 @@ if __name__ == '__main__':
     txt_basefilename  = "%s/desilite_seed%d%s" % (args.OutputDir, args.seed, settings_txt)
 
     # ------------------------------
-    filename_list = []
-
     # Change the seed with thread no for different randoms across processes
     lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=2**args.log2ngrid, DV_KMS=args.griddv, \
         GAUSSIAN_MOCKS=args.gauss)
@@ -316,7 +339,7 @@ if __name__ == '__main__':
                 print(f"Saved file {fname}.", flush=True)
 
             continue
-
+        
         # Cut Lyman-alpha forest region
         if not args.keep_nolya_pixels:
             lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
@@ -327,27 +350,29 @@ if __name__ == '__main__':
         else:
             waves = [wave for i in range(ntemp)]
 
+        if args.save_picca:
+            pcfname = ospath_join(args.OutputDir, f"delta-{ipix}.fits.gz")
+            pcfile  = PiccaFile(pcfname, 'rw')
+        else:
+            pcfile = None
+
         for i in range(ntemp):
-            wave_c, flux_c, err_c = waves[i], fluxes[i], errors[i]
-            if args.chunk_dyn:
-                wave_c, flux_c, err_c = so.chunkDynamic(wave_c, flux_c, err_c, len(wave_c))
-            if args.chunk_fixed:
-                NUMBER_OF_CHUNKS = 3
-                FIXED_CHUNK_EDGES = np.linspace(fid.LYA_FIRST_WVL, fid.LYA_LAST_WVL, num=NUMBER_OF_CHUNKS+1)
-                wave_c, flux_c, err_c = so.divideIntoChunks(wave_c, flux_c, err_c, z_qso[i], FIXED_CHUNK_EDGES)
-            else:
-                wave_c = [wave_c]
-                flux_c = [flux_c]
-                err_c  = [err_c]
+            wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso)
 
             nchunks = len(wave_c)
             nid = meta1['MOCKID'][i]
-            fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
+
+            if not args.save_picca:
+                fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
                 % (args.seed, nid, nc, z_qso[i], settings_txt) for nc in range(nchunks)]
 
-            filename_list.extend(fname)
+                filename_list.extend(fname)
+            else:
+                fname = None
+
             if not args.nosave:
-                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], meta1['RA'][i], args)
+                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], meta1['RA'][i], 
+                    args, pcfile)
 
             if args.plot:
                 save_plots(wave_c, flux_c, err_c, fname, args)
