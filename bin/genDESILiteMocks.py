@@ -272,7 +272,7 @@ if __name__ == '__main__':
     for ui in range(i1, i2):
         ipix = u_pix[ui]
         curr_progress = int(100*(ui-i1)/(i2-i1))
-        print_condition = (curr_progress-last_progress > 4) or (curr_progress == 0)            
+        print_condition = (curr_progress-last_progress > 4) or (ui == i1)            
 
         meta1 = split_meta[ui]
         ntemp = meta1['MOCKID'].size
