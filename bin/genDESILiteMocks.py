@@ -67,7 +67,7 @@ def save_plots(wch, fch, ech, fnames, args):
 def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args, picca=None):
     if picca:
         for (w, f, e) in zip(wave, fmocks, emocks):
-            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso)
+            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso, ra, dec)
             filename_list.append(fname)
     else:
         for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
