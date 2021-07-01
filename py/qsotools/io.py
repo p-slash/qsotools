@@ -1478,15 +1478,17 @@ class PiccaFile():
         self.no_spectra = 0
         self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
     
-    def writeSpectrum(self, wave, delta, error, specres, z_qso):
+    def writeSpectrum(self, wave, delta, error, specres, z_qso, ra, dec):
         R_kms = fid.LIGHT_SPEED/specres/fid.ONE_SIGMA_2_FWHM
         data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
-                              ('RESOMAT','f4',11)])
+                              ('RESOMAT','f8', 11)])
 
         data['LOGLAM'] = np.log10(wave)
         data['DELTA']  = delta
         data['IVAR']   = 1/error**2
-        hdr_dict = {'Z': float(z_qso), 'MEANRESO': R_kms, 'MEANSNR': np.mean(data['IVAR']), 
+        hdr_dict = {'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
+            'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
+            'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 
             'DLL':np.median(np.diff(data['LOGLAM']))}
 
         self.fitsfile.write(data, header=hdr_dict)
