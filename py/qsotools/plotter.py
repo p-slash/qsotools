@@ -168,6 +168,7 @@ class PowerPlotter(object):
     power_fid
     power_true
     error
+    fisher : initialized to diagonal of inverse errors
     """
 
     def _autoRelativeYLim(self, ax, rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax):
@@ -227,7 +228,11 @@ class PowerPlotter(object):
     def __init__(self, filename):
         # Reading file into an ascii table  
         self._readDBTFile(filename)
+        self.fisher = np.diag(1/self.error.ravel()**2)
         print("There are {:d} redshift bins and {:d} k bins.".format(self.nz, self.nk))
+
+    def setFisher(self, fisher):
+        self.fisher = fisher
 
     def addTruePowerFile(self, filename):
         """Sets true power from given file. Saves it as .npy for future readings."""
@@ -265,7 +270,7 @@ class PowerPlotter(object):
 
     def plotRedshiftBin(self, nz, outplot_fname=None, two_row=False, plot_true=True, \
         plot_dbt=False, rel_ylim=0.05, noise_dom=None, auto_ylim_xmin=-1, \
-        auto_ylim_xmax=1000, ignore_last_k_bins=-1):
+        auto_ylim_xmax=1000, kmax_chisquare=None):
         """Plot QMLE results for given redshift bin nz.
 
         Parameters
@@ -286,8 +291,8 @@ class PowerPlotter(object):
             Adds a shade for k larger than this value.
         auto_ylim_xmin, auto_ylim_xmax : float, optional
             Automatically scales the relative error panel by limiting the axis range between these values.
-        ignore_last_k_bins : int, optional
-            When passed ignore that many last k bins from the chi square.
+        kmax_chisquare : float, optional
+            When passed ignore k>kmax_chisquare modes from the chi square.
         """
         if two_row:
             top_ax, bot_ax = create_tworow_figure(1, 3, ylim=rel_ylim)[:-1]
@@ -310,16 +315,6 @@ class PowerPlotter(object):
         erz = self.error[nz]
         ptz = self.power_true[nz]
         z_val = self.z_bins[nz]
-
-        chi_sq_zb = (psz - ptz)**2 / erz**2
-        
-        if ignore_last_k_bins > 0:
-            chi_sq_zb = chi_sq_zb[:-ignore_last_k_bins]
-            ddof = self.k_bins.size-ignore_last_k_bins
-        else:
-            ddof =self.k_bins.size
-
-        chi_sq_zb = np.sum(chi_sq_zb)
 
         # Start plotting
         top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, xerr = 0, yerr = erz*self.k_bins/np.pi, \
@@ -364,13 +359,14 @@ class PowerPlotter(object):
 
         top_ax.set_yticks(yticks)
 
-        print("z={:.1f} Chi-Square / dof: {:.2f} / {:d}.".format(z_val, chi_sq_zb, ddof))
+        chi2, ddof = self.getChiSquare(nz, kmax=kmax_chisquare)
+        print("z={:.1f} Chi-Square / dof: {:.2f} / {:d}.".format(z_val, chi2, ddof))
 
         save_figure(outplot_fname)
 
     def plotAll(self, outplot_fname=None, two_row=False, plot_true=True, pk_ymax=0.5, \
         pk_ymin=1e-4, rel_ylim=0.05, colormap=plt.cm.jet, noise_dom=None, \
-        fmt=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000, ignore_last_k_bins=-1):
+        fmt=None, auto_ylim_xmin=-1, auto_ylim_xmax=1000, kmax_chisquare=None):
         """Plot QMLE results for all redshifts in one figure.
 
         Parameters
@@ -381,6 +377,8 @@ class PowerPlotter(object):
             When passed, add a lower panel for relative error computed by using the true power.
         pk_ymax, pk_ymin : float, optional
             Maximum and minimum y axis limits for kP/pi.
+        fmt: str, optional
+            Define fmt for top axis errorbar plot. Default is "o"
         rel_ylim : float, optional
             Y axis limits for the relative error on the lower panel.
         colormap : plt.cm, optional
@@ -389,8 +387,8 @@ class PowerPlotter(object):
             Adds a shade for k larger than this value.
         auto_ylim_xmin, auto_ylim_xmax : float, optional
             Automatically scales the relative error panel by limiting the axis range between these values.
-        ignore_last_k_bins : int, optional
-            When passed ignore that many last k bins from the chi square.
+        kmax_chisquare : float, optional
+            When passed ignore k>kmax_chisquare modes from the chi square.
         """
         if two_row:
             top_ax, bot_ax, color_array = create_tworow_figure(self.nz, 3, ylim=rel_ylim, \
@@ -403,7 +401,6 @@ class PowerPlotter(object):
             color_array=[colormap(i) for i in np.linspace(0, 1, self.nz)]
 
         set_topax_makeup(top_ax, ymin=pk_ymin, ymax=pk_ymax)
-        chi_sq = 0
 
         if fmt is None:
             fmt = "o"
@@ -415,13 +412,6 @@ class PowerPlotter(object):
             ptz = self.power_true[i]
             z_val = self.z_bins[i]
             ci = color_array[i]
-
-            chi_sq_zb = (psz - ptz)**2 / erz**2
-
-            if ignore_last_k_bins > 0:
-                chi_sq_zb = chi_sq_zb[:-ignore_last_k_bins]
-
-            chi_sq += np.sum(chi_sq_zb)
 
             top_ax.errorbar(self.k_bins, psz*self.k_bins/np.pi, yerr=erz*self.k_bins/np.pi, \
                 fmt=fmt, label="z=%.1f"%z_val, markersize=3, capsize=2, color=ci)
@@ -445,13 +435,9 @@ class PowerPlotter(object):
             top_ax.axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
             if two_row:
                 bot_ax.axvspan(noise_dom, self.k_bins[-1]*1.1, facecolor='0.5', alpha=0.5)
-
-        if ignore_last_k_bins > 0:
-            ddof = self.k_bins.size-ignore_last_k_bins
-        else:
-            ddof = self.k_bins.size
         
-        print("Chi-Square / dof: {:.2f} / {:d}.".format(chi_sq, ddof*self.nz))
+        chi2, ddof = self.getChiSquare(kmax=kmax_chisquare)
+        print("Chi-Square / dof: {:.2f} / {:d}.".format(chi2, ddof))
 
         save_figure(outplot_fname)
 
@@ -504,6 +490,30 @@ class PowerPlotter(object):
             self._autoRelativeYLim(axs[i], rel_err, erz, ptz, auto_ylim_xmin, auto_ylim_xmax)
 
         save_figure(outplot_fname)
+
+    def getChiSquare(self, zbin=None, fisher=None, kmin=None, kmax=None):
+        if fisher:
+            invcov = fisher
+        else:
+            invcov = self.fisher
+
+        d = (self.power_qmle-self.power_true).ravel()
+        to_remove = np.zeros_like(d, dtype=np.bool)
+
+        if kmax and kmax > 0:
+            to_remove |= (self.karray > kmax)
+        if kmin and kmin > 0:
+            to_remove |= (self.karray < kmin)
+        
+        if zbin:
+            to_remove |= (self.zarray != self.zbins[zbin])
+
+        if to_remove.any():
+            invcov = np.delete(invcov, to_remove, axis=0) 
+            invcov = np.delete(invcov, to_remove, axis=1)
+            d = np.delete(d, to_remove, axis=0)
+
+        return d@invcov@d, d.size
 
 class FisherPlotter(object):
     """FisherPlotter is object to plot the Fisher matrix in its entirety or in individual k & z bins.
