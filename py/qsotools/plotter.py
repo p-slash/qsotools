@@ -506,7 +506,7 @@ class PowerPlotter(object):
             to_remove |= (self.karray < kmin)
         
         if zbin:
-            to_remove |= (self.zarray != self.zbins[zbin])
+            to_remove |= (self.zarray != self.z_bins[zbin])
 
         if to_remove.any():
             invcov = np.delete(invcov, to_remove, axis=0) 
@@ -723,7 +723,7 @@ class FisherPlotter(object):
         save_figure(outplot_fname)
 
     def plotZBin(self, zb, scale="norm", ticks=None, inv=False, outplot_fname=None, \
-        tick_lbls=None, colormap=plt.cm.RdBu_r, **kwargs):
+        colormap=plt.cm.RdBu_r, **kwargs):
         """Plot Fisher matrix for a given z bin, i.e. k correlations.
 
         Parameters
@@ -764,7 +764,7 @@ class FisherPlotter(object):
         save_figure(outplot_fname)
 
     def plotKCrossZbin(self, zb, scale="norm", ticks=None, inv=False, outplot_fname=None, \
-        tick_lbls=None, colormap=plt.cm.RdBu_r, **kwargs):
+        colormap=plt.cm.RdBu_r, **kwargs):
         """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations cross z bins.
 
         Parameters
