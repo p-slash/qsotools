@@ -230,6 +230,10 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=3600.)
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
+    parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
+        type=float, default=1.9)
+    parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
+        type=float, default=4.3)
 
     parser.add_argument("--keep-nolya-pixels", action="store_true", \
         help="Instead of removing pixels, set flux=1 for lambda>L_lya")
@@ -373,6 +377,9 @@ if __name__ == '__main__':
         if not args.keep_nolya_pixels:
             lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
                 wave <= fid.LYA_LAST_WVL * (1+z_qso))
+            forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
+                wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
+            lya_ind = np.logical_and(lya_ind, forst_bnd)
             waves  = [wave[lya_ind[i]] for i in range(ntemp)]
             fluxes = [fluxes[i][lya_ind[i]] for i in range(ntemp)]
             errors = [errors[i][lya_ind[i]] for i in range(ntemp)]
