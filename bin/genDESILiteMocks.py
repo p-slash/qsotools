@@ -27,6 +27,28 @@ import qsotools.fiducial as fid
 PKG_ICDF_Z_TABLE = resource_filename('qsotools', 'tables/invcdf_nz_qso_zmin2.1_zmax4.4.dat')
 
 filename_list = []
+RESOMAT = None
+
+def setResolutionMatrix(wave, args, ndiags=11):
+    assert args.use_logspaced_wave
+    assert args.save_picca
+    assert args.fixed_zqso
+
+    Ngrid = wave.size
+    Rint = args.specres
+    dv = args.pixel_dv
+    if args.use_optimal_rmat:
+        print("Using optimal resolution matrix.")
+        print("Calculating correlation function.")
+        z = np.median(wave)/fid.LYA_WAVELENGTH-1
+        _, xi = lm.lognPowerSpGH(z, corr=True)
+        xi = xi.ravel()
+        xi = np.fft.fftshift(xi)
+        print("Calculating optimal rmatrix.")
+        return fid.getOptimalResolutionMatrix(Ngrid, xi, Rint, dv)
+    else:
+        print("Using Gaussian resolution matrix.")
+        return fid.getGaussianResolutionMatrix(Ngrid, Rint, dv)
 
 def save_parameters(txt_basefilename, args):
     Parameters_txt = ("Parameters for these mocks\n"
@@ -67,7 +89,7 @@ def save_plots(wch, fch, ech, fnames, args):
 def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args, picca=None):
     if picca:
         for (w, f, e) in zip(wave, fmocks, emocks):
-            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso, ra, dec)
+            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso, ra, dec, RESOMAT.T)
             filename_list.append(fname)
     else:
         for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
@@ -137,20 +159,22 @@ def getMetadata(args):
         metadata = np.zeros(args.nmocks, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
             ('Z', 'f8'), ('MOCKID', 'i8'), ('PIXNUM', 'i4')])
         metadata['MOCKID'] = np.arange(args.nmocks)
-
-        # Read inverse cumulative distribution function
-        # Generate uniform random numbers
-        # Use inverse CDF to map these to QSO redshifts
-        invcdf, zcdf    = np.genfromtxt(args.invcdf_nz, unpack=True)
-        inv_cdf_interp  = interp1d(invcdf, zcdf)
-
         # Use the same seed for all process to generate the same metadata
         RNST = np.random.default_rng(args.seed)
-        metadata['Z']   = inv_cdf_interp(RNST.uniform(size=args.nmocks))
         # Generate coords in degrees
         metadata['RA']  = RNST.random(args.nmocks) * 360.
         metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
         #? metadata['DEC'] = np.arcsin(2*RNST.random(args.nmocks)-1) * 180./np.pi
+
+        if args.fixed_zqso:
+            metadata['Z'] = args.fixed_zqso
+        else:
+            # Read inverse cumulative distribution function
+            # Generate uniform random numbers
+            # Use inverse CDF to map these to QSO redshifts
+            invcdf, zcdf   = np.genfromtxt(args.invcdf_nz, unpack=True)
+            inv_cdf_interp = interp1d(invcdf, zcdf)
+            metadata['Z']  = inv_cdf_interp(RNST.uniform(size=args.nmocks))
 
     print("Number of nside for heal pixels:", args.hp_nside, flush=True)
     if args.hp_nside:
@@ -177,13 +201,17 @@ if __name__ == '__main__':
     parser.add_argument("OutputDir", help="Output directory")
     parser.add_argument("--master-file", help="Master file location. Generate mocks with "\
         "the exact RA, DEC & Z distribution. nmocks option is ignored when this passed.")
+    parser.add_argument("--fixed-zqso", help="Generate QSOs at this redshift only.", type=float)
     parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
         "Redshift of qso picked at random given n(z). Default: %(default)s"), type=int, default=1)
+
     parser.add_argument("--save-qqfile", action="store_true", \
         help="Saves in quickquasar fileformat. Spectra are not chunked and all pixels are kept."\
         " Sets sigma-per-pixel=0, specres=0, keep-nolya-pixels=True and save-full-flux=True")
     parser.add_argument("--save-picca", action="store_true", \
         help="Saves in picca fileformat.")
+    parser.add_argument("--use-optimal-rmat", action="store_true")
+
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
         type=int, default=332298)
         
@@ -243,6 +271,7 @@ if __name__ == '__main__':
 
     # Create/Check directory
     os_makedirs(args.OutputDir, exist_ok=True)
+    RESOMAT = None
 
     metadata, npixels = getMetadata(args)
     # Set up DESI observed wavelength grid
@@ -368,6 +397,9 @@ if __name__ == '__main__':
 
                 filename_list.extend(fname)
             else:
+                assert nchunks == 1
+                if RESOMAT is None:
+                    RESOMAT = setResolutionMatrix(wave_c[0], args)
                 fname = None
 
             if not args.nosave:
