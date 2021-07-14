@@ -108,14 +108,6 @@ def chunkDynamic(wave, flux, error, no_forest_pixels):
 
     return wave, flux, error
 
-# Assuming R is integer resolution power
-# dv in km/s and k in s/km
-def getSpectResWindow(k, R, dv):
-    x = k*dv/2/np.pi
-    rkms = LIGHT_SPEED/R/ONE_SIGMA_2_FWHM
-
-    return np.exp(-k**2 * rkms**2/2)*np.sinc(x)
-
 class MeanFluxHist():
     """Object that wraps up binning for mean flux calculation as well as pixel redshift
     histogram.
