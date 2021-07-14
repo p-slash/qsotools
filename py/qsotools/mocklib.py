@@ -75,7 +75,9 @@ def lognMeanFluxGH(z):
     return result / np.sqrt(np.pi)
 
 # z is 1d array or list
-def lognPowerSpGH(z, numvpoints=2**18, dv=1., corr=False):    
+def lognPowerSpGH(z, numvpoints=2**18, dv=1., corr=False):
+    if isinstance(z, float):
+        z = np.array([z]) 
     # Set up k array
     k_arr  = 2. * np.pi * np.fft.rfftfreq(numvpoints, d=dv)
 
