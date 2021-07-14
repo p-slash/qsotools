@@ -504,8 +504,8 @@ class PowerPlotter(object):
             to_remove |= (self.karray > kmax)
         if kmin and kmin > 0:
             to_remove |= (self.karray < kmin)
-        
-        if zbin:
+
+        if zbin is not None:
             to_remove |= (self.zarray != self.z_bins[zbin])
 
         if to_remove.any():
