@@ -70,7 +70,7 @@ def save_parameters(txt_basefilename, args):
     args.seed, \
     args.log2ngrid, \
     args.griddv, \
-    "ON") # "ON" if not args.without_z_evo else "OFF")
+    "ON" if not args.fixed_zforest else "OFF")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
     print("Saving parameteres to", temp_fname)
@@ -163,8 +163,8 @@ def getMetadata(args):
         RNST = np.random.default_rng(args.seed)
         # Generate coords in degrees
         metadata['RA']  = RNST.random(args.nmocks) * 360.
-        metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
-        #? metadata['DEC'] = np.arcsin(2*RNST.random(args.nmocks)-1) * 180./np.pi
+        # metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
+        metadata['DEC'] = np.arcsin(2*RNST.random(args.nmocks)-1) * 180./np.pi
 
         if args.fixed_zqso:
             metadata['Z'] = args.fixed_zqso
@@ -202,6 +202,8 @@ if __name__ == '__main__':
     parser.add_argument("--master-file", help="Master file location. Generate mocks with "\
         "the exact RA, DEC & Z distribution. nmocks option is ignored when this passed.")
     parser.add_argument("--fixed-zqso", help="Generate QSOs at this redshift only.", type=float)
+    parser.add_argument("--fixed-zforest", help="Generate forest at this redshift, " \
+        "i.e. turns off redshift evolution.", type=float)
     parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
         "Redshift of qso picked at random given n(z). Default: %(default)s"), type=int, default=1)
 
@@ -276,6 +278,7 @@ if __name__ == '__main__':
     # Create/Check directory
     os_makedirs(args.OutputDir, exist_ok=True)
     RESOMAT = None
+    TURNOFF_ZEVO = args.fixed_zforest is not None
 
     metadata, npixels = getMetadata(args)
     # Set up DESI observed wavelength grid
@@ -298,9 +301,11 @@ if __name__ == '__main__':
     # ------------------------------
     # Change the seed with thread no for different randoms across processes
     lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=2**args.log2ngrid, DV_KMS=args.griddv, \
-        GAUSSIAN_MOCKS=args.gauss)
-    lya_m.setCentralRedshift(3.0)
-    # REDSHIFT_ON=not args.without_z_evo)
+        GAUSSIAN_MOCKS=args.gauss, REDSHIFT_ON=not TURNOFF_ZEVO)
+    if TURNOFF_ZEVO:
+        lya_m.setCentralRedshift(args.fixed_zforest)
+    else:
+        lya_m.setCentralRedshift(3.0)
 
     if args.gauss:
         print("Generating Gaussian mocks.", flush=True)
@@ -353,10 +358,10 @@ if __name__ == '__main__':
             fluxes[i][nonlya_ind[i]] = 1
 
         if not args.save_full_flux:
-            # if args.without_z_evo:
-            #     spectrum_z = z_qso * np.ones_like(fluxes)
-            # else:
-            spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
+            if TURNOFF_ZEVO:
+                spectrum_z = args.fixed_zforest
+            else:
+                spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
             true_mean_flux = mean_flux_function(spectrum_z)
 
             fluxes  = fluxes / true_mean_flux - 1
