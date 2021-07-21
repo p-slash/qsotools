@@ -41,7 +41,7 @@ def setResolutionMatrix(wave, args, ndiags=11):
         print("Using optimal resolution matrix.")
         print("Calculating correlation function.")
         z = np.median(wave)/fid.LYA_WAVELENGTH-1
-        _, xi = lm.lognPowerSpGH(z, corr=True)
+        _, xi = lm.lognPowerSpGH(z, numvpoints=2**16, corr=True)
         xi = xi.ravel()
         xi = np.fft.fftshift(xi)
         print("Calculating optimal rmatrix.")
@@ -216,7 +216,7 @@ if __name__ == '__main__':
 
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
         type=int, default=332298)
-        
+
     parser.add_argument("--sigma-per-pixel", help=("Add Gaussian error to mocks with given sigma. "\
         "Default: %(default)s"), type=float, default=0.7)
     parser.add_argument("--specres", help="Spectral resolution. Default: %(default)s", type=int, \
@@ -415,14 +415,15 @@ if __name__ == '__main__':
                 fname = None
 
             if not args.nosave:
-                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], meta1['RA'][i], 
-                    args, pcfile)
+                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], 
+                    meta1['RA'][i], args, pcfile)
 
             if args.plot:
                 save_plots(wave_c, flux_c, err_c, fname, args)
 
     # Save the list of files in a txt
-    temp_fname = ospath_join(args.OutputDir, f"file_list_qso-{args.ithread}.txt") # "%s_filelist.txt" % txt_basefilename
+    temp_fname = ospath_join(args.OutputDir, f"file_list_qso-{args.ithread}.txt") 
+    # "%s_filelist.txt" % txt_basefilename
     print("Saving chunk spectra file list as ", temp_fname, flush=True)
     toWrite = open(temp_fname, 'w')
     toWrite.write("%d\n" % len(filename_list))
