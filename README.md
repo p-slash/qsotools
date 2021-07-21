@@ -3,7 +3,7 @@ Change the name of the environment to your taste in [requirements.yml](requireme
 
     conda env create -f requirements.yml
     conda activate [ENVNAME]
-    python setup.py install
+    pip install .
 
 This should work even for clusters.
 
