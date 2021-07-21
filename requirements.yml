@@ -12,3 +12,4 @@ dependencies:
   - setuptools
   - jupyter
   - fitsio
+  - healpy
