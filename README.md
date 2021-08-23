@@ -27,6 +27,13 @@ The other scripts are also helpful.
 + [specops.py](py/qsotools/specops.py) does various spectrum operations such as chunking, resampling and binning pixel statistics.
 + [kodiaqviewer.py](py/qsotools/kodiaqviewer.py) is a beta jupyter notebook class for viewing KODIAQ spectra.
 
+## Data
+Please cite respective works when using anything related to the data.
+
++ Keck Observatory Database of Ionized Absorption toward Quasars (KODIAQ) Data Release 2 (DR2) can be found on their [website](https://koa.ipac.caltech.edu/workspace/TMP_939bFW_53591/kodiaq53591.html) (Lehner et al. 2014; O’Meara et al. 2015, 2017). A summary [table](py/qsotools/tables/kodiaq_asu.tsv) from VizieR is part of this package. A [master file](py/qsotools/tables/master_kodiaq_table.csv) is constructed to gather as much information as possible into a single file. Visually inspected DLAs are listed in [here](py/qsotools/tables/kodiaq_vi_dlas.csv). However, this is constructed in order to roughly mask affected regions, and is not accurate enough for precise scientific studies. It can also contain duplicate regions.
++ The Spectral Quasar Absorption Database (SQUAD) DR1 (Murphy et al. 2019) is [here](https://archive.eso.org/cms/eso-archive-news/the-uves-spectral-quasar-absorption-database--squad--data-releas.html). The provided [table](py/qsotools/tables/uves_squad_dr1_quasars_master.csv) is part of this package. An updated [DLA table](py/qsotools/tables/squad_vi_dlas.csv) comes with caveats above.
++ XQ-100 is [here](http://telbib.eso.org/detail.php?bibcode=2016A%26A...594A..91L). A DLA catalog is provided by Sánchez-Ramírez et al., 2016. The relevant part of it is provided [here](py/qsotools/tables/xq100_dla_table_sanchez-ramirez_2016.csv). Similarly, visually inspected DLA (with same caveats) are [here](py/qsotools/tables/xq100_vi_dlas.csv).
+
 Installation
 =====
 ## Conda installation
