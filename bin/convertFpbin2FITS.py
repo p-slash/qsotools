@@ -22,6 +22,17 @@ def readFPBinFile(fname):
 
     return fisher, power
 
+def getFPFilename(x):
+    ifits = x.rfind(".fits")
+    if ifits>0:
+        i1 = x.rfind("[")+1
+        i2 = x.rfind("]")
+        base = x[:ifits] + '-' + x[i1:i2]
+    else:
+        base = x[:-4]
+
+    return base+"_Fp.bin"
+
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
@@ -35,7 +46,7 @@ if __name__ == '__main__':
     # Read qso filenames into a list, then convert to numpy array
     with open(config_qmle.qso_list, 'r') as file_qsolist:
         header = file_qsolist.readline()
-        qso_filename_list = [ospath_join(config_qmle.qso_dir, x.rstrip()[:-4]+"_Fp.bin") \
+        qso_filename_list = [ospath_join(config_qmle.qso_dir, getFPFilename(x.rstrip())) \
             for x in file_qsolist]
 
     no_spectra = len(qso_filename_list)
