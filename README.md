@@ -3,7 +3,7 @@ Overview
 This is the source code that generates mocks, reduce high-resolution spectra and bootstrap QMLE results. It further helps reading and plotting QMLE outputs. Please cite papers Karaçaylı, Font-Ribera & Padmanabhan (2020) and Karaçaylı et al. (submitted to MNRAS).
 
 + Karaçaylı N. G., Font-Ribera A., Padmanabhan N., 2020, [MNRAS](https://doi.org/10.1093/mnras/staa2331), 497, 4742
-+ Karaçaylı N. G., et al., 2021, MNRAS, submitted
++ Karaçaylı N. G., et al., 2021, MNRAS (submitted), [arXiv](https://arxiv.org/abs/2108.10870)
 
 ## Programs
 Scripts under `bin` folder are executable. Pass `--help` for arguments. The most important ones are these four scripts:
