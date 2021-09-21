@@ -16,7 +16,7 @@ from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 ARMS = ['B', 'R', 'Z']
 
 def transversePFolder(P, args):
-    working_dir   = ospath_join(args.Directory, P)
+    working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.iglob(ospath_join(working_dir, "*", "spectra-*.fits*"))
 
     for fname in fname_spectra:
