@@ -66,7 +66,7 @@ def fitGaussian2RMat(wave, rmat):
     v  = fid.LIGHT_SPEED * np.log(wave)
     dv = np.mean(np.diff(v))
 
-    fitt = lambda x, R_kms: fid.getSpectographWindow_x(x, \
+    fitt = lambda x, R_kms: dv*fid.getSpectographWindow_x(x, \
         fid.LIGHT_SPEED/R_kms/fid.ONE_SIGMA_2_FWHM, dv)
 
     rmat_ave = np.mean(rmat, axis=1)
@@ -75,7 +75,7 @@ def fitGaussian2RMat(wave, rmat):
     R_kms, _ = curve_fit(fitt, x, rmat_ave, p0=dv, bounds=(dv/100, 100*dv))
 
     logging.debug("Fitting R (km/s) to the average resomat.")
-    logging.debug("ndiags=%d, R_kms=%.1f.", ndiags, R_kms)
+    logging.debug("ndiags=%d, R_kms=%.1f km/s.", ndiags, R_kms)
 
     return R_kms[0]
 
