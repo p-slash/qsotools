@@ -18,6 +18,7 @@ ARMS = ['B', 'R', 'Z']
 def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.iglob(ospath_join(working_dir, "*", "spectra-*.fits*"))
+    logging.info("Working i directory %s", working_dir)
 
     rreplace = lambda s, new: new.join(s.rsplit("/spectra-", 1))
     for fname in fname_spectra:
