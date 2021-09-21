@@ -153,7 +153,7 @@ def printProgress(i, ifinal, percThres=5):
 
     if print_condition:
         etime = (time.time()-start_time)/60 # min
-        logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.", flush=True)
+        logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
         printProgress.last_progress = curr_progress
 
     return print_condition
