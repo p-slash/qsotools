@@ -98,7 +98,7 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
     nspectra   = fspec[f'{arm}_FLUX'].read_header()['NAXIS2']
     ARM_FLUXES = fspec[f'{arm}_FLUX'].read()
     ARM_IVAR   = fspec[f'{arm}_IVAR'].read()
-    ARM_MASK   = fspec[f'{arm}_MASK'].read()
+    ARM_MASK   = np.array(fspec[f'{arm}_MASK'].read(), dtype=bool)
     ARM_RESOM  = ftruth[f'{arm}_RESOLUTION'].read()
 
     for i in range(nspectra):
