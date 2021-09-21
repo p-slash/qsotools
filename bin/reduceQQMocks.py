@@ -72,7 +72,7 @@ def fitGaussian2RMat(wave, rmat):
     logging.debug("Fitting R (km/s) to the average resomat.")
     logging.debug("ndiags=%d, R_kms=%.1f.", ndiags, R_kms)
 
-    return R_kms
+    return R_kms[0]
 
 def saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     ndiags = rmat.shape[0]
