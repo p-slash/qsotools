@@ -2,6 +2,7 @@
 import argparse
 import fitsio
 import glob
+import time
 import logging
 
 from os      import walk as os_walk
@@ -18,7 +19,7 @@ ARMS = ['B', 'R', 'Z']
 def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.iglob(ospath_join(working_dir, "*", "spectra-*.fits*"))
-    logging.info("Working i directory %s", working_dir)
+    logging.info("Working in directory %s", working_dir)
 
     rreplace = lambda s, new: new.join(s.rsplit("/spectra-", 1))
     for fname in fname_spectra:
@@ -111,8 +112,7 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
         remaining_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, args)
         remaining_pixels &= ~ARM_MASK[i]
 
-        # Instead check if short
-        if not remaining_pixels.any():
+        if np.sum(remaining_pixels)<5:
             # Empty spectrum
             continue
 
@@ -144,6 +144,17 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
         # Save it
         saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args)
 
+def printProgress(i, ifinal, percThres=4):
+    curr_progress = int(100*i/ifinal)
+    print_condition = (curr_progress-printProgress.last_progress > percThres) or (i == 0)
+
+    if print_condition:
+        etime = (time.time()-start_time)/60 # min
+        logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.", flush=True)
+        printProgress.last_progress = curr_progress
+
+    return print_condition
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory. Saves next to spectra-X-X.fits as delta-X-X.fits")
@@ -171,6 +182,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    start_time = time.time()
     logging.basicConfig(filename=ospath_join(args.Directory, 'reduction.log'), \
         level=logging.DEBUG if args.debug else logging.INFO)
 
