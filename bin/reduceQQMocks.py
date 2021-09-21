@@ -19,11 +19,12 @@ def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.iglob(ospath_join(working_dir, "*", "spectra-*.fits*"))
 
+    rreplace = lambda s, new: new.join(s.rsplit("/spectra-", 1))
     for fname in fname_spectra:
         fspec  = fitsio.FITS(fname)
-        ftruth = fitsio.FITS(fname.replace("/spectra-", "/truth-"))
-        fzbest = fitsio.FITS(fname.replace("/spectra-", "/zbest-"))
-        fdelta = fitsio.FITS(fname.replace("/spectra-", "/delta-"), "rw", clobber=True)
+        ftruth = fitsio.FITS(rreplace(fname, "/truth-"))
+        fzbest = fitsio.FITS(rreplace(fname, "/zbest-"))
+        fdelta = fitsio.FITS(rreplace(fname, "/delta-"), "rw", clobber=True)
 
         fbrmap = fspec['FIBERMAP']['TARGET_RA', 'TARGET_DEC'].read()
 
