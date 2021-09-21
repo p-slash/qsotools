@@ -170,7 +170,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     logging.basicConfig(filename=ospath_join(args.Directory, 'reduction.log'), \
-        encoding='utf-8', level=logging.DEBUG if args.debug else logging.INFO)
+        level=logging.DEBUG if args.debug else logging.INFO)
 
     # The data is organized under P=0, 1, ... (ipix//100) folders
     # Each P folder has ipix folders.
