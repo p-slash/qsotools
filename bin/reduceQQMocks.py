@@ -178,10 +178,10 @@ if __name__ == '__main__':
     # Truth is Directory/P/ipix/truth-16-{ipix}.fits. This has continuum
 
     if args.P_folders is None:
-        args.P_folders = [x for x in next(os_walk(args.Directory))[1] if x.isdigit()]
+        args.P_folders = [int(x) for x in next(os_walk(args.Directory))[1] if x.isdigit()]
         logging.info("Transversing all P folders. There are %d many.", len(args.P_folders))
     else:
-        args.P_folders = [x for x in args.P_folders if x.isdigit()]
+        # args.P_folders = [x for x in args.P_folders if x.isdigit()]
         logging.info("Transversing given P folders. There are %d many.", len(args.P_folders))
 
     for P in args.P_folders:
