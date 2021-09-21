@@ -102,8 +102,8 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
     ARM_RESOM  = ftruth[f'{arm}_RESOLUTION'].read()
 
     for i in range(nspectra):
-        ra    = fbrmap['TARGET_RA']
-        dec   = fbrmap['TARGET_DEC']
+        ra    = fbrmap['TARGET_RA'][i]
+        dec   = fbrmap['TARGET_DEC'][i]
         z_qso = getRedshift(i, fzbest)
 
         # cut out forest
