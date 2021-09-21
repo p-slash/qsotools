@@ -23,6 +23,7 @@ def transversePFolder(P, args):
 
     pixNFinal = len(fname_spectra)
     rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
+    printProgress.last_progress=0
     for pi, fname in enumerate(fname_spectra):
         printProgress(pi, pixNFinal)
         fspec  = fitsio.FITS(fname)
