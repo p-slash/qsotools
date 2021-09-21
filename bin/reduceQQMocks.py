@@ -83,7 +83,7 @@ def saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     data['LOGLAM'] = np.log10(wave)
     data['DELTA']  = delta
     data['IVAR']   = ivar
-    data['RESOMAT']= rmat
+    data['RESOMAT']= rmat.T
     R_kms = fitGaussian2RMat(wave, rmat)
 
     hdr_dict = {'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
