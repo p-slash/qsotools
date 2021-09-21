@@ -18,11 +18,13 @@ ARMS = ['B', 'R', 'Z']
 
 def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
-    fname_spectra = glob.iglob(ospath_join(working_dir, "*", "spectra-*.fits*"))
+    fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
     logging.info("Working in directory %s", working_dir)
 
-    rreplace = lambda s, new: new.join(s.rsplit("/spectra-", 1))
-    for fname in fname_spectra:
+    pixNFinal = len(fname_spectra)
+    rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
+    for pi, fname in enumerate(fname_spectra):
+        printProgress(pi, pixNFinal)
         fspec  = fitsio.FITS(fname)
         ftruth = fitsio.FITS(rreplace(fname, "/truth-"))
         fzbest = fitsio.FITS(rreplace(fname, "/zbest-"))
@@ -144,9 +146,9 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
         # Save it
         saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args)
 
-def printProgress(i, ifinal, percThres=4):
+def printProgress(i, ifinal, percThres=5):
     curr_progress = int(100*i/ifinal)
-    print_condition = (curr_progress-printProgress.last_progress > percThres) or (i == 0)
+    print_condition = (curr_progress-printProgress.last_progress >= percThres) or (i == 0)
 
     if print_condition:
         etime = (time.time()-start_time)/60 # min
