@@ -29,7 +29,7 @@ def transversePFolder(P, args):
         printProgress(pi, pixNFinal)
         fitsfiles = openFITSFiles(fname)
 
-        fbrmap = fitsfiles['Spec']['FIBERMAP']['TARGET_RA', 'TARGET_DEC'].read()
+        fbrmap = fitsfiles['Spec']['FIBERMAP']['TARGETID', 'TARGET_RA', 'TARGET_DEC'].read()
 
         # Reads ARM_FLUX extensions, it helps serialize i/o
         for arm in ARMS:
@@ -128,7 +128,7 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     data['RESOMAT']= rmat.T
     R_kms = fitGaussian2RMat(wave, rmat)
 
-    hdr_dict = {'THINGID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
+    hdr_dict = {'TARGETID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
         'MEANSNR': np.mean(np.sqrt(data['IVAR'])), \
         'DLL':np.median(np.diff(data['LOGLAM']))}
@@ -145,9 +145,9 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
     ARM_RESOM  = fitsfiles['Truth'][f'{arm}_RESOLUTION'].read()
 
     for i in range(nspectra):
+        thid  = fbrmap['TARGETID'][i]
         ra    = fbrmap['TARGET_RA'][i]
         dec   = fbrmap['TARGET_DEC'][i]
-        thid  = fitsfiles['Zbest']['TARGETID'][i]
         z_qso = getRedshift(i, fitsfiles['Zbest'])
 
         # cut out forest
