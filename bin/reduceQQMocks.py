@@ -10,7 +10,8 @@ from os.path import join as ospath_join
 
 import numpy as np
 from scipy.interpolate import interp1d
-from scipy.optimize import curve_fit
+from scipy.optimize    import curve_fit
+
 import qsotools.fiducial as fid
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 
@@ -19,23 +20,51 @@ ARMS = ['B', 'R', 'Z']
 def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
+    rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
+
     logging.info("Working in directory %s", working_dir)
 
     pixNFinal = len(fname_spectra)
-    rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
     printProgress.last_progress=0
     for pi, fname in enumerate(fname_spectra):
         printProgress(pi, pixNFinal)
-        fspec  = fitsio.FITS(fname)
-        ftruth = fitsio.FITS(rreplace(fname, "/truth-"))
-        fzbest = fitsio.FITS(rreplace(fname, "/zbest-"))
-        fdelta = fitsio.FITS(rreplace(fname, "/delta-"), "rw", clobber=True)
+        fitsfiles = openFITSFiles(fname)
 
-        fbrmap = fspec['FIBERMAP']['TARGET_RA', 'TARGET_DEC'].read()
+        fbrmap = fitsfiles['Spec']['FIBERMAP']['TARGET_RA', 'TARGET_DEC'].read()
 
         # Reads ARM_FLUX extensions, it helps serialize i/o
         for arm in ARMS:
-            forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args)
+            forEachArm(arm, fbrmap, fitsfiles, args)
+
+        closeFITSFiles(fitsfiles)
+
+    printProgress(pixNFinal, pixNFinal)
+
+def openFITSFiles(fname):
+    fitsfiles = {}
+    fitsfiles['Spec']  = fitsio.FITS(fname)
+    fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
+    fitsfiles['Zbest'] = fitsio.FITS(rreplace(fname, "/zbest-"))
+    fitsfiles['Delta'] = fitsio.FITS(rreplace(fname, "/delta-"), "rw", clobber=True)
+
+    return fitsfiles
+
+def closeFITSFiles(fitsfiles):
+    fitsfiles['Spec'].close()
+    fitsfiles['Truth'].close()
+    fitsfiles['Zbest'].close()
+    fitsfiles['Delta'].close()
+
+def printProgress(i, ifinal, percThres=5):
+    curr_progress = int(100*i/ifinal)
+    print_condition = (curr_progress-printProgress.last_progress >= percThres) or (i == 0)
+
+    if print_condition:
+        etime = (time.time()-start_time)/60 # min
+        logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
+        printProgress.last_progress = curr_progress
+
+    return print_condition
 
 # Simply returns redshift.
 # Do more if you want to check for errors etc.
@@ -55,14 +84,14 @@ def getTrueContinuumInterp(i, ftruth):
 
 def getForestAnalysisRegion(wave, z_qso, args):
     lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
-                wave <= fid.LYA_LAST_WVL * (1+z_qso))
+        wave <= fid.LYA_LAST_WVL * (1+z_qso))
     forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
-            wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
+        wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
     lya_ind = np.logical_and(lya_ind, forst_bnd)
 
     return lya_ind
 
-def fitGaussian2RMat(wave, rmat):
+def fitGaussian2RMat(thid, wave, rmat):
     v  = fid.LIGHT_SPEED * np.log(wave)
     dv = np.mean(np.diff(v))
 
@@ -70,20 +99,28 @@ def fitGaussian2RMat(wave, rmat):
         fid.LIGHT_SPEED/R_kms/fid.ONE_SIGMA_2_FWHM, dv)
 
     rmat_ave = np.mean(rmat, axis=1)
+    rmat_std = np.std(rmat, axis=1)
     ndiags = rmat_ave.shape[0]
     x = np.arange(ndiags//2,-(ndiags//2)-1,-1)*dv
-    R_kms, _ = curve_fit(fitt, x, rmat_ave, p0=dv, bounds=(dv/100, 100*dv))
+    R_kms, eR_kms = curve_fit(fitt, x, rmat_ave, sigma=rmat_std, absolute_sigma=True, \
+        p0=dv, bounds=(dv/100, 100*dv))
+    R_kms  = R_kms[0]
+    eR_kms = eR_kms[0]
+    chi2 = np.sum((fitt(x, R_kms)-rmat_ave)**2/rmat_std**2)
 
-    logging.debug("Fitting R (km/s) to the average resomat.")
-    logging.debug("ndiags=%d, R_kms=%.1f km/s.", ndiags, R_kms)
+    # Warn if precision or chi^2 is bad
+    if eR_kms/R_kms > 0.2 or chi2/x.size>2:
+        logging.debug("Resolution R_kms is questionable. ID: %d", thid)
+        logging.debug("Precision e/R: %.1f%.", eR_kms/R_kms*100)
+        logging.debug("Chi^2 of the fit: %.1f / %d.", chi2, x.size)
 
-    return R_kms[0]
+    return R_kms
 
-def saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
+def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     ndiags = rmat.shape[0]
 
-    data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
-                          ('RESOMAT','f8', ndiags)])
+    data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'), \
+        ('RESOMAT','f8', ndiags)])
 
     data['LOGLAM'] = np.log10(wave)
     data['DELTA']  = delta
@@ -91,25 +128,27 @@ def saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     data['RESOMAT']= rmat.T
     R_kms = fitGaussian2RMat(wave, rmat)
 
-    hdr_dict = {'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
+    hdr_dict = {'THINGID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
-        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 
+        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), \
         'DLL':np.median(np.diff(data['LOGLAM']))}
 
-    fdelta.write(data, header=hdr_dict)
+    if not args.nosave:
+        fdelta.write(data, header=hdr_dict)
 
-def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
-    ARM_WAVE   = fspec[f'{arm}_WAVELENGTH'].read()
-    nspectra   = fspec[f'{arm}_FLUX'].read_header()['NAXIS2']
-    ARM_FLUXES = fspec[f'{arm}_FLUX'].read()
-    ARM_IVAR   = fspec[f'{arm}_IVAR'].read()
-    ARM_MASK   = np.array(fspec[f'{arm}_MASK'].read(), dtype=bool)
-    ARM_RESOM  = ftruth[f'{arm}_RESOLUTION'].read()
+def forEachArm(arm, fbrmap, fitsfiles, args):
+    ARM_WAVE   = fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
+    nspectra   = fitsfiles['Spec'][f'{arm}_FLUX'].read_header()['NAXIS2']
+    ARM_FLUXES = fitsfiles['Spec'][f'{arm}_FLUX'].read()
+    ARM_IVAR   = fitsfiles['Spec'][f'{arm}_IVAR'].read()
+    ARM_MASK   = np.array(fitsfiles['Spec'][f'{arm}_MASK'].read(), dtype=bool)
+    ARM_RESOM  = fitsfiles['Truth'][f'{arm}_RESOLUTION'].read()
 
     for i in range(nspectra):
         ra    = fbrmap['TARGET_RA'][i]
         dec   = fbrmap['TARGET_DEC'][i]
-        z_qso = getRedshift(i, fzbest)
+        thid  = fitsfiles['Zbest']['TARGETID'][i]
+        z_qso = getRedshift(i, fitsfiles['Zbest'])
 
         # cut out forest
         remaining_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, args)
@@ -129,7 +168,7 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
             # Short chunk
             continue
 
-        cont_interp = getTrueContinuumInterp(i, ftruth)
+        cont_interp = getTrueContinuumInterp(i, fitsfiles['Truth'])
 
         z    = wave/fid.LYA_WAVELENGTH-1
         cont = cont_interp(wave)
@@ -145,18 +184,7 @@ def forEachArm(arm, fbrmap, fspec, fzbest, ftruth, fdelta, args):
         rmat = np.delete(ARM_RESOM, ~remaining_pixels, axis=1) 
 
         # Save it
-        saveDelta(wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args)
-
-def printProgress(i, ifinal, percThres=5):
-    curr_progress = int(100*i/ifinal)
-    print_condition = (curr_progress-printProgress.last_progress >= percThres) or (i == 0)
-
-    if print_condition:
-        etime = (time.time()-start_time)/60 # min
-        logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
-        printProgress.last_progress = curr_progress
-
-    return print_condition
+        saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fitsfiles['Delta'], args)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -203,6 +231,8 @@ if __name__ == '__main__':
 
     for P in args.P_folders:
         transversePFolder(P, args)
+
+    logging.info("Done!")
 
 
 
