@@ -105,13 +105,13 @@ def fitGaussian2RMat(thid, wave, rmat):
     R_kms, eR_kms = curve_fit(fitt, x, rmat_ave, sigma=rmat_std, absolute_sigma=True, \
         p0=dv, bounds=(dv/100, 100*dv))
     R_kms  = R_kms[0]
-    eR_kms = eR_kms[0]
+    eR_kms = eR_kms[0, 0]
     chi2 = np.sum((fitt(x, R_kms)-rmat_ave)**2/rmat_std**2)
 
     # Warn if precision or chi^2 is bad
     if eR_kms/R_kms > 0.2 or chi2/x.size>2:
         logging.debug("Resolution R_kms is questionable. ID: %d", thid)
-        logging.debug("Precision e/R: %.1f%.", eR_kms/R_kms*100)
+        logging.debug("Precision e/R: %.1f\%.", eR_kms/R_kms*100)
         logging.debug("Chi^2 of the fit: %.1f / %d.", chi2, x.size)
 
     return R_kms
