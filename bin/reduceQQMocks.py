@@ -126,7 +126,7 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     data['DELTA']  = delta
     data['IVAR']   = ivar
     data['RESOMAT']= rmat.T
-    R_kms = fitGaussian2RMat(wave, rmat)
+    R_kms = fitGaussian2RMat(thid, wave, rmat)
 
     hdr_dict = {'TARGETID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
