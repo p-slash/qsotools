@@ -111,10 +111,9 @@ def fitGaussian2RMat(thid, wave, rmat):
     # Warn if precision or chi^2 is bad
     if eR_kms/R_kms > 0.2 or chi2/x.size>2:
         logging.debug("Resolution R_kms is questionable. ID: %d", thid)
+        logging.debug("R_kms: %.1f km/s - dv: %.1f km/s", R_kms, dv)
         logging.debug("Precision e/R: %.1f percent.", eR_kms/R_kms*100)
         logging.debug("Chi^2 of the fit: %.1f / %d.", chi2, x.size)
-        print(rmat_ave)
-        print(rmat_std)
 
     return R_kms
 
