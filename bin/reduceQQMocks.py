@@ -20,7 +20,6 @@ ARMS = ['B', 'R', 'Z']
 def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
-    rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
 
     logging.info("Working in directory %s", working_dir)
 
@@ -41,6 +40,7 @@ def transversePFolder(P, args):
     printProgress(pixNFinal, pixNFinal)
 
 def openFITSFiles(fname):
+    rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
     fitsfiles = {}
     fitsfiles['Spec']  = fitsio.FITS(fname)
     fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
