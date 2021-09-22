@@ -99,21 +99,24 @@ def fitGaussian2RMat(thid, wave, rmat):
         fid.LIGHT_SPEED/R_kms/fid.ONE_SIGMA_2_FWHM, dv)
 
     rmat_ave = np.mean(rmat, axis=1)
-    rmat_std = np.std(rmat, axis=1)
+
+    # Chi^2 values are bad. Also yields error by std being close 0.
+    # rmat_std = np.std(rmat, axis=1)
+    # sigma=rmat_std, absolute_sigma=True
+    #chi2 = np.sum((fitt(x, R_kms)-rmat_ave)**2/rmat_std**2)
+
     ndiags = rmat_ave.shape[0]
     x = np.arange(ndiags//2,-(ndiags//2)-1,-1)*dv
-    R_kms, eR_kms = curve_fit(fitt, x, rmat_ave, sigma=rmat_std, absolute_sigma=True, \
-        p0=dv, bounds=(dv/100, 100*dv))
+    R_kms, eR_kms = curve_fit(fitt, x, rmat_ave, p0=dv, bounds=(dv/10, 10*dv))
     R_kms  = R_kms[0]
     eR_kms = eR_kms[0, 0]
-    chi2 = np.sum((fitt(x, R_kms)-rmat_ave)**2/rmat_std**2)
 
     # Warn if precision or chi^2 is bad
-    if eR_kms/R_kms > 0.2 or chi2/x.size>2:
+    if eR_kms/R_kms > 0.2:# or chi2/x.size>2:
         logging.debug("Resolution R_kms is questionable. ID: %d", thid)
         logging.debug("R_kms: %.1f km/s - dv: %.1f km/s", R_kms, dv)
         logging.debug("Precision e/R: %.1f percent.", eR_kms/R_kms*100)
-        logging.debug("Chi^2 of the fit: %.1f / %d.", chi2, x.size)
+        # logging.debug("Chi^2 of the fit: %.1f / %d.", chi2, x.size)
 
     return R_kms
 
