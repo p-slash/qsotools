@@ -290,6 +290,7 @@ if __name__ == '__main__':
     if args.save_qqfile:
         args.sigma_per_pixel = 0
         args.specres = 0
+        args.desi_w1 = 3400.0
         args.z_forest_min = 0
         args.keep_nolya_pixels = True
         args.save_full_flux = True
