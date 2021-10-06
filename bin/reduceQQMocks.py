@@ -85,8 +85,10 @@ def getTrueContinuumInterp(i, ftruth):
 def getForestAnalysisRegion(wave, z_qso, args):
     lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
         wave <= fid.LYA_LAST_WVL * (1+z_qso))
-    forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
-        wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
+
+    w1 = max(fid.LYA_WAVELENGTH*(1+args.z_forest_min), args.desi_w1)
+    w2 = min(fid.LYA_WAVELENGTH*(1+args.z_forest_max), args.desi_w2)
+    forst_bnd = np.logical_and(wave >= w1, wave <= w2)
     lya_ind = np.logical_and(lya_ind, forst_bnd)
 
     return lya_ind
@@ -196,10 +198,10 @@ if __name__ == '__main__':
     parser.add_argument("--P-folders", nargs='*', type=int, help="P folders to run test."
         " Default is all available folders. Leave space between numbers when specifying multiple.")
 
-    # parser.add_argument("--desi-w1", help=("Lower wavelength of DESI wave grid in A. "\
-    #     "Default: %(default)s A"), type=float, default=3600.)
-    # parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
-    #     "Default: %(default)s A"), type=float, default=9800.)
+    parser.add_argument("--desi-w1", help=("Lower wavelength of DESI wave grid in A. "\
+        "Avoid boundary. Default: %(default)s A"), type=float, default=3600.)
+    parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
+        "Avoid boundary. Default: %(default)s A"), type=float, default=9800.)
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.9)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
