@@ -1464,7 +1464,15 @@ class QQFile():
         else:
             raise Exception("Metadata HDU not found in catalog.")
 
-        self.metadata = self.fitsfile[metadata_str]['RA','DEC','Z','TARGETID'].read()
+        metahdu = self.fitsfile[metadata_str]
+        colnames = metahdu.get_colnames()
+        l1 = ['RA','DEC','Z','TARGETID']
+
+        # Check must-have columns are present
+        if not all(elem in colnames for elem in l1):
+            raise Exception("Missing metadata info ra, dec, z or targetid")
+
+        self.metadata = metahdu[l1].read()
         self.nqso = len(self.metadata['RA'])
 
     def close(self):
