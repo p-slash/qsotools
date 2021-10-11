@@ -1457,7 +1457,7 @@ class QQFile():
 
     def readMetadata(self):
         extnames = [hdu.get_extname() for hdu in self.fitsfile]
-        if 'METADATA' not in extnames:
+        if 'METADATA' in extnames:
             metadata_str = 'METADATA'
         elif 'QSO_CAT' in extnames:
             metadata_str = 'QSO_CAT'
