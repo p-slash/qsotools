@@ -145,6 +145,8 @@ def getDESIwavegrid(args):
 # Returns metadata array and number of pixels
 def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,TARGETID
+    meta_dt = np.dtype([('RA','f8'), ('DEC','f8'), ('Z','f8'),\
+        ('TARGETID','i8'), ('PIXNUM','i4')])
     if args.master_file:
         print("Reading master file:", args.master_file, flush=True)
         master_file = QQFile(args.master_file)
@@ -152,12 +154,18 @@ def getMetadata(args):
         master_file.close()
 
         args.nmocks = master_file.nqso
-        metadata = master_file.metadata
+
+        # Add pixnum field to metadata
+        metadata = np.zeros(args.nmocks, dtype=meta_dt)
+        metadata['RA']       = master_file.metadata['RA']
+        metadata['DEC']      = master_file.metadata['DEC']
+        metadata['Z']        = master_file.metadata['Z']
+        metadata['TARGETID'] = master_file.metadata['TARGETID']
+
         print("Number of mocks to generate:", args.nmocks, flush=True)
     else:
         print("Generating random metadata.", flush=True)
-        metadata = np.zeros(args.nmocks, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
-            ('Z', 'f8'), ('TARGETID', 'i8'), ('PIXNUM', 'i4')])
+        metadata = np.zeros(args.nmocks, dtype=meta_dt)
         metadata['TARGETID'] = np.arange(args.nmocks)
         # Use the same seed for all process to generate the same metadata
         RNST = np.random.default_rng(args.seed)
