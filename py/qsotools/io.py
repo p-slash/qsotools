@@ -1459,8 +1459,8 @@ class QQFile():
         extnames = [hdu.get_extname() for hdu in self.fitsfile]
         if 'METADATA' not in extnames:
             metadata_str = 'METADATA'
-        # elif 'QSO_CAT' in extnames:
-        #     metadata_str = 'QSO_CAT'
+        elif 'QSO_CAT' in extnames:
+            metadata_str = 'QSO_CAT'
         else:
             raise Exception("Metadata HDU not found in catalog.")
 

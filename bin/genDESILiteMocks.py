@@ -144,7 +144,7 @@ def getDESIwavegrid(args):
 
 # Returns metadata array and number of pixels
 def getMetadata(args):
-    # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
+    # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,TARGETID
     if args.master_file:
         print("Reading master file:", args.master_file, flush=True)
         master_file = QQFile(args.master_file)
@@ -157,8 +157,8 @@ def getMetadata(args):
     else:
         print("Generating random metadata.", flush=True)
         metadata = np.zeros(args.nmocks, dtype=[('RA', 'f8'), ('DEC', 'f8'), \
-            ('Z', 'f8'), ('MOCKID', 'i8'), ('PIXNUM', 'i4')])
-        metadata['MOCKID'] = np.arange(args.nmocks)
+            ('Z', 'f8'), ('TARGETID', 'i8'), ('PIXNUM', 'i4')])
+        metadata['TARGETID'] = np.arange(args.nmocks)
         # Use the same seed for all process to generate the same metadata
         RNST = np.random.default_rng(args.seed)
         # Generate coords in degrees
@@ -338,7 +338,7 @@ if __name__ == '__main__':
         print_condition = (curr_progress-last_progress > 4) or (ui == i1)            
 
         meta1 = split_meta[ui]
-        ntemp = meta1['MOCKID'].size
+        ntemp = meta1['TARGETID'].size
         z_qso = meta1['Z'][:, None]
 
         if print_condition:
@@ -403,7 +403,7 @@ if __name__ == '__main__':
             wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso)
 
             nchunks = len(wave_c)
-            nid = meta1['MOCKID'][i]
+            nid = meta1['TARGETID'][i]
 
             if not args.save_picca:
                 fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
