@@ -153,7 +153,10 @@ def getMetadata(args):
         master_file.readMetadata()
         master_file.close()
 
-        args.nmocks = master_file.nqso
+        # Remove low redshift quasars
+        zqso_cut_index = master_file.metadata['Z'] > args.z_quasar_min
+        master_file.metadata = master_file.metadata[zqso_cut_index]
+        args.nmocks = master_file.metadata.size
 
         # Add pixnum field to metadata
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
@@ -240,6 +243,8 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=3600.)
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
+    parser.add_argument("--z-quasar-min", help="Lowest quasar redshift. Default: %(default)s", \
+        type=float, default=2.1)
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.9)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
