@@ -1449,15 +1449,22 @@ class QQFile():
         self.close()
 
     def readAll(self):
-        self.metadata = self.fitsfile['METADATA'].read()
-        self.nqso = len(self.metadata['RA'])
+        self.readMetadata()
 
         self.wave = self.fitsfile['WAVELENGTH'].read()
         self.fluxes = self.fitsfile['TRANSMISSION'].read().T
         self.close()
 
-    def readMetada(self):
-        self.metadata = self.fitsfile['METADATA'].read()
+    def readMetadata(self):
+        extnames = [hdu.get_extname() for hdu in self.fitsfile]
+        if 'METADATA' not in extnames:
+            metadata_str = 'METADATA'
+        # elif 'QSO_CAT' in extnames:
+        #     metadata_str = 'QSO_CAT'
+        else:
+            raise Exception("Metadata HDU not found in catalog.")
+
+        self.metadata = self.fitsfile[metadata_str].read()
         self.nqso = len(self.metadata['RA'])
 
     def close(self):
