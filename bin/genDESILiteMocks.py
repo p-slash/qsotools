@@ -148,7 +148,7 @@ def getMetadata(args):
     if args.master_file:
         print("Reading master file:", args.master_file, flush=True)
         master_file = QQFile(args.master_file)
-        master_file.readMetada()
+        master_file.readMetadata()
         master_file.close()
 
         args.nmocks = master_file.nqso
