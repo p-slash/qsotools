@@ -1464,7 +1464,7 @@ class QQFile():
         else:
             raise Exception("Metadata HDU not found in catalog.")
 
-        self.metadata = self.fitsfile[metadata_str].read()
+        self.metadata = self.fitsfile[metadata_str]['RA','DEC','Z','TARGETID'].read()
         self.nqso = len(self.metadata['RA'])
 
     def close(self):
