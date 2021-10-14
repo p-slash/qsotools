@@ -146,30 +146,29 @@ def getDESIwavegrid(args):
 def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,TARGETID
     meta_dt = np.dtype([('RA','f8'), ('DEC','f8'), ('Z','f8'),\
-        ('TARGETID','i8'), ('PIXNUM','i4')])
+        ('MOCKID','i8'), ('PIXNUM','i4')])
+    dt_list = ['RA', 'DEC', 'Z', 'MOCKID']
     if args.master_file:
         print("Reading master file:", args.master_file, flush=True)
         master_file = QQFile(args.master_file)
-        master_file.readMetadata()
+        l1 = master_file.readMetadata() # l1 is ordered as 'RA','DEC','Z', 'MOCK/TARGETID'
         master_file.close()
 
         # Remove low redshift quasars
-        zqso_cut_index = master_file.metadata['Z'] > args.z_quasar_min
+        zqso_cut_index       = master_file.metadata['Z'] > args.z_quasar_min
         master_file.metadata = master_file.metadata[zqso_cut_index]
-        args.nmocks = master_file.metadata.size
+        args.nmocks          = master_file.metadata.size
 
         # Add pixnum field to metadata
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
-        metadata['RA']       = master_file.metadata['RA']
-        metadata['DEC']      = master_file.metadata['DEC']
-        metadata['Z']        = master_file.metadata['Z']
-        metadata['TARGETID'] = master_file.metadata['TARGETID']
+        for mcol, fcol in zipped(dt_list, l1):
+            metadata[mcol] = master_file.metadata[fcol]
 
         print("Number of mocks to generate:", args.nmocks, flush=True)
     else:
         print("Generating random metadata.", flush=True)
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
-        metadata['TARGETID'] = np.arange(args.nmocks)
+        metadata['MOCKID'] = np.arange(args.nmocks)
         # Use the same seed for all process to generate the same metadata
         RNST = np.random.default_rng(args.seed)
         # Generate coords in degrees
@@ -351,7 +350,7 @@ if __name__ == '__main__':
         print_condition = (curr_progress-last_progress > 4) or (ui == i1)            
 
         meta1 = split_meta[ui]
-        ntemp = meta1['TARGETID'].size
+        ntemp = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
 
         if print_condition:
@@ -416,7 +415,7 @@ if __name__ == '__main__':
             wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso)
 
             nchunks = len(wave_c)
-            nid = meta1['TARGETID'][i]
+            nid = meta1['MOCKID'][i]
 
             if not args.save_picca:
                 fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
