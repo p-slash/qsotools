@@ -1466,14 +1466,25 @@ class QQFile():
 
         metahdu = self.fitsfile[metadata_str]
         colnames = metahdu.get_colnames()
-        l1 = ['RA','DEC','Z','TARGETID']
+
+        # Do not change ordering.
+        # genDESILiteMocks assumes 'RA', 'DEC', 'Z', 'MOCK/TARGETID'
+        l1 = ['RA','DEC','Z']
 
         # Check must-have columns are present
         if not all(elem in colnames for elem in l1):
-            raise Exception("Missing metadata info ra, dec, z or targetid")
+            raise Exception("Missing metadata info: RA, DEC or Z.")
+        if 'MOCKID' in colnames:
+            l1.append('MOCKID')
+        elif 'TARGETID' in colnames:
+            l1.append('TARGETID')
+        else:
+            raise Exception("Missing metadata info: MOCKID or TARGETID.")
 
         self.metadata = metahdu[l1].read()
-        self.nqso = len(self.metadata['RA'])
+        self.nqso     = self.metadata.size
+
+        return l1
 
     def close(self):
         self.fitsfile.close()
