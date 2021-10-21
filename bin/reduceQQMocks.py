@@ -6,11 +6,12 @@ import time
 import logging
 
 from os      import walk as os_walk
-from os.path import join as ospath_join
+from os.path import join as ospath_join, basename as ospath_base
 
 import numpy as np
-from scipy.interpolate import interp1d
+import scipy.sparse
 from scipy.optimize    import curve_fit
+from scipy.interpolate import interp1d
 
 import qsotools.fiducial as fid
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
@@ -45,7 +46,13 @@ def openFITSFiles(fname):
     fitsfiles['Spec']  = fitsio.FITS(fname)
     fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
     fitsfiles['Zbest'] = fitsio.FITS(rreplace(fname, "/zbest-"))
-    fitsfiles['Delta'] = fitsio.FITS(rreplace(fname, "/delta-"), "rw", clobber=True)
+
+    fdname = rreplace(fname, "/delta-")
+    if args.output_dir != args.Directory:
+        fdname = ospath_base(fdname)
+        fdname = ospath_join(args.output_dir, fdname)
+
+    fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
     return fitsfiles
 
@@ -122,6 +129,79 @@ def fitGaussian2RMat(thid, wave, rmat):
 
     return R_kms
 
+def constructCSRMatrix(data, oversampling):
+    nrows         = data.shape[0]
+    nelem_per_row = data.shape[1]
+    # assert nelem_per_row % 2 == 1
+
+    ncols = nrows*oversampling + nelem_per_row-1
+
+    indices = np.repeat(np.arange(nrows)*oversampling, nelem_per_row) + \
+        np.tile(np.arange(nelem_per_row), nrows)
+    iptrs = np.arange(nrows+1)*nelem_per_row
+
+    return scipy.sparse.csr_matrix((data.flatten(), indices, iptrs), shape=(nrows, ncols))
+
+def getDIAfromdata(rmat_data):
+    ndiags, nrows = rmat_data.shape
+    assert nrows > ndiags
+
+    offsets = np.arange(ndiags//2, -(-ndiags//2)-1, -1)
+    return scipy.sparse.dia_matrix((rmat_data, offsets), (nrows, nrows))
+
+# Assume offset[0] == -offset[-1]
+def getOversampledRMat(wave, rmat, oversampling=3):
+    if isinstance(rmat, np.ndarray) and rmat.ndim == 2:
+        rmat_dia = getDIAfromdata(rmat)
+    elif scipy.sparse.isspmatrix_dia(rmat):
+        rmat_dia = rmat
+    else:
+        raise ValueError("Cannot use given rmat in oversampling.")
+
+    # Properties of the resolution matrix
+    nrows = wave.size
+    dw    = np.mean(np.diff(wave))
+    noff  = rmat_dia.offsets[0]
+
+    # Oversampled resolution matrix elements per row
+    nelem_per_row = 2*noff*oversampling + 1
+    # ncols = nrows*oversampling + nelem_per_row-1
+    
+    # Pad the boundaries of the input wave grid
+    padded_wave = np.concatenate(( dw*np.arange(-noff, 0)+wave[0], wave, \
+        dw*np.arange(1, noff+1)+wave[-1] ))
+    # assert padded_wave.size == (2*noff+wave.size)
+    
+    # Generate oversampled wave grid that is padded at the bndry
+    # oversampled_wave = np.linspace(padded_wave[0], padded_wave[-1], \
+    #    oversampling*padded_wave.size)
+    # assert ncols == oversampled_wave.size
+
+    data = np.zeros((nrows, nelem_per_row))
+
+    # Helper function to pad boundaries
+    def getPaddedRow(i):
+        row_vector = rmat_dia.getrow(i).data
+        if i < noff:
+            row_vector = np.concatenate((np.flip(row_vector[i*2+1:]), row_vector))
+        if i > nrows-noff-1:
+            ii = i-nrows
+            row_vector = np.concatenate((row_vector, np.flip(row_vector[:ii*2+1])))
+        return row_vector
+
+    for i in range(nrows):
+        row_vector = getPaddedRow(i)
+        win    = padded_wave[i:i+2*noff+1]
+        wout   = np.linspace(win[0], win[-1], nelem_per_row)
+        spline = scipy.interpolate.CubicSpline(win, row_vector)
+
+        data[i] = spline(wout)
+
+    # csr_res = constructCSRMatrix(data, oversampling)
+        
+    # return csr_res, oversampled_wave
+    return data
+
 def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     ndiags = rmat.shape[0]
 
@@ -138,6 +218,9 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
         'MEANSNR': np.mean(np.sqrt(data['IVAR'])), \
         'DLL':np.median(np.diff(data['LOGLAM']))}
+
+    if args.oversample_rmat>1:
+        hdr_dict['OVERSAMP'] = args.oversample_rmat
 
     if not args.nosave:
         fdelta.write(data, header=hdr_dict)
@@ -187,7 +270,9 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
         ivar  = ivar*tr_mf**2
 
         # Cut rmat
-        rmat = np.delete(ARM_RESOM, ~remaining_pixels, axis=1) 
+        rmat = np.delete(ARM_RESOM, ~remaining_pixels, axis=1)
+        if args.oversample_rmat>1:
+            rmat = getOversampledRMat(wave, rmat, args.oversample_rmat)
 
         # Save it
         saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fitsfiles['Delta'], args)
@@ -195,6 +280,7 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory. Saves next to spectra-X-X.fits as delta-X-X.fits")
+    parser.add_argument("--output-dir", help="Save results here if passed.")
     parser.add_argument("--P-folders", nargs='*', type=int, help="P folders to run test."
         " Default is all available folders. Leave space between numbers when specifying multiple.")
 
@@ -206,6 +292,10 @@ if __name__ == '__main__':
         type=float, default=1.9)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
         type=float, default=4.3)
+
+    parser.add_argument("--oversample-rmat", help="Oversampling factor for resolution matrix. "\
+        "Pass >1 to get finely space response function.", type=int)
+
     parser.add_argument("--skip", help="Skip short chunks lower than given ratio", type=float)
 
     # parser.add_argument("--coadd")
@@ -220,7 +310,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     start_time = time.time()
-    logging.basicConfig(filename=ospath_join(args.Directory, 'reduction.log'), \
+
+    if not args.output_dir:
+        args.output_dir = args.Directory
+
+    logging.basicConfig(filename=ospath_join(args.output_dir, 'reduction.log'), \
         level=logging.DEBUG if args.debug else logging.INFO)
 
     # The data is organized under P=0, 1, ... (ipix//100) folders
