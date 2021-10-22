@@ -60,7 +60,8 @@ def save_parameters(txt_basefilename, args):
         "Seed                 : %d\n"
         "NGrid                : %d\n"
         "GridPixelSize        : %f\n"
-        "Redshift Evolution   : %s\n") % ( 
+        "Redshift Evolution   : %s\n"
+        "Catalog used         : %s\n") % ( 
     "Gaussian Mocks" if args.gauss else "Lognormal Mocks", \
     "Logarithmic", \
     # if not args.use_eds_v else "EdS", \
@@ -70,7 +71,8 @@ def save_parameters(txt_basefilename, args):
     args.seed, \
     args.log2ngrid, \
     args.griddv, \
-    "ON" if not args.fixed_zforest else "OFF")
+    "ON" if not args.fixed_zforest else "OFF", \
+    args.master_file if args.master_file else "None")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
     print("Saving parameteres to", temp_fname)
