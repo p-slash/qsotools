@@ -11,6 +11,7 @@ from os.path import join as ospath_join
 from os      import makedirs as os_makedirs
 import time
 import argparse
+import logging
 
 import numpy as np
 import healpy
@@ -38,16 +39,16 @@ def setResolutionMatrix(wave, args, ndiags=11):
     Rint = args.specres
     dv = args.pixel_dv
     if args.use_optimal_rmat:
-        print("Using optimal resolution matrix.")
-        print("Calculating correlation function.")
+        logging.info("Using optimal resolution matrix.")
+        logging.info("Calculating correlation function.")
         z = np.median(wave)/fid.LYA_WAVELENGTH-1
         _, xi = lm.lognPowerSpGH(z, numvpoints=2**16, corr=True)
         xi = xi.ravel()
         xi = np.fft.fftshift(xi)
-        print("Calculating optimal rmatrix.")
+        logging.info("Calculating optimal rmatrix.")
         return fid.getOptimalResolutionMatrix(Ngrid, xi, Rint, dv)
     else:
-        print("Using Gaussian resolution matrix.")
+        logging.info("Using Gaussian resolution matrix.")
         return fid.getGaussianResolutionMatrix(Ngrid, Rint, dv)
 
 def save_parameters(txt_basefilename, args):
@@ -75,7 +76,7 @@ def save_parameters(txt_basefilename, args):
     args.master_file if args.master_file else "None")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
-    print("Saving parameteres to", temp_fname)
+    logging.info("Saving parameteres to", temp_fname)
     toWrite = open(temp_fname, 'w')
     toWrite.write(Parameters_txt)
     toWrite.close()
@@ -131,12 +132,12 @@ def chunkHelper(i, waves, fluxes, errors, z_qso):
 def getDESIwavegrid(args):
     # Set up DESI observed wavelength grid
     if args.use_logspaced_wave:
-        print(f"Using logspaced wavelength grid with dv={args.pixel_dv} km/s.")
+        logging.info(f"Using logspaced wavelength grid with dv={args.pixel_dv} km/s.")
         base          = np.exp(args.pixel_dv / fid.LIGHT_SPEED)
         npix_desi     = int(np.log(args.desi_w2 / args.desi_w1) / args.pixel_dv * fid.LIGHT_SPEED)+1
         DESI_WAVEGRID = args.desi_w1 * np.power(base, np.arange(npix_desi))
     else:
-        print(f"Using linear wavelength grid with dlambda={args.pixel_dlambda} A.")
+        logging.info(f"Using linear wavelength grid with dlambda={args.pixel_dlambda} A.")
         npix_desi = int((args.desi_w2 - args.desi_w1) / args.pixel_dlambda) + 1
         DESI_WAVEGRID = args.desi_w1 + np.arange(npix_desi) * args.pixel_dlambda
 
@@ -151,7 +152,7 @@ def getMetadata(args):
         ('PIXNUM','i4'), ('COADD_EXPTIME','f8'), ('FLUX_R','f8')])
     dt_list = list(meta_dt.names).remove('PIXNUM')
     if args.master_file:
-        print("Reading master file:", args.master_file, flush=True)
+        logging.info("Reading master file:", args.master_file)
         master_file = QQFile(args.master_file)
         l1 = master_file.readMetadata() # l1 is ordered as 'RA','DEC','Z', 'MOCK/TARGETID'
         master_file.close()
@@ -166,9 +167,9 @@ def getMetadata(args):
         for mcol, fcol in zipped(dt_list, l1):
             metadata[mcol] = master_file.metadata[fcol]
 
-        print("Number of mocks to generate:", args.nmocks, flush=True)
+        logging.info("Number of mocks to generate:", args.nmocks)
     else:
-        print("Generating random metadata.", flush=True)
+        logging.info("Generating random metadata.")
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
         metadata['MOCKID'] = np.arange(args.nmocks)
         # Use the same seed for all process to generate the same metadata
@@ -188,7 +189,7 @@ def getMetadata(args):
             inv_cdf_interp = interp1d(invcdf, zcdf)
             metadata['Z']  = inv_cdf_interp(RNST.uniform(size=args.nmocks))
 
-    print("Number of nside for heal pixels:", args.hp_nside, flush=True)
+    logging.info("Number of nside for heal pixels:", args.hp_nside)
     if args.hp_nside:
         npixels = healpy.nside2npix(args.hp_nside)
         # when lonlat=True: RA first, Dec later
@@ -204,7 +205,7 @@ def getMetadata(args):
         qqfile = QQFile(mstrfname, 'rw')
         qqfile.writeMetadata(metadata)
         qqfile.close()
-        print("Saved master metadata to", mstrfname, flush=True)
+        logging.info("Saved master metadata to", mstrfname)
 
     return metadata, npixels
 
@@ -285,6 +286,7 @@ if __name__ == '__main__':
         help="Must be < # heal pixels. Default: %(default)s")
     parser.add_argument("--ithread", type=int, default=0, \
         help="Must be < nthreads. Default: %(default)s")
+    parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
     
     start_time = time.time()
@@ -293,6 +295,9 @@ if __name__ == '__main__':
     os_makedirs(args.OutputDir, exist_ok=True)
     RESOMAT = None
     TURNOFF_ZEVO = args.fixed_zforest is not None
+
+    logging.basicConfig(filename=ospath_join(args.OutputDir, f'genthread{args.ithread}.log'), \
+        level=logging.DEBUG if args.debug else logging.INFO)
 
     metadata, npixels = getMetadata(args)
     # Set up DESI observed wavelength grid
@@ -324,21 +329,21 @@ if __name__ == '__main__':
         lya_m.setCentralRedshift(3.0)
 
     if args.gauss:
-        print("Generating Gaussian mocks.", flush=True)
+        logging.info("Generating Gaussian mocks.")
         mean_flux_function = fid.meanFluxFG08
     else:
-        print("Generating lognormal mocks.", flush=True)
+        logging.info("Generating lognormal mocks.")
         mean_flux_function = lm.lognMeanFluxGH
 
     if args.ithread == 0:
         save_parameters(txt_basefilename, args)
 
     metadata.sort(order='PIXNUM')
-    print("Metadata sorted.", flush=True)
+    logging.info("Metadata sorted.")
 
     u_pix, s = np.unique(metadata['PIXNUM'], return_index=True)
     split_meta = np.split(metadata, s[1:])
-    print(f"Length of split metadata {len(split_meta)} vs npixels {npixels}.", flush=True)
+    logging.info(f"Length of split metadata {len(split_meta)} vs npixels {npixels}.")
 
     # parallel support
     dithr = int(len(u_pix)/args.nthreads)
@@ -356,9 +361,9 @@ if __name__ == '__main__':
         z_qso = meta1['Z'][:, None]
 
         if print_condition:
-            print(f"Working on pixel {ipix}. Number of qsos is {ntemp}.")
+            logging.info(f"Working on pixel {ipix}. Number of qsos is {ntemp}.")
             etime = (time.time()-start_time)/60 # min
-            print(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.", flush=True)
+            logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
             last_progress = curr_progress
 
         if ntemp == 0:
@@ -390,7 +395,7 @@ if __name__ == '__main__':
             filename_list.extend([fname])
 
             if print_condition:
-                print(f"Saved file {fname}.", flush=True)
+                logging.info(f"Saved file {fname}.")
 
             continue
         
@@ -440,14 +445,14 @@ if __name__ == '__main__':
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, f"file_list_qso-{args.ithread}.txt") 
     # "%s_filelist.txt" % txt_basefilename
-    print("Saving chunk spectra file list as ", temp_fname, flush=True)
+    logging.info("Saving chunk spectra file list as ", temp_fname)
     toWrite = open(temp_fname, 'w')
     toWrite.write("%d\n" % len(filename_list))
     for f in filename_list:
         toWrite.write(f +"\n")
     toWrite.close()
 
-    print("DONE!")
+    logging.info("DONE!")
 
 
 

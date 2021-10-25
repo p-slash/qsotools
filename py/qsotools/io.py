@@ -3,6 +3,7 @@ from configparser import ConfigParser
 from os.path import exists as os_exists, join as ospath_join
 from collections import namedtuple
 from itertools import groupby
+import logging
 
 import numpy as np
 from scipy.stats import binned_statistic
@@ -1462,7 +1463,8 @@ class QQFile():
         elif 'QSO_CAT' in extnames:
             metadata_str = 'QSO_CAT'
         else:
-            raise Exception("Metadata HDU not found in catalog.")
+            metadata_str = 1
+            logging.warning("Metadata not found by hduname. Using extension 1.")
 
         metahdu = self.fitsfile[metadata_str]
         colnames = metahdu.get_colnames()
