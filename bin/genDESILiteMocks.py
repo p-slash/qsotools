@@ -76,7 +76,7 @@ def save_parameters(txt_basefilename, args):
     args.master_file if args.master_file else "None")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
-    logging.info("Saving parameteres to", temp_fname)
+    logging.info(f"Saving parameteres to {temp_fname}")
     toWrite = open(temp_fname, 'w')
     toWrite.write(Parameters_txt)
     toWrite.close()
@@ -152,7 +152,7 @@ def getMetadata(args):
         ('PIXNUM','i4'), ('COADD_EXPTIME','f8'), ('FLUX_R','f8')])
     dt_list = list(meta_dt.names).remove('PIXNUM')
     if args.master_file:
-        logging.info("Reading master file:", args.master_file)
+        logging.info(f"Reading master file: {args.master_file}")
         master_file = QQFile(args.master_file)
         l1 = master_file.readMetadata() # l1 is ordered as 'RA','DEC','Z', 'MOCK/TARGETID'
         master_file.close()
@@ -167,7 +167,7 @@ def getMetadata(args):
         for mcol, fcol in zipped(dt_list, l1):
             metadata[mcol] = master_file.metadata[fcol]
 
-        logging.info("Number of mocks to generate:", args.nmocks)
+        logging.info(f"Number of mocks to generate: {args.nmocks}")
     else:
         logging.info("Generating random metadata.")
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
@@ -189,7 +189,7 @@ def getMetadata(args):
             inv_cdf_interp = interp1d(invcdf, zcdf)
             metadata['Z']  = inv_cdf_interp(RNST.uniform(size=args.nmocks))
 
-    logging.info("Number of nside for heal pixels:", args.hp_nside)
+    logging.info(f"Number of nside for heal pixels: {args.hp_nside}")
     if args.hp_nside:
         npixels = healpy.nside2npix(args.hp_nside)
         # when lonlat=True: RA first, Dec later
@@ -205,7 +205,7 @@ def getMetadata(args):
         qqfile = QQFile(mstrfname, 'rw')
         qqfile.writeMetadata(metadata)
         qqfile.close()
-        logging.info("Saved master metadata to", mstrfname)
+        logging.info(f"Saved master metadata to {mstrfname}")
 
     return metadata, npixels
 
@@ -445,7 +445,7 @@ if __name__ == '__main__':
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, f"file_list_qso-{args.ithread}.txt") 
     # "%s_filelist.txt" % txt_basefilename
-    logging.info("Saving chunk spectra file list as ", temp_fname)
+    logging.info(f"Saving chunk spectra file list as {temp_fname}")
     toWrite = open(temp_fname, 'w')
     toWrite.write("%d\n" % len(filename_list))
     for f in filename_list:

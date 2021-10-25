@@ -1474,7 +1474,7 @@ class QQFile():
         l1 = []
         def add_colname(radec):
             if f'TARGET_{radec}' in colnames:
-                l1.append('TARGET_{radec}')
+                l1.append(f'TARGET_{radec}')
             elif radec in colnames:
                 l1.append(radec)
             else:
