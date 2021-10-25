@@ -164,7 +164,7 @@ def getMetadata(args):
 
         # Add pixnum field to metadata
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
-        for mcol, fcol in zipped(dt_list, l1):
+        for mcol, fcol in zip(dt_list, l1):
             metadata[mcol] = master_file.metadata[fcol]
 
         logging.info(f"Number of mocks to generate: {args.nmocks}")
