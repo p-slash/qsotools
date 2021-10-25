@@ -147,9 +147,9 @@ def getDESIwavegrid(args):
 # Returns metadata array and number of pixels
 def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,TARGETID
-    meta_dt = np.dtype([('RA','f8'), ('DEC','f8'), ('Z','f8'),\
-        ('MOCKID','i8'), ('PIXNUM','i4')])
-    dt_list = ['RA', 'DEC', 'Z', 'MOCKID']
+    meta_dt = np.dtype([('RA','f8'), ('DEC','f8'), ('Z','f8'),('MOCKID','i8'), \
+        ('PIXNUM','i4'), ('COADD_EXPTIME','f8'), ('FLUX_R','f8')])
+    dt_list = list(meta_dt.names).remove('PIXNUM')
     if args.master_file:
         print("Reading master file:", args.master_file, flush=True)
         master_file = QQFile(args.master_file)
