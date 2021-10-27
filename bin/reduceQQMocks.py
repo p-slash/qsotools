@@ -146,7 +146,7 @@ def getDIAfromdata(rmat_data):
     ndiags, nrows = rmat_data.shape
     assert nrows > ndiags
 
-    offsets = np.arange(ndiags//2, -(-ndiags//2)-1, -1)
+    offsets = np.arange(ndiags//2, -(ndiags//2)-1, -1)
     return scipy.sparse.dia_matrix((rmat_data, offsets), (nrows, nrows))
 
 # Assume offset[0] == -offset[-1]
