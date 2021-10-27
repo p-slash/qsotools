@@ -177,7 +177,7 @@ def getOversampledRMat(wave, rmat, oversampling=3):
     #    oversampling*padded_wave.size)
     # assert ncols == oversampled_wave.size
 
-    data = np.zeros((nrows, nelem_per_row))
+    data = np.zeros((nelem_per_row, nrows))
 
     # Helper function to pad boundaries
     def getPaddedRow(i):
@@ -195,7 +195,7 @@ def getOversampledRMat(wave, rmat, oversampling=3):
         wout   = np.linspace(win[0], win[-1], nelem_per_row)
         spline = scipy.interpolate.CubicSpline(win, row_vector)
 
-        data[i] = spline(wout)
+        data[:, i] = spline(wout)
 
     # csr_res = constructCSRMatrix(data, oversampling)
         
