@@ -195,7 +195,8 @@ def getOversampledRMat(wave, rmat, oversampling=3):
         wout   = np.linspace(win[0], win[-1], nelem_per_row)
         spline = scipy.interpolate.CubicSpline(win, row_vector)
 
-        data[:, i] = spline(wout)
+        new_row = spline(wout)
+        data[:, i] = new_row/new_row.sum()
 
     # csr_res = constructCSRMatrix(data, oversampling)
         
@@ -216,8 +217,8 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
 
     hdr_dict = {'TARGETID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
-        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), \
-        'DLL':np.median(np.diff(data['LOGLAM']))}
+        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': 'T', \
+        'DLL':np.median(np.diff(data['LOGLAM'])), 'DLAMBDA':np.median(np.diff(wave)) }
 
     if args.oversample_rmat>1:
         hdr_dict['OVERSAMP'] = args.oversample_rmat
@@ -272,7 +273,11 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
         # Cut rmat
         rmat = np.delete(ARM_RESOM, ~remaining_pixels, axis=1)
         if args.oversample_rmat>1:
-            rmat = getOversampledRMat(wave, rmat, args.oversample_rmat)
+            try:
+                rmat = getOversampledRMat(wave, rmat, args.oversample_rmat)
+            except:
+                logging.error("Oversampling failed. Npix: %d.", wave.size)
+                continue
 
         # Save it
         saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fitsfiles['Delta'], args)
