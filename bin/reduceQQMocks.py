@@ -276,7 +276,7 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
             try:
                 rmat = getOversampledRMat(wave, rmat, args.oversample_rmat)
             except:
-                logging.error("Oversampling failed. Npix: %d.", wave.size)
+                logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
                 continue
 
         # Save it
