@@ -1,5 +1,9 @@
 import numpy as np
+import scipy.sparse
 from scipy.stats import binned_statistic, norm
+from scipy.signal import fftconvolve
+from scipy.linalg import sqrtm as sla_sqrtm
+from scipy.special import erf
 
 from astropy.io import ascii
 from astropy.table import Table
@@ -108,6 +112,182 @@ def chunkDynamic(wave, flux, error, no_forest_pixels):
 
     return wave, flux, error
 
+# -----------------------------------------------------
+# Resolution matrix begins
+# -----------------------------------------------------
+# Assuming R is integer resolution power
+# dv in km/s and k in s/km
+def getSpectographWindow_k(k, Rint, dv):
+    Rv = LIGHT_SPEED / Rint / ONE_SIGMA_2_FWHM
+    x = k*dv/2/np.pi # numpy sinc convention multiplies x with pi
+    
+    W2k = np.exp(-(k*Rv)**2/2) * np.sinc(x)
+    return W2k
+
+def getSpectographWindow_x(x, Rint, dv):
+    Rv = LIGHT_SPEED / Rint / ONE_SIGMA_2_FWHM
+    gamma_p = (x + (dv/2))/Rv/np.sqrt(2)
+    gamma_m = (x - (dv/2))/Rv/np.sqrt(2)
+    
+    return (erf(gamma_p)-erf(gamma_m))/2/dv
+
+def getGaussianResolutionMatrix(Ngrid, Rint, dv, ndiags=11):
+    resomat = np.empty((ndiags, Ngrid))
+    offsets = np.arange(ndiags//2,-(ndiags//2)-1,-1)
+
+    for i in range(Ngrid):
+        resomat[:, i]=getSpectographWindow_x(offsets*dv, Rint, dv)*dv
+
+    return resomat
+
+def getOptimalResolutionMatrix(Ngrid, xi, Rint, dv, ndiags=11):
+    # Calculate true correlation function
+    v_xi = np.arange(xi.size)
+    v_xi -= v_xi[v_xi.size//2]
+
+    window = getSpectographWindow_x(v_xi, Rint, dv)
+
+    # fftconvolve shifts the array by one index for some reason
+    xi_2 = fftconvolve(xi, window, mode='same')
+    xi_2 = np.roll(xi_2, (np.argmax(xi)-np.argmax(xi_2)))
+    xi_2 = fftconvolve(xi_2, window, mode='same')
+    xi_2 = np.roll(xi_2, (np.argmax(xi)-np.argmax(xi_2)))
+
+    grid = (np.arange(Ngrid)-Ngrid/2)*dv
+    S = np.empty((Ngrid, Ngrid))
+    S2 = np.empty((Ngrid, Ngrid))
+    for i in range(Ngrid):
+        vtemp = grid - grid[i]
+        S[:, i] = np.interp(vtemp, v_xi, xi)
+        S2[:, i] = np.interp(vtemp, v_xi, xi_2)
+
+    Ropt = sla_sqrtm(S2)@np.linalg.inv(sla_sqrtm(S))
+
+    # compress
+    offsets = np.arange(ndiags//2,-(ndiags//2)-1,-1)
+    resomat = np.zeros((ndiags, Ngrid))
+    # offsets: [ 5  4  3  2  1  0 -1 -2 -3 -4 -5]
+    # when offsets[i]>0, remove initial offsets[i] elements from resomat.T[i]
+    # when offsets[i]<0, remove last |offsets[i]| elements from resomat.T[i]
+    for i in range(ndiags):
+        off = offsets[i]
+        if off>=0:
+            resomat[i, off:] = Ropt.diagonal(off)
+        else:
+            resomat[i, :off] = Ropt.diagonal(off)
+
+    return resomat
+
+def fitGaussian2RMat(thid, wave, rmat):
+    v  = LIGHT_SPEED * np.log(wave)
+    dv = np.mean(np.diff(v))
+
+    fitt = lambda x, R_kms: dv*getSpectographWindow_x(x, \
+        LIGHT_SPEED/R_kms/ONE_SIGMA_2_FWHM, dv)
+
+    rmat_ave = np.mean(rmat, axis=1)
+
+    # Chi^2 values are bad. Also yields error by std being close 0.
+    # rmat_std = np.std(rmat, axis=1)
+    # sigma=rmat_std, absolute_sigma=True
+    #chi2 = np.sum((fitt(x, R_kms)-rmat_ave)**2/rmat_std**2)
+
+    ndiags = rmat_ave.shape[0]
+    x = np.arange(ndiags//2,-(ndiags//2)-1,-1)*dv
+    R_kms, eR_kms = curve_fit(fitt, x, rmat_ave, p0=dv, bounds=(dv/10, 10*dv))
+    R_kms  = R_kms[0]
+    eR_kms = eR_kms[0, 0]
+
+    # Warn if precision or chi^2 is bad
+    if eR_kms/R_kms > 0.2:# or chi2/x.size>2:
+        logging.debug("Resolution R_kms is questionable. ID: %d", thid)
+        logging.debug("R_kms: %.1f km/s - dv: %.1f km/s", R_kms, dv)
+        logging.debug("Precision e/R: %.1f percent.", eR_kms/R_kms*100)
+        # logging.debug("Chi^2 of the fit: %.1f / %d.", chi2, x.size)
+
+    return R_kms
+
+def constructCSRMatrix(data, oversampling):
+    nrows         = data.shape[0]
+    nelem_per_row = data.shape[1]
+    # assert nelem_per_row % 2 == 1
+
+    ncols = nrows*oversampling + nelem_per_row-1
+
+    indices = np.repeat(np.arange(nrows)*oversampling, nelem_per_row) + \
+        np.tile(np.arange(nelem_per_row), nrows)
+    iptrs = np.arange(nrows+1)*nelem_per_row
+
+    return scipy.sparse.csr_matrix((data.flatten(), indices, iptrs), shape=(nrows, ncols))
+
+def getDIAfromdata(rmat_data):
+    ndiags, nrows = rmat_data.shape
+    assert nrows > ndiags
+
+    offsets = np.arange(ndiags//2, -(ndiags//2)-1, -1)
+    return scipy.sparse.dia_matrix((rmat_data, offsets), (nrows, nrows))
+
+# Assume offset[0] == -offset[-1]
+def getOversampledRMat(wave, rmat, oversampling=3):
+    if isinstance(rmat, np.ndarray) and rmat.ndim == 2:
+        rmat_dia = getDIAfromdata(rmat)
+    elif scipy.sparse.isspmatrix_dia(rmat):
+        rmat_dia = rmat
+    else:
+        raise ValueError("Cannot use given rmat in oversampling.")
+
+    # Properties of the resolution matrix
+    nrows = wave.size
+    dw    = np.mean(np.diff(wave))
+    noff  = rmat_dia.offsets[0]
+
+    # Oversampled resolution matrix elements per row
+    nelem_per_row = 2*noff*oversampling + 1
+    # ncols = nrows*oversampling + nelem_per_row-1
+    
+    # Pad the boundaries of the input wave grid
+    padded_wave = np.concatenate(( dw*np.arange(-noff, 0)+wave[0], wave, \
+        dw*np.arange(1, noff+1)+wave[-1] ))
+    # assert padded_wave.size == (2*noff+wave.size)
+    
+    # Generate oversampled wave grid that is padded at the bndry
+    # oversampled_wave = np.linspace(padded_wave[0], padded_wave[-1], \
+    #    oversampling*padded_wave.size)
+    # assert ncols == oversampled_wave.size
+
+    data = np.zeros((nelem_per_row, nrows))
+
+    # Helper function to pad boundaries
+    def getPaddedRow(i):
+        row_vector = rmat_dia.getrow(i).data
+        if i < noff:
+            row_vector = np.concatenate((np.flip(row_vector[i*2+1:]), row_vector))
+        if i > nrows-noff-1:
+            ii = i-nrows
+            row_vector = np.concatenate((row_vector, np.flip(row_vector[:ii*2+1])))
+        return row_vector
+
+    for i in range(nrows):
+        row_vector = getPaddedRow(i)
+        win    = padded_wave[i:i+2*noff+1]
+        wout   = np.linspace(win[0], win[-1], nelem_per_row)
+        spline = scipy.interpolate.CubicSpline(win, row_vector)
+
+        new_row = spline(wout)
+        data[:, i] = new_row/new_row.sum()
+
+    # csr_res = constructCSRMatrix(data, oversampling)
+        
+    # return csr_res, oversampled_wave
+    return data
+
+# -----------------------------------------------------
+# Resolution matrix ends
+# -----------------------------------------------------
+
+# -----------------------------------------------------
+# Mean flux begins
+# -----------------------------------------------------
 class MeanFluxHist():
     """Object that wraps up binning for mean flux calculation as well as pixel redshift
     histogram.

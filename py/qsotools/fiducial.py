@@ -2,9 +2,6 @@ import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.integrate import trapz as scipy_trapz
-from scipy.signal import fftconvolve
-from scipy.linalg import sqrtm as sla_sqrtm
-from scipy.special import erf
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -34,69 +31,6 @@ def formBins(nblin, nblog, dklin, dklog, k0, klast=-1):
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
 
     return bin_edges, bin_centers
-
-# Assuming R is integer resolution power
-# dv in km/s and k in s/km
-def getSpectographWindow_k(k, Rint, dv):
-    Rv = LIGHT_SPEED / Rint / ONE_SIGMA_2_FWHM
-    x = k*dv/2/np.pi # numpy sinc convention multiplies x with pi
-    
-    W2k = np.exp(-(k*Rv)**2/2) * np.sinc(x)
-    return W2k
-
-def getSpectographWindow_x(x, Rint, dv):
-    Rv = LIGHT_SPEED / Rint / ONE_SIGMA_2_FWHM
-    gamma_p = (x + (dv/2))/Rv/np.sqrt(2)
-    gamma_m = (x - (dv/2))/Rv/np.sqrt(2)
-    
-    return (erf(gamma_p)-erf(gamma_m))/2/dv
-
-def getGaussianResolutionMatrix(Ngrid, Rint, dv, ndiags=11):
-    resomat = np.empty((ndiags, Ngrid))
-    offsets = np.arange(ndiags//2,-(ndiags//2)-1,-1)
-
-    for i in range(Ngrid):
-        resomat[:, i]=getSpectographWindow_x(offsets*dv, Rint, dv)*dv
-
-    return resomat
-
-def getOptimalResolutionMatrix(Ngrid, xi, Rint, dv, ndiags=11):
-    # Calculate true correlation function
-    v_xi = np.arange(xi.size)
-    v_xi -= v_xi[v_xi.size//2]
-
-    window = getSpectographWindow_x(v_xi, Rint, dv)
-
-    # fftconvolve shifts the array by one index for some reason
-    xi_2 = fftconvolve(xi, window, mode='same')
-    xi_2 = np.roll(xi_2, (np.argmax(xi)-np.argmax(xi_2)))
-    xi_2 = fftconvolve(xi_2, window, mode='same')
-    xi_2 = np.roll(xi_2, (np.argmax(xi)-np.argmax(xi_2)))
-
-    grid = (np.arange(Ngrid)-Ngrid/2)*dv
-    S = np.empty((Ngrid, Ngrid))
-    S2 = np.empty((Ngrid, Ngrid))
-    for i in range(Ngrid):
-        vtemp = grid - grid[i]
-        S[:, i] = np.interp(vtemp, v_xi, xi)
-        S2[:, i] = np.interp(vtemp, v_xi, xi_2)
-
-    Ropt = sla_sqrtm(S2)@np.linalg.inv(sla_sqrtm(S))
-
-    # compress
-    offsets = np.arange(ndiags//2,-(ndiags//2)-1,-1)
-    resomat = np.zeros((ndiags, Ngrid))
-    # offsets: [ 5  4  3  2  1  0 -1 -2 -3 -4 -5]
-    # when offsets[i]>0, remove initial offsets[i] elements from resomat.T[i]
-    # when offsets[i]<0, remove last |offsets[i]| elements from resomat.T[i]
-    for i in range(ndiags):
-        off = offsets[i]
-        if off>=0:
-            resomat[i, off:] = Ropt.diagonal(off)
-        else:
-            resomat[i, :off] = Ropt.diagonal(off)
-
-    return resomat
 
 # -----------------------------------------------------
 # Power spectrum begins
