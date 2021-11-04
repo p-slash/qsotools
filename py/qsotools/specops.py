@@ -131,12 +131,18 @@ def getSpectographWindow_x(x, Rint, dv):
     
     return (erf(gamma_p)-erf(gamma_m))/2/dv
 
-def getGaussianResolutionMatrix(Ngrid, Rint, dv, ndiags=11):
+def getGaussianResolutionMatrix(wave, Rint, ndiags=11):#(Ngrid, Rint, dv, ndiags=11):
+    Ngrid = wave.size
+    dvarr = np.empty_like(wave)
     resomat = np.empty((ndiags, Ngrid))
     offsets = np.arange(ndiags//2,-(ndiags//2)-1,-1)
 
-    for i in range(Ngrid):
-        resomat[:, i]=getSpectographWindow_x(offsets*dv, Rint, dv)*dv
+    dvarr[:-1] = np.diff(wave)
+    dvarr *= LIGHT_SPEED / wave
+    dvarr[-1]  = dvarr[-2]
+
+    for i, dv in enumerate(dvarr):
+        resomat[:, i] = getSpectographWindow_x(offsets*dv, Rint, dv)*dv
 
     return resomat
 
@@ -269,7 +275,7 @@ def getOversampledRMat(wave, rmat, oversampling=3):
 
     for i in range(nrows):
         row_vector = getPaddedRow(i)
-        win    = padded_wave[i:i+2*noff+1]
+        win    = padded_wave[i:i+2*noff+1]-wave[i]
         wout   = np.linspace(win[0], win[-1], nelem_per_row)
         spline = scipy.interpolate.CubicSpline(win, row_vector)
 
