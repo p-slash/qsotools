@@ -31,7 +31,6 @@ filename_list = []
 RESOMAT = None
 
 def setResolutionMatrix(wave, args, ndiags=11):
-    assert args.use_logspaced_wave
     assert args.save_picca
     assert args.fixed_zqso
 
