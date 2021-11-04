@@ -46,10 +46,14 @@ def setResolutionMatrix(wave, args, ndiags=11):
         xi = xi.ravel()
         xi = np.fft.fftshift(xi)
         logging.info("Calculating optimal rmatrix.")
-        return fid.getOptimalResolutionMatrix(Ngrid, xi, Rint, dv)
+        return so.getOptimalResolutionMatrix(Ngrid, xi, Rint, dv)
     else:
         logging.info("Using Gaussian resolution matrix.")
-        return fid.getGaussianResolutionMatrix(Ngrid, Rint, dv)
+        rmat = so.getGaussianResolutionMatrix(wave, Rint)
+
+        if args.oversample_rmat > 1:
+            rmat = so.getOversampledRMat(wave, rmat, args.oversample_rmat)
+        return rmat
 
 def save_parameters(txt_basefilename, args):
     Parameters_txt = ("Parameters for these mocks\n"
@@ -74,7 +78,7 @@ def save_parameters(txt_basefilename, args):
     args.griddv, \
     "ON" if not args.fixed_zforest else "OFF", \
     args.master_file if args.master_file else "None")
-            
+
     temp_fname = "%s_parameters.txt" % txt_basefilename
     logging.info(f"Saving parameteres to {temp_fname}")
     toWrite = open(temp_fname, 'w')
@@ -92,7 +96,8 @@ def save_plots(wch, fch, ech, fnames, args):
 def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args, picca=None):
     if picca:
         for (w, f, e) in zip(wave, fmocks, emocks):
-            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso, ra, dec, RESOMAT.T)
+            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso, ra, dec, RESOMAT.T, \
+                islinbin=not args.use_logspaced_wave, oversampling=args.oversample_rmat)
             filename_list.append(fname)
     else:
         for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
@@ -227,6 +232,8 @@ if __name__ == '__main__':
     parser.add_argument("--save-picca", action="store_true", \
         help="Saves in picca fileformat.")
     parser.add_argument("--use-optimal-rmat", action="store_true")
+    parser.add_argument("--oversample-rmat", help="Oversampling factor for resolution matrix. "\
+        "Pass >1 to get finely space response function.", type=int, default=1)
 
     parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
         type=int, default=332298)
