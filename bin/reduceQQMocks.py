@@ -13,7 +13,7 @@ from scipy.optimize    import curve_fit
 from scipy.interpolate import interp1d
 
 import qsotools.fiducial as fid
-import qsotools.specops as spec
+import qsotools.specops as so
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 
 ARMS = ['B', 'R', 'Z']
@@ -110,11 +110,11 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     data['DELTA']  = delta
     data['IVAR']   = ivar
     data['RESOMAT']= rmat.T
-    R_kms = spec.fitGaussian2RMat(thid, wave, rmat)
+    R_kms = so.fitGaussian2RMat(thid, wave, rmat)
 
     hdr_dict = {'TARGETID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
-        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': 'T', \
+        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': True, \
         'DLL':np.median(np.diff(data['LOGLAM'])), 'DLAMBDA':np.median(np.diff(wave)) }
 
     if args.oversample_rmat>1:
@@ -137,15 +137,16 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
         dec   = fbrmap['TARGET_DEC'][i]
         z_qso = getRedshift(i, fitsfiles['Zbest'])
 
-        # cut out forest
-        remaining_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, args)
+        # cut out forest, but do not remove masked pixels individually
+        # resolution matrix assumes all pixels to be present
+        forest_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, args)
         remaining_pixels &= ~ARM_MASK[i]
 
         if np.sum(remaining_pixels)<5:
             # Empty spectrum
             continue
 
-        wave = ARM_WAVE[remaining_pixels]
+        wave = ARM_WAVE[forest_pixels]
         dlambda = np.mean(np.diff(wave))
 
         # Skip short chunks
@@ -159,19 +160,25 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
 
         z    = wave/fid.LYA_WAVELENGTH-1
         cont = cont_interp(wave)
-        flux = ARM_FLUXES[i][remaining_pixels] / cont
-        ivar = ARM_IVAR[i][remaining_pixels] * cont**2
+
+        flux = ARM_FLUXES[i][forest_pixels] / cont
+        ivar = ARM_IVAR[i][forest_pixels] * cont**2
 
         # Make it delta
         tr_mf = TRUE_MEAN_FLUX(z)
         delta = flux/tr_mf-1
         ivar  = ivar*tr_mf**2
 
-        # Cut rmat
-        rmat = np.delete(ARM_RESOM, ~remaining_pixels, axis=1)
+        # Mask by setting things to 0
+        mask = ARM_MASK[i][forest_pixels]
+        delta[mask] = 0
+        ivar[mask]  = 0
+
+        # Cut rmat forest region, but keep individual bad pixel values in
+        rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
         if args.oversample_rmat>1:
             try:
-                rmat = spec.getOversampledRMat(wave, rmat, args.oversample_rmat)
+                rmat = so.getOversampledRMat(wave, rmat, args.oversample_rmat)
             except:
                 logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
                 continue
