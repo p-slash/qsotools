@@ -277,9 +277,16 @@ def getOversampledRMat(wave, rmat, oversampling=3):
         row_vector = getPaddedRow(i)
         win    = padded_wave[i:i+2*noff+1]-wave[i]
         wout   = np.linspace(win[0], win[-1], nelem_per_row)
-        spline = scipy.interpolate.CubicSpline(win, row_vector)
 
-        new_row = spline(wout)
+        # Raw cubic spline introduces oscillations
+        # log of the resolution matrix should behave softer
+        # but possible negative values must be accounted for.
+        # spline = scipy.interpolate.CubicSpline(win, row_vector)
+        shift_positive = np.min(row_vector)-np.min(np.abs(row_vector))
+        spline_tmp = scipy.interpolate.CubicSpline(win, np.log(row_vector-shift_positive))
+        stable_spline = lambda x: np.exp(spline_tmp(x))+shift_positive
+
+        new_row = stable_spline(wout)
         data[:, i] = new_row/new_row.sum()
 
     # csr_res = constructCSRMatrix(data, oversampling)
