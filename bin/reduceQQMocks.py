@@ -140,7 +140,7 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
         # cut out forest, but do not remove masked pixels individually
         # resolution matrix assumes all pixels to be present
         forest_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, args)
-        remaining_pixels &= ~ARM_MASK[i]
+        remaining_pixels = forest_pixels & ~ARM_MASK[i]
 
         if np.sum(remaining_pixels)<5:
             # Empty spectrum
