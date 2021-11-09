@@ -9,7 +9,6 @@ from os      import walk as os_walk
 from os.path import join as ospath_join, basename as ospath_base
 
 import numpy as np
-from scipy.optimize    import curve_fit
 from scipy.interpolate import interp1d
 
 import qsotools.fiducial as fid
