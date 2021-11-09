@@ -3,6 +3,7 @@ import scipy.sparse
 from scipy.stats import binned_statistic, norm
 from scipy.signal import fftconvolve
 from scipy.linalg import sqrtm as sla_sqrtm
+from scipy.optimize import curve_fit
 from scipy.special import erf
 
 from astropy.io import ascii
