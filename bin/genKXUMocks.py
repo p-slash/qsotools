@@ -73,16 +73,6 @@ def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width, arg
         mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.coord.dec.rad, obs_fits.coord.ra.rad, \
             obs_fits.s2n, spec_res, pixel_width)
 
-def saveListByLine(array, fname):
-    toWrite = open(fname, 'w')
-    toWrite.write('%d\n'%len(array))
-    for a in array:
-        if len(a) == 2:
-            toWrite.write("%d %.1f\n"%(a[0], a[1]))
-        else:
-            toWrite.write('%s\n'%str(a))
-    toWrite.close()
-
 # ------------------------------
 def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
     if not args.save_full_flux:
@@ -489,12 +479,12 @@ if __name__ == '__main__':
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
-    saveListByLine(specres_list, temp_fname)
+    qio.saveListByLine(specres_list, temp_fname)
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt")
     print("Saving chunk spectra file list as ", temp_fname)
-    saveListByLine(filename_list, temp_fname)
+    qio.saveListByLine(filename_list, temp_fname)
 
     spectral_record_list.saveAsTable(ospath_join(args.OutputDir, "spr-all.csv"))
     nondups = spectral_record_list.getNonDuplicates(args.separation)
@@ -505,7 +495,7 @@ if __name__ == '__main__':
         filename_list.extend(fl)
     temp_fname = ospath_join(args.OutputDir, "file_list_qso-nonduplicates.txt")
     print("Saving chunk spectra file list as ", temp_fname)
-    saveListByLine(filename_list, temp_fname)
+    qio.saveListByLine(filename_list, temp_fname)
 
 
 
