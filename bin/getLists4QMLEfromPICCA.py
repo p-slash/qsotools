@@ -66,7 +66,7 @@ def getFlistFromOne(f, args):
 
     return flst, slst
 
-def GetNCopy(object):
+class GetNCopy(object):
     def __init__(self, args):
         self.args = args
     def __call__(self, f):
