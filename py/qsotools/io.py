@@ -23,6 +23,10 @@ import qsotools.fiducial as fid
 import qsotools.specops as so
 
 from pkg_resources import resource_filename
+# ------------------------------------------
+# --------------- Tables -------------------
+# ------------------------------------------
+
 TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
 TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
@@ -32,6 +36,20 @@ TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasa
 TABLE_KODIAQ_VI_DLA = resource_filename('qsotools', 'tables/kodiaq_vi_dlas.csv')
 TABLE_SQUAD_VI_DLA  = resource_filename('qsotools', 'tables/squad_vi_dlas.csv')
 TABLE_XQ100_VI_DLA  = resource_filename('qsotools', 'tables/xq100_vi_dlas.csv')
+
+def saveListByLine(array, fname):
+    toWrite = open(fname, 'w')
+    toWrite.write('%d\n'%len(array))
+    for a in array:
+        if len(a) == 2:
+            toWrite.write("%d %.1f\n"%(a[0], a[1]))
+        else:
+            toWrite.write('%s\n'%str(a))
+    toWrite.close()
+
+# ------------------------------------------
+# ------------ SpectralRecord --------------
+# ------------------------------------------
 
 SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
 
