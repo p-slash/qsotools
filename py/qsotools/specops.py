@@ -235,7 +235,7 @@ def getDIAfromdata(rmat_data):
     return scipy.sparse.dia_matrix((rmat_data, offsets), (nrows, nrows))
 
 # Assume offset[0] == -offset[-1]
-def getOversampledRMat(wave, rmat, oversampling=3):
+def getOversampledRMat(wave, rmat, oversampling=3, dw=None):
     if isinstance(rmat, np.ndarray) and rmat.ndim == 2:
         rmat_dia = getDIAfromdata(rmat)
     elif scipy.sparse.isspmatrix_dia(rmat):
@@ -245,7 +245,8 @@ def getOversampledRMat(wave, rmat, oversampling=3):
 
     # Properties of the resolution matrix
     nrows = wave.size
-    dw    = np.mean(np.diff(wave))
+    if not dw:
+        dw = np.mean(np.diff(wave))
     noff  = rmat_dia.offsets[0]
 
     # Oversampled resolution matrix elements per row
@@ -262,7 +263,7 @@ def getOversampledRMat(wave, rmat, oversampling=3):
     #    oversampling*padded_wave.size)
     # assert ncols == oversampled_wave.size
 
-    data = np.zeros((nelem_per_row, nrows))
+    data = np.empty((nelem_per_row, nrows))
 
     # Helper function to pad boundaries
     def getPaddedRow(i):
