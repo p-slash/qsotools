@@ -5,6 +5,7 @@ import fitsio
 import argparse
 import glob
 from multiprocessing import Pool
+from functools import partial
 
 from os import makedirs as os_makedirs
 from os.path import join as ospath_join, basename as ospath_base
@@ -65,6 +66,13 @@ def getFlistFromOne(f, args):
 
     return flst, slst
 
+def GetNCopy(object):
+    def __init__(self, args):
+        self.args = args
+    def __call__(self, f):
+        return getFlistFromOne(f, self.args)
+
+def 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory.")
@@ -90,7 +98,7 @@ if __name__ == '__main__':
     all_flst = []
 
     with Pool(processes=args.nproc) as pool:
-        imap_it = pool.imap(lambda f: getFlistFromOne(f, args), all_deltas)
+        imap_it = pool.imap(GetNCopy(args), all_deltas)
 
         for flst, slst in imap_it:
             all_flst.extend(flst)
