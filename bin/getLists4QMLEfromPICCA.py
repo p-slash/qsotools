@@ -48,7 +48,7 @@ def getFlistFromOne(f, args):
 
             newRmat = getOversampledRMat(10**data['LOGLAM'], data['RESOMAT'].T, \
                 args.oversample_rmat)
-            newdata = np.empty(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
+            newdata = np.empty(data.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
                 ('RESOMAT','f8', newRmat.shape[0])])
 
             newdata['LOGLAM']  = data['LOGLAM']
