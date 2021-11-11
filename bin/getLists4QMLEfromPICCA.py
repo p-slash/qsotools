@@ -89,11 +89,8 @@ if __name__ == '__main__':
     all_slst = set()
     all_flst = []
 
-    def oneProcess(f):
-        return getFlistFromOne(f, args)
-
     with Pool(processes=args.nproc) as pool:
-        imap_it = pool.imap(oneProcess, all_deltas)
+        imap_it = pool.imap(lambda f: getFlistFromOne(f, args), all_deltas)
 
         for flst, slst in imap_it:
             all_flst.extend(flst)
