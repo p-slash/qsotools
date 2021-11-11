@@ -48,7 +48,7 @@ def getFlistFromOne(f, args):
         if args.oversample_rmat > 1:
             data = hdu.read()
 
-            newRmat = getOversampledRMat(10**data['LOGLAM'], data['RESOMAT'].T, \
+            newRmat = getOversampledRMat(data.size, data['RESOMAT'].T, \
                 args.oversample_rmat)
             newdata = np.empty(data.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
                 ('RESOMAT','f8', newRmat.shape[0])])

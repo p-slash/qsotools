@@ -177,7 +177,7 @@ def forEachArm(arm, fbrmap, fitsfiles, args):
         rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
         if args.oversample_rmat>1:
             try:
-                rmat = so.getOversampledRMat(wave, rmat, args.oversample_rmat)
+                rmat = so.getOversampledRMat(wave.size, rmat, args.oversample_rmat)
             except:
                 logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
                 continue
