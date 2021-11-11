@@ -4,6 +4,7 @@ import numpy as np
 import fitsio
 import argparse
 import glob
+from multiprocessing import Pool
 
 from os import makedirs as os_makedirs
 from os.path import join as ospath_join, basename as ospath_base
@@ -67,11 +68,12 @@ def getFlistFromOne(f, args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory.")
-    parser.add_argument("--snr-cut", help="S/N cut using MEANSNR in header. ", default=0, type=float)
+    parser.add_argument("--snr-cut", help="S/N cut using MEANSNR in header.", default=0, type=float)
     parser.add_argument("--oversample-rmat", type=int, default=1, 
         help="Oversampling factor for resolution matrix. "\
         "Pass >1 to get finely space response function. It will save to osamp-dir")
     parser.add_argument("--osamp-dir", help="Folder to save new oversampled resomat.")
+    parser.add_argument("--nproc", type=int, default=None)
     args = parser.parse_args()
 
     if args.oversample_rmat>1:
@@ -83,14 +85,19 @@ if __name__ == '__main__':
 
         os_makedirs(args.osamp_dir, exist_ok=True)
 
-    all_deltas = glob.glob(ospath_join(args.Directory, "delta-*.fits*"))
+    all_deltas = glob.iglob(ospath_join(args.Directory, "delta-*.fits*"))
     all_slst = set()
     all_flst = []
 
-    for f in all_deltas:
-        flst, slst = getFlistFromOne(f, args)
-        all_flst.extend(flst)
-        all_slst = all_slst.union(slst)
+    def oneProcess(f):
+        return getFlistFromOne(f, args)
+
+    with Pool(processes=args.nproc) as pool:
+        imap_it = pool.imap(oneProcess, all_deltas)
+
+        for flst, slst in imap_it:
+            all_flst.extend(flst)
+            all_slst = all_slst.union(slst)
 
     temp_fname = ospath_join(args.Directory, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
