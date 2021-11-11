@@ -56,7 +56,7 @@ def getFlistFromOne(f, args):
             newdata['IVAR']    = data['IVAR']
             newdata['RESOMAT'] = newRmat.T
 
-            fitsfile.write(newdata, header=hdr)
+            newfits.write(newdata, header=hdr)
 
     fts.close()
     if args.oversample_rmat > 1:
