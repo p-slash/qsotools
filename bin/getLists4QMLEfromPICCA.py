@@ -99,7 +99,7 @@ if __name__ == '__main__':
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(GetNCopy(args), all_deltas)
 
-        for flst, slst in imap_it:
+        for (flst, slst) in imap_it:
             all_flst.extend(flst)
             all_slst = all_slst.union(slst)
 
