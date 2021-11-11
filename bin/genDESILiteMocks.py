@@ -51,7 +51,7 @@ def setResolutionMatrix(wave, args, ndiags=11):
         rmat = so.getGaussianResolutionMatrix(wave, Rint)
 
         if args.oversample_rmat > 1:
-            rmat = so.getOversampledRMat(wave, rmat, args.oversample_rmat)
+            rmat = so.getOversampledRMat(wave.size, rmat, args.oversample_rmat)
         return rmat
 
 def save_parameters(txt_basefilename, args):

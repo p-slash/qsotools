@@ -235,7 +235,19 @@ def getDIAfromdata(rmat_data):
     return scipy.sparse.dia_matrix((rmat_data, offsets), (nrows, nrows))
 
 # Assume offset[0] == -offset[-1]
-def getOversampledRMat(wave, rmat, oversampling=3, dw=None):
+# wave must be linearly spaced!
+# nrows = wave.size
+# Pad the boundaries of the input wave grid
+# padded_wave = np.concatenate(( dw*np.arange(-noff, 0)+wave[0], wave, \
+#     dw*np.arange(1, noff+1)+wave[-1] ))
+# assert padded_wave.size == (2*noff+wave.size)
+
+# Generate oversampled wave grid that is padded at the bndry
+# oversampled_wave = np.linspace(padded_wave[0], padded_wave[-1], \
+#    oversampling*padded_wave.size)
+# assert ncols == oversampled_wave.size
+# win    = padded_wave[i:i+2*noff+1]-wave[i]
+def getOversampledRMat(nrows, rmat, oversampling=3):
     if isinstance(rmat, np.ndarray) and rmat.ndim == 2:
         rmat_dia = getDIAfromdata(rmat)
     elif scipy.sparse.isspmatrix_dia(rmat):
@@ -244,26 +256,15 @@ def getOversampledRMat(wave, rmat, oversampling=3, dw=None):
         raise ValueError("Cannot use given rmat in oversampling.")
 
     # Properties of the resolution matrix
-    nrows = wave.size
-    if not dw:
-        dw = np.mean(np.diff(wave))
     noff  = rmat_dia.offsets[0]
 
     # Oversampled resolution matrix elements per row
     nelem_per_row = 2*noff*oversampling + 1
     # ncols = nrows*oversampling + nelem_per_row-1
-    
-    # Pad the boundaries of the input wave grid
-    padded_wave = np.concatenate(( dw*np.arange(-noff, 0)+wave[0], wave, \
-        dw*np.arange(1, noff+1)+wave[-1] ))
-    # assert padded_wave.size == (2*noff+wave.size)
-    
-    # Generate oversampled wave grid that is padded at the bndry
-    # oversampled_wave = np.linspace(padded_wave[0], padded_wave[-1], \
-    #    oversampling*padded_wave.size)
-    # assert ncols == oversampled_wave.size
 
     data = np.empty((nelem_per_row, nrows))
+    win  = np.arange(-noff, noff+1)
+    wout = np.linspace(-noff, noff, nelem_per_row)
 
     # Helper function to pad boundaries
     def getPaddedRow(i):
@@ -277,18 +278,15 @@ def getOversampledRMat(wave, rmat, oversampling=3, dw=None):
 
     for i in range(nrows):
         row_vector = getPaddedRow(i)
-        win    = padded_wave[i:i+2*noff+1]-wave[i]
-        wout   = np.linspace(win[0], win[-1], nelem_per_row)
 
         # Raw cubic spline introduces oscillations
         # log of the resolution matrix should behave softer
         # but possible negative values must be accounted for.
         # spline = scipy.interpolate.CubicSpline(win, row_vector)
         shift_positive = np.min(row_vector)-np.min(np.abs(row_vector))
-        spline_tmp = scipy.interpolate.CubicSpline(win, np.log(row_vector-shift_positive))
-        stable_spline = lambda x: np.exp(spline_tmp(x))+shift_positive
+        stable_spline  = scipy.interpolate.CubicSpline(win, np.log(row_vector-shift_positive))
 
-        new_row = stable_spline(wout)
+        new_row = np.exp(stable_spline(wout))+shift_positive
         data[:, i] = new_row/new_row.sum()
 
     # csr_res = constructCSRMatrix(data, oversampling)
