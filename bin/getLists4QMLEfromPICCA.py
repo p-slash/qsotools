@@ -75,6 +75,7 @@ class GetNCopy(object):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory.")
+    parser.add_argument("--flist", help="Only convert these delta files. Cancels directory list.")
     parser.add_argument("--snr-cut", help="S/N cut using MEANSNR in header.", default=0, type=float)
     parser.add_argument("--oversample-rmat", type=int, default=1, 
         help="Oversampling factor for resolution matrix. "\
@@ -92,7 +93,10 @@ if __name__ == '__main__':
 
         os_makedirs(args.osamp_dir, exist_ok=True)
 
-    all_deltas = glob.iglob(ospath_join(args.Directory, "delta-*.fits*"))
+    if args.flist:
+        all_deltas = args.flist
+    else:
+        all_deltas = glob.iglob(ospath_join(args.Directory, "delta-*.fits*"))
     all_slst = set()
     all_flst = []
 
