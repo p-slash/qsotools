@@ -5,7 +5,6 @@ import fitsio
 import argparse
 import glob
 from multiprocessing import Pool
-from functools import partial
 
 from os import makedirs as os_makedirs
 from os.path import join as ospath_join, basename as ospath_base
@@ -57,6 +56,8 @@ def getFlistFromOne(f, args):
             newdata['DELTA']   = data['DELTA']
             newdata['IVAR']    = data['IVAR']
             newdata['RESOMAT'] = newRmat.T
+
+            hdr['OVERSAMP'] = args.oversample_rmat
 
             newfits.write(newdata, header=hdr)
 
