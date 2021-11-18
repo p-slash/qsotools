@@ -246,16 +246,17 @@ def getDIAfromdata(rmat_data):
 #    oversampling*padded_wave.size)
 # assert ncols == oversampled_wave.size
 # win    = padded_wave[i:i+2*noff+1]-wave[i]
-def getOversampledRMat(nrows, rmat, oversampling=3):
+def getOversampledRMat(rmat, oversampling=3):
     if isinstance(rmat, np.ndarray) and rmat.ndim == 2:
-        rmat_dia = getDIAfromdata(rmat)
-    elif scipy.sparse.isspmatrix_dia(rmat):
-        rmat_dia = rmat
+        ndiags, nrows = rmat_data.shape
+        assert nrows > ndiags
+
+        offsets = np.arange(ndiags//2, -(ndiags//2)-1, -1)
     else:
         raise ValueError("Cannot use given rmat in oversampling.")
 
     # Properties of the resolution matrix
-    noff  = rmat_dia.offsets[0]
+    noff = offsets[0]
 
     # Oversampled resolution matrix elements per row
     nelem_per_row = 2*noff*oversampling + 1
@@ -264,19 +265,19 @@ def getOversampledRMat(nrows, rmat, oversampling=3):
     data = np.empty((nelem_per_row, nrows))
     win  = np.arange(-noff, noff+1)
     wout = np.linspace(-noff, noff, nelem_per_row)
+    row_vector = np.zeros_like(win)
 
     # Helper function to pad boundaries
     def getPaddedRow(i):
-        row_vector = rmat_dia.getrow(i).data
+        row_vector = np.array([rmat[j,i+offsets[j]] for j in reversed(range(row_vector.size))])
+        # row_vector = np.flip(row_vector)
         if i < noff:
-            row_vector = np.concatenate((np.flip(row_vector[i*2+1:]), row_vector))
-        if i > nrows-noff-1:
-            ii = i-nrows
-            row_vector = np.concatenate((row_vector, np.flip(row_vector[:ii*2+1])))
-        return row_vector
+            row_vector[:noff] = np.flip(row_vector[noff+1:])
+        elif i > nrows-noff-1:
+            row_vector[noff+1:] = np.flip(row_vector[:noff])
 
     for i in range(nrows):
-        row_vector = getPaddedRow(i)
+        getPaddedRow(i)
 
         # Raw cubic spline introduces oscillations
         # log of the resolution matrix should behave softer

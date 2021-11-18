@@ -146,7 +146,7 @@ class Reducer(object):
             rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
             if self.args.oversample_rmat>1:
                 try:
-                    rmat = so.getOversampledRMat(wave.size, rmat, self.args.oversample_rmat)
+                    rmat = so.getOversampledRMat(rmat, self.args.oversample_rmat)
                 except Exception as e:
                     logging.error(e)
                     logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
