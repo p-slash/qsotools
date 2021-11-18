@@ -4,8 +4,9 @@ import fitsio
 import glob
 import time
 import logging
+from multiprocessing import Pool
 
-from os      import walk as os_walk
+from os      import walk as os_walk, makedirs as os_makedirs
 from os.path import join as ospath_join, basename as ospath_base
 
 import numpy as np
@@ -16,61 +17,6 @@ import qsotools.specops as so
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 
 ARMS = ['B', 'R', 'Z']
-
-def transversePFolder(P, args):
-    working_dir   = ospath_join(args.Directory, str(P))
-    fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
-
-    logging.info("Working in directory %s", working_dir)
-
-    pixNFinal = len(fname_spectra)
-    printProgress.last_progress=0
-    for pi, fname in enumerate(fname_spectra):
-        printProgress(pi, pixNFinal)
-        fitsfiles = openFITSFiles(fname)
-
-        fbrmap = fitsfiles['Spec']['FIBERMAP']['TARGETID', 'TARGET_RA', 'TARGET_DEC'].read()
-
-        # Reads ARM_FLUX extensions, it helps serialize i/o
-        for arm in ARMS:
-            forEachArm(arm, fbrmap, fitsfiles, args)
-
-        closeFITSFiles(fitsfiles)
-
-    printProgress(pixNFinal, pixNFinal)
-
-def openFITSFiles(fname):
-    rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
-    fitsfiles = {}
-    fitsfiles['Spec']  = fitsio.FITS(fname)
-    fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
-    fitsfiles['Zbest'] = fitsio.FITS(rreplace(fname, "/zbest-"))
-
-    fdname = rreplace(fname, "/delta-")
-    if args.output_dir != args.Directory:
-        fdname = ospath_base(fdname)
-        fdname = ospath_join(args.output_dir, fdname)
-
-    fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
-
-    return fitsfiles
-
-def closeFITSFiles(fitsfiles):
-    fitsfiles['Spec'].close()
-    fitsfiles['Truth'].close()
-    fitsfiles['Zbest'].close()
-    fitsfiles['Delta'].close()
-
-def printProgress(i, ifinal, percThres=5):
-    curr_progress = int(100*i/ifinal)
-    print_condition = (curr_progress-printProgress.last_progress >= percThres) or (i == 0)
-
-    if print_condition:
-        etime = (time.time()-start_time)/60 # min
-        logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
-        printProgress.last_progress = curr_progress
-
-    return print_condition
 
 # Simply returns redshift.
 # Do more if you want to check for errors etc.
@@ -122,68 +68,137 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     if not args.nosave:
         fdelta.write(data, header=hdr_dict)
 
-def forEachArm(arm, fbrmap, fitsfiles, args):
-    ARM_WAVE   = fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
-    nspectra   = fitsfiles['Spec'][f'{arm}_FLUX'].read_header()['NAXIS2']
-    ARM_FLUXES = fitsfiles['Spec'][f'{arm}_FLUX'].read()
-    ARM_IVAR   = fitsfiles['Spec'][f'{arm}_IVAR'].read()
-    ARM_MASK   = np.array(fitsfiles['Spec'][f'{arm}_MASK'].read(), dtype=bool)
-    ARM_RESOM  = fitsfiles['Truth'][f'{arm}_RESOLUTION'].read()
+class Reducer(object):
+    def openFITSFiles(fname):
+        rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
+        self.fitsfiles['Spec']  = fitsio.FITS(fname)
+        self.fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
+        self.fitsfiles['Zbest'] = fitsio.FITS(rreplace(fname, "/zbest-"))
 
-    for i in range(nspectra):
-        thid  = fbrmap['TARGETID'][i]
-        ra    = fbrmap['TARGET_RA'][i]
-        dec   = fbrmap['TARGET_DEC'][i]
-        z_qso = getRedshift(i, fitsfiles['Zbest'])
+        fdname = rreplace(fname, "/delta-")
+        if self.args.output_dir != self.args.Directory:
+            fdname = ospath_base(fdname)
+            fdname = ospath_join(self.args.output_dir, fdname)
 
-        # cut out forest, but do not remove masked pixels individually
-        # resolution matrix assumes all pixels to be present
-        forest_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, args)
-        remaining_pixels = forest_pixels & ~ARM_MASK[i]
+        self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
-        if np.sum(remaining_pixels)<5:
-            # Empty spectrum
-            continue
+    def closeFITSFiles():
+        self.fitsfiles['Spec'].close()
+        self.fitsfiles['Truth'].close()
+        self.fitsfiles['Zbest'].close()
+        self.fitsfiles['Delta'].close()
 
-        wave = ARM_WAVE[forest_pixels]
-        dlambda = np.mean(np.diff(wave))
+    def forEachArm(arm, fbrmap):
+        ARM_WAVE   = self.fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
+        nspectra   = self.fitsfiles['Spec'][f'{arm}_FLUX'].read_header()['NAXIS2']
+        ARM_FLUXES = self.fitsfiles['Spec'][f'{arm}_FLUX'].read()
+        ARM_IVAR   = self.fitsfiles['Spec'][f'{arm}_IVAR'].read()
+        ARM_MASK   = np.array(self.fitsfiles['Spec'][f'{arm}_MASK'].read(), dtype=bool)
+        ARM_RESOM  = self.fitsfiles['Truth'][f'{arm}_RESOLUTION'].read()
 
-        # Skip short chunks
-        MAX_NO_PIXELS = int((fid.LYA_LAST_WVL-fid.LYA_FIRST_WVL)*(1+z_qso) / dlambda)
-        isShort = lambda x: args.skip and (np.sum(x) < MAX_NO_PIXELS * args.skip)
-        if isShort(remaining_pixels):
-            # Short chunk
-            continue
+        for i in range(nspectra):
+            thid  = fbrmap['TARGETID'][i]
+            ra    = fbrmap['TARGET_RA'][i]
+            dec   = fbrmap['TARGET_DEC'][i]
+            z_qso = getRedshift(i, self.fitsfiles['Zbest'])
 
-        cont_interp = getTrueContinuumInterp(i, fitsfiles['Truth'])
+            # cut out forest, but do not remove masked pixels individually
+            # resolution matrix assumes all pixels to be present
+            forest_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, self.args)
+            remaining_pixels = forest_pixels & ~ARM_MASK[i]
 
-        z    = wave/fid.LYA_WAVELENGTH-1
-        cont = cont_interp(wave)
-
-        flux = ARM_FLUXES[i][forest_pixels] / cont
-        ivar = ARM_IVAR[i][forest_pixels] * cont**2
-
-        # Make it delta
-        tr_mf = TRUE_MEAN_FLUX(z)
-        delta = flux/tr_mf-1
-        ivar  = ivar*tr_mf**2
-
-        # Mask by setting things to 0
-        mask = ARM_MASK[i][forest_pixels]
-        delta[mask] = 0
-        ivar[mask]  = 0
-
-        # Cut rmat forest region, but keep individual bad pixel values in
-        rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
-        if args.oversample_rmat>1:
-            try:
-                rmat = so.getOversampledRMat(wave.size, rmat, args.oversample_rmat)
-            except:
-                logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
+            if np.sum(remaining_pixels)<5:
+                # Empty spectrum
                 continue
 
-        # Save it
-        saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fitsfiles['Delta'], args)
+            wave = ARM_WAVE[forest_pixels]
+            dlambda = np.mean(np.diff(wave))
+
+            # Skip short chunks
+            MAX_NO_PIXELS = int((fid.LYA_LAST_WVL-fid.LYA_FIRST_WVL)*(1+z_qso) / dlambda)
+            isShort = lambda x: self.args.skip and (np.sum(x) < MAX_NO_PIXELS * self.args.skip)
+            if isShort(remaining_pixels):
+                # Short chunk
+                continue
+
+            cont_interp = getTrueContinuumInterp(i, self.fitsfiles['Truth'])
+
+            z    = wave/fid.LYA_WAVELENGTH-1
+            cont = cont_interp(wave)
+
+            flux = ARM_FLUXES[i][forest_pixels] / cont
+            ivar = ARM_IVAR[i][forest_pixels] * cont**2
+
+            # Make it delta
+            tr_mf = TRUE_MEAN_FLUX(z)
+            delta = flux/tr_mf-1
+            ivar  = ivar*tr_mf**2
+
+            # Mask by setting things to 0
+            mask = ARM_MASK[i][forest_pixels]
+            delta[mask] = 0
+            ivar[mask]  = 0
+
+            # Cut rmat forest region, but keep individual bad pixel values in
+            rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
+            if self.args.oversample_rmat>1:
+                try:
+                    rmat = so.getOversampledRMat(wave.size, rmat, self.args.oversample_rmat)
+                except:
+                    logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
+                    continue
+
+            # Save it
+            saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, self.fitsfiles['Delta'], \
+                self.args)
+
+    def __init__(self, args):
+        self.args = args
+        self.fitsfiles = {}
+
+    def __call__(self, fname):
+        openFITSFiles(fname)
+        fbrmap = self.fitsfiles['Spec']['FIBERMAP']['TARGETID', 'TARGET_RA', 'TARGET_DEC'].read()
+        # Reads ARM_FLUX extensions, it helps serialize i/o
+        for arm in ARMS:
+            forEachArm(arm, fbrmap)
+
+        closeFITSFiles()
+
+        return 1
+
+class Progress(object):
+    """docstring for Progress"""
+    def __init__(self, total, percThres=5):
+        self.i=0
+        self.total = total
+        self.percThres = percThres
+        self.last_progress=0
+        self.start_time = time.time()
+
+    def increase(self):
+        self.i+=1
+        curr_progress = int(100*self.i/self.total)
+        print_condition = (curr_progress-self.last_progress >= self.percThres) or (self.i == 0)
+
+        if print_condition:
+            etime = (time.time()-self.start_time)/60 # min
+            logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
+            self.last_progress = curr_progress
+
+def transversePFolder(P, args):
+    working_dir   = ospath_join(args.Directory, str(P))
+    fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
+
+    logging.info("Working in directory %s", working_dir)
+    pcounter = Progress(len(fname_spectra))
+
+    with Pool(processes=args.nproc) as pool:
+        imap_it = pool.imap(Reducer(args), fname_spectra)
+
+        for i in imap_it:
+            pcounter.increase()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -202,9 +217,10 @@ if __name__ == '__main__':
         type=float, default=4.3)
 
     parser.add_argument("--oversample-rmat", help="Oversampling factor for resolution matrix. "\
-        "Pass >1 to get finely space response function.", type=int, default=1)
+        "Pass >1 to get finely spaced response function.", type=int, default=1)
 
     parser.add_argument("--skip", help="Skip short chunks lower than given ratio", type=float)
+    parser.add_argument("--nproc", type=int, default=None)
 
     # parser.add_argument("--coadd")
     # parser.add_argument("--chunk-dyn",  action="store_true", \
@@ -221,6 +237,8 @@ if __name__ == '__main__':
 
     if not args.output_dir:
         args.output_dir = args.Directory
+    else:
+        os_makedirs(args.output_dir, exist_ok=True)
 
     logging.basicConfig(filename=ospath_join(args.output_dir, 'reduction.log'), \
         level=logging.DEBUG if args.debug else logging.INFO)
