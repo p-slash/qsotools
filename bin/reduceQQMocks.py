@@ -183,7 +183,7 @@ class Reducer(object):
         self.closeFITSFiles()
 
         if self.bad_spectra:
-            logging.info("Saving a list of bad spectra to %s.\n", self.badspectra_fname)
+            logging.info("Saving a list of bad spectra to %s.", self.badspectra_fname)
             saveListByLine(self.bad_spectra, self.badspectra_fname)
 
         return 1
