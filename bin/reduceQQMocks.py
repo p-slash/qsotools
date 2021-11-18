@@ -89,6 +89,7 @@ class Reducer(object):
         self.badspectra_fname = removeSuffix(self.badspectra_fname, ".fits")
         self.badspectra_fname += ".txt"
         if self.args.output_dir != self.args.Directory:
+            self.badspectra_fname = ospath_base(self.badspectra_fname)
             self.badspectra_fname = ospath_join(self.args.output_dir, self.badspectra_fname)
 
     def closeFITSFiles(self):
