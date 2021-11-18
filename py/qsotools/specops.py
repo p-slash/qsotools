@@ -265,19 +265,18 @@ def getOversampledRMat(rmat, oversampling=3):
     data = np.empty((nelem_per_row, nrows))
     win  = np.arange(-noff, noff+1)
     wout = np.linspace(-noff, noff, nelem_per_row)
-    row_vector = np.zeros_like(win)
 
     # Helper function to pad boundaries
     def getPaddedRow(i):
-        row_vector = np.array([rmat[j,i+offsets[j]] for j in reversed(range(row_vector.size))])
-        # row_vector = np.flip(row_vector)
+        row_vector = np.array([rmat[j,i+offsets[j]] for j in reversed(range(ndiags))])
         if i < noff:
             row_vector[:noff] = np.flip(row_vector[noff+1:])
         elif i > nrows-noff-1:
             row_vector[noff+1:] = np.flip(row_vector[:noff])
+        return row_vector
 
     for i in range(nrows):
-        getPaddedRow(i)
+        row_vector = getPaddedRow(i)
 
         # Raw cubic spline introduces oscillations
         # log of the resolution matrix should behave softer
