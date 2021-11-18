@@ -154,8 +154,9 @@ class Reducer(object):
             if self.args.oversample_rmat>1:
                 try:
                     rmat = so.getOversampledRMat(wave.size, rmat, self.args.oversample_rmat)
-                except:
-                    logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
+                except Exception e:
+                    logging.error("Oversampling failed. %s, TARGETID: %d, Npix: %d.", \
+                        e.what(), thid, wave.size)
                     self.bad_spectra.append(f"{self.fname}[{arm}_FLUX][{i}]")
                     continue
 
@@ -181,7 +182,7 @@ class Reducer(object):
 
         self.closeFITSFiles()
 
-        if not self.bad_spectra:
+        if self.bad_spectra:
             logging.info("Saving a list of bad spectra to %s.\n", self.badspectra_fname)
             saveListByLine(self.bad_spectra, self.badspectra_fname)
 
@@ -190,10 +191,10 @@ class Reducer(object):
 class Progress(object):
     """docstring for Progress"""
     def __init__(self, total, percThres=5):
-        self.i=0
+        self.i = 0
         self.total = total
         self.percThres = percThres
-        self.last_progress=0
+        self.last_progress = 0
         self.start_time = time.time()
 
     def increase(self):
@@ -276,11 +277,13 @@ if __name__ == '__main__':
         # args.P_folders = [x for x in args.P_folders if x.isdigit()]
         logging.info("Transversing given P folders. There are %d many.", len(args.P_folders))
 
-    Pcounter = Progress(len(args.P_folders))
+    Pcounter = Progress(len(args.P_folders), 1)
     for P in args.P_folders:
         transversePFolder(P, args)
-        logging.info("===============================================================\n"*3)
-        logging.info("One P folder down.")
+        logging.info("===============================================================")
+        logging.info("===============================================================")
+        logging.info("===============================================================")
+        logging.info("One P folder finished.")
         Pcounter.increase()
 
     logging.info("Done!")
