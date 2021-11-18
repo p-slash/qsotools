@@ -84,8 +84,9 @@ class Reducer(object):
         self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
         self.badspectra_fname = rreplace(fname, "/bad_spectra-")
-        self.badspectra_fname = self.badspectra_fname.removesuffix(".gz")
-        self.badspectra_fname = self.badspectra_fname.removesuffix(".fits")
+        removeSuffix = lambda s, suf: s[:-len(suf)] if s.endswith(suf) else s
+        self.badspectra_fname = removeSuffix(self.badspectra_fname, ".gz")
+        self.badspectra_fname = removeSuffix(self.badspectra_fname, ".fits")
         self.badspectra_fname += ".txt"
         if self.args.output_dir != self.args.Directory:
             self.badspectra_fname = ospath_join(self.args.output_dir, self.badspectra_fname)
