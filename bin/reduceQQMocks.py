@@ -69,7 +69,7 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
         fdelta.write(data, header=hdr_dict)
 
 class Reducer(object):
-    def openFITSFiles(fname):
+    def openFITSFiles(self, fname):
         rreplace  = lambda s, new: new.join(s.rsplit("/spectra-", 1))
         self.fitsfiles['Spec']  = fitsio.FITS(fname)
         self.fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
@@ -82,13 +82,13 @@ class Reducer(object):
 
         self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
-    def closeFITSFiles():
+    def closeFITSFiles(self):
         self.fitsfiles['Spec'].close()
         self.fitsfiles['Truth'].close()
         self.fitsfiles['Zbest'].close()
         self.fitsfiles['Delta'].close()
 
-    def forEachArm(arm, fbrmap):
+    def forEachArm(self, arm, fbrmap):
         ARM_WAVE   = self.fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
         nspectra   = self.fitsfiles['Spec'][f'{arm}_FLUX'].read_header()['NAXIS2']
         ARM_FLUXES = self.fitsfiles['Spec'][f'{arm}_FLUX'].read()
