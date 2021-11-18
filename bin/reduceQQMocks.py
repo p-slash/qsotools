@@ -168,7 +168,7 @@ class Reducer(object):
 
     def __call__(self, fname):
         self.openFITSFiles(fname)
-        self.fname=fname
+        self.fname = fname
         fbrmap = self.fitsfiles['Spec']['FIBERMAP']['TARGETID', 'TARGET_RA', 'TARGET_DEC'].read()
         # Reads ARM_FLUX extensions, it helps serialize i/o
         for arm in ARMS:
@@ -176,7 +176,8 @@ class Reducer(object):
 
         self.closeFITSFiles()
 
-        saveListByLine(self.bad_spectra, self.badspectra_fname)
+        if not self.bad_spectra:
+            saveListByLine(self.bad_spectra, self.badspectra_fname)
 
         return 1
 
