@@ -282,7 +282,7 @@ def getOversampledRMat(rmat, oversampling=3):
         # log of the resolution matrix should behave softer
         # but possible negative values must be accounted for.
         # spline = scipy.interpolate.CubicSpline(win, row_vector)
-        shift_positive = row_vector.min()-np.abs(row_vector.nonzero()).min()
+        shift_positive = row_vector.min() - np.abs(row_vector[row_vector.nonzero()]).min()
         stable_spline  = scipy.interpolate.CubicSpline(win, np.log(row_vector-shift_positive))
 
         new_row = np.exp(stable_spline(wout))+shift_positive
