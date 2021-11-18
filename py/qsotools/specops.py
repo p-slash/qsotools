@@ -215,8 +215,7 @@ def fitGaussian2RMat(thid, wave, rmat):
     return R_kms
 
 def constructCSRMatrix(data, oversampling):
-    nrows         = data.shape[0]
-    nelem_per_row = data.shape[1]
+    nrows, nelem_per_row = data.shape
     # assert nelem_per_row % 2 == 1
 
     ncols = nrows*oversampling + nelem_per_row-1

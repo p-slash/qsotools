@@ -156,10 +156,13 @@ class Reducer(object):
                     rmat = so.getOversampledRMat(wave.size, rmat, self.args.oversample_rmat)
                 except:
                     logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
-                    self.bad_spectra.append(f"{self.fname}['{arm}_FLUX'][{i}]")
+                    self.bad_spectra.append(f"{self.fname}[{arm}_FLUX][{i}]")
                     continue
 
             # Save it
+            if args.nosave:
+                continue
+
             saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, self.fitsfiles['Delta'], \
                 self.args)
 
@@ -179,6 +182,7 @@ class Reducer(object):
         self.closeFITSFiles()
 
         if not self.bad_spectra:
+            logging.info("Saving a list of bad spectra to %s.\n", self.badspectra_fname)
             saveListByLine(self.bad_spectra, self.badspectra_fname)
 
         return 1
