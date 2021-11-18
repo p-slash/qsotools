@@ -269,8 +269,12 @@ if __name__ == '__main__':
         # args.P_folders = [x for x in args.P_folders if x.isdigit()]
         logging.info("Transversing given P folders. There are %d many.", len(args.P_folders))
 
+    Pcounter = Progress(len(args.P_folders))
     for P in args.P_folders:
         transversePFolder(P, args)
+        logging.info("===============================================================\n"*3)
+        logging.info("One P folder down.")
+        Pcounter.increase()
 
     logging.info("Done!")
 
