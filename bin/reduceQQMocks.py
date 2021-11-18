@@ -14,6 +14,7 @@ from scipy.interpolate import interp1d
 
 import qsotools.fiducial as fid
 import qsotools.specops as so
+from qsotools.io import saveListByLine
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 
 ARMS = ['B', 'R', 'Z']
@@ -82,6 +83,13 @@ class Reducer(object):
 
         self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
+        self.badspectra_fname = rreplace(fname, "/bad_spectra-")
+        self.badspectra_fname = self.badspectra_fname.removesuffix(".gz")
+        self.badspectra_fname = self.badspectra_fname.removesuffix(".fits")
+        self.badspectra_fname += ".txt"
+        if self.args.output_dir != self.args.Directory:
+            self.badspectra_fname = ospath_join(self.args.output_dir, self.badspectra_fname)
+
     def closeFITSFiles(self):
         self.fitsfiles['Spec'].close()
         self.fitsfiles['Truth'].close()
@@ -146,6 +154,7 @@ class Reducer(object):
                     rmat = so.getOversampledRMat(wave.size, rmat, self.args.oversample_rmat)
                 except:
                     logging.error("Oversampling failed. TARGETID: %d, Npix: %d.", thid, wave.size)
+                    self.bad_spectra.append(f"{self.fname}['{arm}_FLUX'][{i}]")
                     continue
 
             # Save it
@@ -155,15 +164,19 @@ class Reducer(object):
     def __init__(self, args):
         self.args = args
         self.fitsfiles = {}
+        self.bad_spectra = []
 
     def __call__(self, fname):
         self.openFITSFiles(fname)
+        self.fname=fname
         fbrmap = self.fitsfiles['Spec']['FIBERMAP']['TARGETID', 'TARGET_RA', 'TARGET_DEC'].read()
         # Reads ARM_FLUX extensions, it helps serialize i/o
         for arm in ARMS:
             self.forEachArm(arm, fbrmap)
 
         self.closeFITSFiles()
+
+        saveListByLine(self.bad_spectra, self.badspectra_fname)
 
         return 1
 
@@ -190,7 +203,8 @@ def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
 
-    logging.info("Working in directory %s", working_dir)
+    logging.info("Working in directory %s/. There are %d many files.", \
+        working_dir, len(fname_spectra))
     pcounter = Progress(len(fname_spectra))
 
     with Pool(processes=args.nproc) as pool:
