@@ -248,7 +248,7 @@ def getDIAfromdata(rmat_data):
 # win    = padded_wave[i:i+2*noff+1]-wave[i]
 def getOversampledRMat(rmat, oversampling=3):
     if isinstance(rmat, np.ndarray) and rmat.ndim == 2:
-        ndiags, nrows = rmat_data.shape
+        ndiags, nrows = rmat.shape
         assert nrows > ndiags
 
         offsets = np.arange(ndiags//2, -(ndiags//2)-1, -1)
