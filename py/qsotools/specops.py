@@ -268,12 +268,12 @@ def getOversampledRMat(rmat, oversampling=3):
 
     # Helper function to pad boundaries
     def getPaddedRow(i):
-        row_vector = np.array([rmat[j,i+offsets[j]] for j in reversed(range(ndiags))])
+        xvec = [(j,i+offsets[j]) for j in reversed(range(ndiags))]
         if i < noff:
-            row_vector[:noff] = np.flip(row_vector[noff+1:])
+            xvec[:noff] = reversed(xvec[noff+1:])
         elif i > nrows-noff-1:
-            row_vector[noff+1:] = np.flip(row_vector[:noff])
-        return row_vector
+            xvec[noff+1:] = reversed(xvec[:noff])
+        return np.array(rmat[x] for x in xvec)
 
     for i in range(nrows):
         row_vector = getPaddedRow(i)
