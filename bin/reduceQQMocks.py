@@ -110,7 +110,7 @@ class Reducer(object):
             forest_pixels  = getForestAnalysisRegion(ARM_WAVE, z_qso, self.args)
             remaining_pixels = forest_pixels & ~ARM_MASK[i]
 
-            if np.sum(remaining_pixels)<5:
+            if np.sum(remaining_pixels)<15:
                 # Empty spectrum
                 continue
 
@@ -278,9 +278,10 @@ if __name__ == '__main__':
         logging.info("One P folder finished.")
         Pcounter.increase()
 
-    badspectra_fname = ospath_join(args.output_dir, "bad_spectra.txt")
-    logging.info("Saving a list of bad spectra to %s.", badspectra_fname)
-    saveListByLine(bad_spectra_all, badspectra_fname)
+    if bad_spectra_all:
+        badspectra_fname = ospath_join(args.output_dir, "bad_spectra.txt")
+        logging.info("Saving a list of bad spectra to %s.", badspectra_fname)
+        saveListByLine(bad_spectra_all, badspectra_fname)
 
     logging.info("Done!")
 
