@@ -156,7 +156,7 @@ class Reducer(object):
             if self.args.oversample_rmat>1:
                 try:
                     rmat = so.getOversampledRMat(wave.size, rmat, self.args.oversample_rmat)
-                except Exception e:
+                except Exception as e:
                     logging.error("Oversampling failed. %s, TARGETID: %d, Npix: %d.", \
                         e.what(), thid, wave.size)
                     self.bad_spectra.append(f"{self.fname}[{arm}_FLUX][{i}]")
