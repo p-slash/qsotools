@@ -84,15 +84,6 @@ class Reducer(object):
         if not args.nosave:
             self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
-        self.badspectra_fname = rreplace(fname, "/bad_spectra-")
-        removeSuffix = lambda s, suf: s[:-len(suf)] if s.endswith(suf) else s
-        self.badspectra_fname = removeSuffix(self.badspectra_fname, ".gz")
-        self.badspectra_fname = removeSuffix(self.badspectra_fname, ".fits")
-        self.badspectra_fname += ".txt"
-        if self.args.output_dir != self.args.Directory:
-            self.badspectra_fname = ospath_base(self.badspectra_fname)
-            self.badspectra_fname = ospath_join(self.args.output_dir, self.badspectra_fname)
-
     def closeFITSFiles(self):
         self.fitsfiles['Spec'].close()
         self.fitsfiles['Truth'].close()
@@ -182,11 +173,7 @@ class Reducer(object):
 
         self.closeFITSFiles()
 
-        if self.bad_spectra:
-            logging.info("Saving a list of bad spectra to %s.", self.badspectra_fname)
-            saveListByLine(self.bad_spectra, self.badspectra_fname)
-
-        return 1
+        return self.bad_spectra
 
 class Progress(object):
     """docstring for Progress"""
@@ -215,12 +202,15 @@ def transversePFolder(P, args):
         working_dir, len(fname_spectra))
     pcounter = Progress(len(fname_spectra))
 
+    bad_spec = []
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Reducer(args), fname_spectra)
 
-        for i in imap_it:
+        for bs in imap_it:
+            bad_spec.extend(bs)
             pcounter.increase()
 
+    return bad_spec
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -278,13 +268,19 @@ if __name__ == '__main__':
         logging.info("Transversing given P folders. There are %d many.", len(args.P_folders))
 
     Pcounter = Progress(len(args.P_folders), 1)
+    bad_spectra_all = []
     for P in args.P_folders:
-        transversePFolder(P, args)
+        bsa = transversePFolder(P, args)
+        bad_spectra_all.extend(bsa)
         logging.info("===============================================================")
         logging.info("===============================================================")
         logging.info("===============================================================")
         logging.info("One P folder finished.")
         Pcounter.increase()
+
+    badspectra_fname = ospath_join(args.output_dir, "bad_spectra.txt")
+    logging.info("Saving a list of bad spectra to %s.", badspectra_fname)
+    saveListByLine(bad_spectra_all, badspectra_fname)
 
     logging.info("Done!")
 
