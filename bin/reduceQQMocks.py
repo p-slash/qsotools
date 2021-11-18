@@ -81,7 +81,8 @@ class Reducer(object):
             fdname = ospath_base(fdname)
             fdname = ospath_join(self.args.output_dir, fdname)
 
-        self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
+        if not args.nosave:
+            self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
         self.badspectra_fname = rreplace(fname, "/bad_spectra-")
         removeSuffix = lambda s, suf: s[:-len(suf)] if s.endswith(suf) else s
@@ -96,7 +97,8 @@ class Reducer(object):
         self.fitsfiles['Spec'].close()
         self.fitsfiles['Truth'].close()
         self.fitsfiles['Zbest'].close()
-        self.fitsfiles['Delta'].close()
+        if not args.nosave:
+            self.fitsfiles['Delta'].close()
 
     def forEachArm(self, arm, fbrmap):
         ARM_WAVE   = self.fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
@@ -161,11 +163,9 @@ class Reducer(object):
                     continue
 
             # Save it
-            if args.nosave:
-                continue
-
-            saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, self.fitsfiles['Delta'], \
-                self.args)
+            if not args.nosave:
+                saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, \
+                    self.fitsfiles['Delta'], self.args)
 
     def __init__(self, args):
         self.args = args
@@ -211,7 +211,7 @@ def transversePFolder(P, args):
     working_dir   = ospath_join(args.Directory, str(P))
     fname_spectra = glob.glob(ospath_join(working_dir, "*", "spectra-*.fits*"))
 
-    logging.info("Working in directory %s/. There are %d many files.", \
+    logging.info("Working in directory %s/. There are %d files.", \
         working_dir, len(fname_spectra))
     pcounter = Progress(len(fname_spectra))
 
