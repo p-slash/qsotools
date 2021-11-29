@@ -1474,21 +1474,7 @@ class QQFile():
         self.fluxes = self.fitsfile['TRANSMISSION'].read().T
         self.close()
 
-    def readMetadata(self):
-        extnames = [hdu.get_extname() for hdu in self.fitsfile]
-        if 'METADATA' in extnames:
-            metadata_str = 'METADATA'
-        elif 'QSO_CAT' in extnames:
-            metadata_str = 'QSO_CAT'
-        else:
-            metadata_str = 1
-            logging.warning("Metadata not found by hduname. Using extension 1.")
-
-        metahdu = self.fitsfile[metadata_str]
-        colnames = metahdu.get_colnames()
-
-        # Do not change ordering.
-        # genDESILiteMocks assumes 'RA', 'DEC', 'Z', 'MOCK/TARGETID'
+    def getColList(colnames):
         l1 = []
         def add_colname(radec):
             if f'TARGET_{radec}' in colnames:
@@ -1512,11 +1498,36 @@ class QQFile():
         else:
             raise Exception("Missing metadata info: MOCKID or TARGETID.")
 
-        l1.append('COADD_EXPTIME')
-        l1.append('FLUX_R')
+    def readMetadata(self):
+        extnames = [hdu.get_extname() for hdu in self.fitsfile]
+        if 'METADATA' in extnames:
+            metadata_str = 'METADATA'
+        elif 'QSO_CAT' in extnames:
+            metadata_str = 'QSO_CAT'
+        else:
+            metadata_str = 1
+            logging.warning("Metadata not found by hduname. Using extension 1.")
 
-        self.metadata = metahdu[l1].read()
-        self.nqso     = self.metadata.size
+        metahdu = self.fitsfile[metadata_str]
+        colnames = metahdu.get_colnames()
+
+        meta_dt = np.dtype([('RA','f8'), ('DEC','f8'), ('Z','f8'),('MOCKID','i8'), \
+            ('COADD_EXPTIME','f8'), ('FLUX_R','f8')])
+
+        self.metadata = np.zeros(metahdu.get_nrows(), dtype=meta_dt)
+
+        l1 = QQFile.getColList(colnames)
+        for mcol, fcol in zip(['RA', 'DEC', 'Z', 'MOCKID'], l1):
+            self.metadata[mcol] = metahdu[fcol].read()
+
+        if 'COADD_EXPTIME' in colnames:
+            self.metadata['COADD_EXPTIME'] = metahdu['COADD_EXPTIME'].read()
+            l1.append('COADD_EXPTIME')
+        if 'FLUX_R' in colnames:
+            self.metadata['FLUX_R'] = metahdu['FLUX_R'].read()
+            l1.append('FLUX_R')
+
+        self.nqso = self.metadata.size
 
         return l1
 

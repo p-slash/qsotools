@@ -159,7 +159,7 @@ def getMetadata(args):
     if args.master_file:
         logging.info(f"Reading master file: {args.master_file}")
         master_file = QQFile(args.master_file)
-        l1 = master_file.readMetadata() # l1 is ordered as 'RA','DEC','Z', 'MOCK/TARGETID'
+        l1 = master_file.readMetadata()
         master_file.close()
 
         # Remove low redshift quasars
@@ -169,8 +169,8 @@ def getMetadata(args):
 
         # Add pixnum field to metadata
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
-        for mcol, fcol in zip(dt_list, l1):
-            metadata[mcol] = master_file.metadata[fcol]
+        for mcol in list(set(l1) & set(dt_list)):
+            metadata[mcol] = master_file.metadata[mcol]
 
         logging.info(f"Number of mocks to generate: {args.nmocks}")
     else:
@@ -252,8 +252,8 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=3600.)
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
-    parser.add_argument("--z-quasar-min", help="Lowest quasar redshift. Default: %(default)s", \
-        type=float, default=2.1)
+    parser.add_argument("--z-quasar-min", type=float, default=1.5, \
+        help="Lowest quasar redshift. Only when created from a catalog. Default: %(default)s")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.9)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
