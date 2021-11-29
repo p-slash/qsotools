@@ -1498,6 +1498,8 @@ class QQFile():
         else:
             raise Exception("Missing metadata info: MOCKID or TARGETID.")
 
+        return l1
+
     def readMetadata(self):
         extnames = [hdu.get_extname() for hdu in self.fitsfile]
         if 'METADATA' in extnames:
