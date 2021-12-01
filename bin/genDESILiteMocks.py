@@ -252,7 +252,7 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=3600.)
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
-    parser.add_argument("--z-quasar-min", type=float, default=1.5, \
+    parser.add_argument("--z-quasar-min", type=float, default=2.1, \
         help="Lowest quasar redshift. Only when created from a catalog. Default: %(default)s")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.9)
