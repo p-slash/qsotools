@@ -320,6 +320,13 @@ class MeanFluxHist():
         self.all_flux_values = np.empty((nz,), dtype=list)
         for i in range(nz): self.all_flux_values[i] = []
 
+    def __add__(self, hist2):
+        self.z_hist         += hist2.z_hist
+        self.total_flux     += hist2.total_flux
+        self.total_error2   += hist2.total_error2
+        self.counts         += hist2.counts
+        for i in range(self.nz): self.all_flux_values[i].extend(hist2.all_flux_values[i])
+
     def addSpectrum(self, qso, weight=1, f1=LYA_FIRST_WVL, f2=LYA_LAST_WVL, compute_scatter=False):
         lya_ind = np.logical_and(qso.wave>=f1*(1+qso.z_qso), qso.wave<=f2*(1+qso.z_qso))
         z     = qso.wave[lya_ind] / LYA_WAVELENGTH - 1
