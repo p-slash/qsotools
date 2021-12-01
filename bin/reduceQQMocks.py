@@ -134,10 +134,13 @@ class Reducer(object):
             mask = ARM_MASK[i][forest_pixels]
 
             if args.compute_mean_flux:
-                qso = Spectrum(wave, flux, 1./np.sqrt(ivar), z_qso, 5000, 1.0, {'RA':ra, 'DEC':dec})
-                qso.setZScoreMask(fsigma=1, esigma=2.5)
-                qso.applyMask()
-                self.local_meanflux_hist.addSpectrum(qso, weight=1)
+                try:
+                    qso = Spectrum(wave, flux, 1./np.sqrt(ivar), z_qso, 5000, 1.0, {'RA':ra, 'DEC':dec})
+                    qso.setZScoreMask(fsigma=1, esigma=3.5)
+                    qso.applyMask()
+                    self.local_meanflux_hist.addSpectrum(qso, weight=1)
+                except Exception as e:
+                    print(e)
                 continue
 
             # Make it delta
