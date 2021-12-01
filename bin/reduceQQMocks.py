@@ -215,7 +215,7 @@ def transversePFolder(P, args):
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Reducer(args), fname_spectra)
 
-        for bs, mf in imap_it:
+        for (bs, mf) in imap_it:
             bad_spec.extend(bs)
             if args.compute_mean_flux:
                 mf_hist+=mf
