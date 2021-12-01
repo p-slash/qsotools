@@ -81,14 +81,14 @@ class Reducer(object):
             fdname = ospath_base(fdname)
             fdname = ospath_join(self.args.output_dir, fdname)
 
-        if not args.nosave or not args.compute_mean_flux:
+        if not (args.nosave or args.compute_mean_flux):
             self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
     def closeFITSFiles(self):
         self.fitsfiles['Spec'].close()
         self.fitsfiles['Truth'].close()
         self.fitsfiles['Zbest'].close()
-        if not args.nosave or not args.compute_mean_flux:
+        if not (args.nosave or args.compute_mean_flux):
             self.fitsfiles['Delta'].close()
 
     def forEachArm(self, arm, fbrmap):
