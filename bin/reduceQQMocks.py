@@ -14,7 +14,7 @@ from scipy.interpolate import interp1d
 
 import qsotools.fiducial as fid
 import qsotools.specops as so
-from qsotools.io import saveListByLine
+from qsotools.io import saveListByLine, Spectrum
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 
 ARMS = ['B', 'R', 'Z']
@@ -81,14 +81,14 @@ class Reducer(object):
             fdname = ospath_base(fdname)
             fdname = ospath_join(self.args.output_dir, fdname)
 
-        if not args.nosave:
+        if not args.nosave or not args.compute_mean_flux:
             self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
 
     def closeFITSFiles(self):
         self.fitsfiles['Spec'].close()
         self.fitsfiles['Truth'].close()
         self.fitsfiles['Zbest'].close()
-        if not args.nosave:
+        if not args.nosave or not args.compute_mean_flux:
             self.fitsfiles['Delta'].close()
 
     def forEachArm(self, arm, fbrmap):
@@ -131,6 +131,14 @@ class Reducer(object):
 
             flux = ARM_FLUXES[i][forest_pixels] / cont
             ivar = ARM_IVAR[i][forest_pixels] * cont**2
+            mask = ARM_MASK[i][forest_pixels]
+
+            if args.compute_mean_flux:
+                qso = Spectrum(wave, flux, 1./np.sqrt(ivar), z_qso, 5000, 1.0, {'RA':ra, 'DEC':dec})
+                qso.setZScoreMask(fsigma=1, esigma=2.5)
+                qso.applyMask()
+                self.local_meanflux_hist.addSpectrum(qso, weight=1)
+                continue
 
             # Make it delta
             tr_mf = TRUE_MEAN_FLUX(z)
@@ -138,7 +146,6 @@ class Reducer(object):
             ivar  = ivar*tr_mf**2
 
             # Mask by setting things to 0
-            mask = ARM_MASK[i][forest_pixels]
             delta[mask] = 0
             ivar[mask]  = 0
 
@@ -162,6 +169,7 @@ class Reducer(object):
         self.args = args
         self.fitsfiles = {}
         self.bad_spectra = []
+        self.local_meanflux_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
     def __call__(self, fname):
         self.openFITSFiles(fname)
@@ -173,7 +181,7 @@ class Reducer(object):
 
         self.closeFITSFiles()
 
-        return self.bad_spectra
+        return self.bad_spectra, self.local_meanflux_hist
 
 class Progress(object):
     """docstring for Progress"""
@@ -203,14 +211,17 @@ def transversePFolder(P, args):
     pcounter = Progress(len(fname_spectra))
 
     bad_spec = []
+    mf_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Reducer(args), fname_spectra)
 
-        for bs in imap_it:
+        for bs, mf in imap_it:
             bad_spec.extend(bs)
+            if args.compute_mean_flux:
+                mf_hist+=mf
             pcounter.increase()
 
-    return bad_spec
+    return bad_spec, mf_hist
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -227,6 +238,8 @@ if __name__ == '__main__':
         type=float, default=1.9)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
         type=float, default=4.3)
+    parser.add_argument("--compute-mean-flux", action="store_true", \
+        help="Does not reduce to delta.")
 
     parser.add_argument("--oversample-rmat", help="Oversampling factor for resolution matrix. "\
         "Pass >1 to get finely spaced response function.", type=int, default=1)
@@ -269,9 +282,12 @@ if __name__ == '__main__':
 
     Pcounter = Progress(len(args.P_folders), 1)
     bad_spectra_all = []
+    mean_flux_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
     for P in args.P_folders:
-        bsa = transversePFolder(P, args)
+        bsa, mf = transversePFolder(P, args)
         bad_spectra_all.extend(bsa)
+        if args.compute_mean_flux:
+            mean_flux_hist += mf
         logging.info("===============================================================")
         logging.info("===============================================================")
         logging.info("===============================================================")
@@ -282,6 +298,12 @@ if __name__ == '__main__':
         badspectra_fname = ospath_join(args.output_dir, "bad_spectra.txt")
         logging.info("Saving a list of bad spectra to %s.", badspectra_fname)
         saveListByLine(bad_spectra_all, badspectra_fname)
+
+    if args.compute_mean_flux:
+        mean_flux_hist.getMeanStatistics()
+        meanflux_fname = ospath_join(args.output_dir, "mean-flux-stats.txt")
+        logging.info("Saving mean flux stats to %s.", meanflux_fname)
+        mean_flux_hist.saveHistograms(meanflux_fname)
 
     logging.info("Done!")
 
