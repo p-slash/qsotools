@@ -4,7 +4,7 @@ binscripts = [os.path.join("bin", f) for f in os.listdir("bin") if f.endswith(".
 
 setup(
     name="qsotools",
-    version="1.0",
+    version="1.1",
     packages=['qsotools'],
     package_dir={'qsotools': 'py/qsotools'},
     package_data={"qsotools": ["tables/*"]},
