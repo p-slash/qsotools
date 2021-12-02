@@ -331,7 +331,7 @@ class Spectrum:
         if pivot is None:
             pivot = np.median(arr)
         
-        MAD = min(scipy_mad(arr), 1)
+        MAD = scipy_mad(arr) + 1e-8
 
         return (arr - pivot) / MAD
 
