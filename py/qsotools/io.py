@@ -1518,10 +1518,10 @@ class QQFile():
 
         self.metadata = np.zeros(metahdu.get_nrows(), dtype=meta_dt)
 
-        l1 = QQFile.getColList(colnames)
-        for mcol, fcol in zip(['RA', 'DEC', 'Z', 'MOCKID'], l1):
+        for mcol, fcol in zip(['RA', 'DEC', 'Z', 'MOCKID'], QQFile.getColList(colnames)):
             self.metadata[mcol] = metahdu[fcol].read()
 
+        l1 = ['RA', 'DEC', 'Z', 'MOCKID']
         if 'COADD_EXPTIME' in colnames:
             self.metadata['COADD_EXPTIME'] = metahdu['COADD_EXPTIME'].read()
             l1.append('COADD_EXPTIME')
