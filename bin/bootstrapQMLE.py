@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import argparse
-from sys import sys_argv
+import sys
 from os.path import join as ospath_join, getsize as ospath_getsize
 from multiprocessing import Pool
 from itertools import groupby
@@ -117,7 +117,7 @@ if __name__ == '__main__':
     # Set up log
     logging.basicConfig(filename=ospath_join(args.BootDirectory, 'bootstrapping.log'), \
         level=logging.INFO)
-    logging.info(" ".join(sys_argv))
+    logging.info(" ".join(sys.argv))
 
     # Find the number of bootstrapping files
     bootfiles = glob.glob(ospath_join(args.BootDirectory, "bootresults-*.dat"))
