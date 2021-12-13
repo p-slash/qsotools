@@ -79,9 +79,16 @@ class Booter(object):
 
     def __call__(self, pe):
         fname = ospath_join(self.args.BootDirectory, f"bootresults-{pe}.dat")
+        t0 = time.time()
 
         # Read fishers and powers
         fishers, powers = readBootFile(fname)
+
+        t1 = time.time()
+        etime = (t1-t0)/60 # min
+        logging.info(f"Reading bootresults file. Elapsed time: {etime:.1f} mins.")
+        t0 = t1
+
         nspec = powers.shape[0]
         assert (powers.shape[1] == self.Nbin)
 
@@ -89,10 +96,26 @@ class Booter(object):
         this_fisher   = np.zeros((self.args.bootnum, self.Nbin*self.Nbin))
         this_power_b4 = np.zeros((self.args.bootnum, self.Nbin))
 
+        t1 = time.time()
+        etime = (t1-t0)/60 # min
+        logging.info(f"Creating empty arrays. Elapsed time: {etime:.1f} mins.")
+        t0 = t1
+
         # Each file has a different seed for multiprocessing
         RND = np.random.default_rng(self.args.seed + pe)
         booted_indices = RND.integers(low=0, high=nspec, size=(self.args.bootnum, nspec))
+
+        t1 = time.time()
+        etime = (t1-t0)/60 # min
+        logging.info(f"Generated boot indices. Elapsed time: {etime:.1f} mins.")
+        t0 = t1
+
         counts = getCounts(booted_indices, self.args.bootnum, nspec)
+
+        t1 = time.time()
+        etime = (t1-t0)/60 # min
+        logging.info(f"Getting counts. Elapsed time: {etime:.1f} mins.")
+        t0 = t1
 
         for ispec in range(nspec):
             ci = counts[ispec]
