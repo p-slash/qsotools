@@ -50,6 +50,9 @@ Change the name of the environment to your taste in [requirements.yml](requireme
 
 This should work even for clusters.
 
+### Developer installation
+Open [setup.py](setup.py). Change the line for package dir to `package_dir={'': 'py'},` (This seems to be a bug in pip?). Follow the steps above, but run `pip install -e .` in the end.
+
 ## Manual home installation
 **Warning**: running `python setup.py install` is **NOT** recommended.
 
