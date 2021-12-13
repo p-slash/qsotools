@@ -91,7 +91,7 @@ class Booter(object):
 
         # Each file has a different seed for multiprocessing
         RND = np.random.default_rng(self.args.seed + pe)
-        booted_indices = RND.randint(nspec, size=(self.args.bootnum, nspec))
+        booted_indices = RND.integers(low=0, high=nspec, size=(self.args.bootnum, nspec))
         counts = getCounts(booted_indices, self.args.bootnum, nspec)
 
         for ispec in range(nspec):
