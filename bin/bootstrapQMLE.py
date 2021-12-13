@@ -1,29 +1,46 @@
 #!/usr/bin/env python
 import argparse
-from os.path import join as ospath_join
+from sys import sys_argv
+from os.path import join as ospath_join, getsize as ospath_getsize
+from multiprocessing import Pool
 from itertools import groupby
-
+import glob
 import struct
+import time
+import logging
+
 import numpy as np
 import fitsio
-import re
 
-import qsotools.io as qio
+def getNfromBootfile(fname):
+    with open(fname, "rb") as f:
+        N = int(struct.unpack('i', f.read(struct.calcsize('i')))[0])
+    return N
 
-def readFPBinFile(fname):
-    with open(fname, "rb") as fpbin:
-        N = int(struct.unpack('i', fpbin.read(struct.calcsize('i')))[0])
-        
-        fisher_fmt = 'd'*N*N
-        fisher = struct.unpack(fisher_fmt, fpbin.read(struct.calcsize(fisher_fmt)))
-        fisher = np.array(fisher, dtype=np.double)
-        fisher = fisher.reshape((N, N))
+# Returns fishers, powers
+# fishers.shape = (nspec, N*N)
+# powers.shape = (nspec, N)
+def readBootFile(fname):
+    filesize = ospath_getsize(fname)
 
-        power_fmt = 'd'*N
-        power = struct.unpack(power_fmt, fpbin.read(struct.calcsize(power_fmt)))
-        power = np.array(power, dtype=np.double)
+    with open(fname, "rb") as bootfile:
+        N = int(struct.unpack('i', bootfile.read(struct.calcsize('i')))[0])
 
-    return fisher, power
+        id_size     = struct.calcsize('i')
+        fisher_size = struct.calcsize('d'*N*N)
+        power_size  = struct.calcsize('d'*N)
+        aspec_size  = id_size+fisher_size+power_size
+        nspec = int((filesize-struct.calcsize('i'))/aspec_size)
+
+        powers  = np.empty((nspec, N))
+        fishers = np.empty((nspec, N*N))
+
+        for ispec in range(nspec):
+            temp_data = bootfile.read(aspec_size)
+            fishers[ispec] = struct.unpack('d'*N*N, temp_data[id_size:id_size+fisher_size])
+            powers[ispec]  = struct.unpack('d'*N, temp_data[id_size+fisher_size:])
+
+    return fishers, powers
 
 def getCounts(booted_indices, bootnum, no_spectra):
     # Does sorting helps with add.at?
@@ -34,191 +51,109 @@ def getCounts(booted_indices, bootnum, no_spectra):
 
     return np.transpose(counts)
 
-# This function assumes spectra are organized s0/ s1/ .. folders
-# and individual results are saved under s0/combined_Fp.fits
-def qmleBootRunDESI(booted_indices, qso_fname_list, N, inputdir, bootnum, fp_file):
-    total_fisher   = np.zeros((bootnum, N, N))
-    total_power_b4 = np.zeros((bootnum, N))
-    total_power    = np.zeros((bootnum, N))
+class Progress(object):
+    """docstring for Progress"""
+    def __init__(self, total, percThres=5):
+        self.i = 0
+        self.total = total
+        self.percThres = percThres
+        self.last_progress = 0
+        self.start_time = time.time()
 
-    sno_regex= re.compile('/s(\d+)/desilite')
-    getSno = lambda x: int(sno_regex.search(x).group(1))
-    # id_regex = re.compile('_id(\d+)_')
-    # getIDno= lambda x: int(id_regex.search(x).group(1))
-    
-    qso_fname_list.sort(key=getSno) # Sort for groupby
-    no_spectra = len(qso_fname_list)
-    perc = int(no_spectra/20)
+    def increase(self):
+        self.i+=1
+        curr_progress = int(100*self.i/self.total)
+        print_condition = (curr_progress-self.last_progress >= self.percThres) or (self.i == 0)
 
-    # counts shape (no_spectra, bootnum)
-    print("Getting repetitions...", flush=True)
-    counts = getCounts(booted_indices, bootnum, no_spectra)
+        if print_condition:
+            etime = (time.time()-self.start_time)/60 # min
+            logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
+            self.last_progress = curr_progress
 
-    qind = 0 # Stores the index in qso_fname_list for the loop
 
-    for grno, sn_group in groupby(qso_fname_list, key=getSno):
-        fitspath = ospath_join(inputdir, "s%d"%grno, fp_file)
-        print("Reading {:s}...".format(fitspath), flush=True)
+class Booter(object):
+    """docstring for Booter"""
+    def __init__(self, N, args):
+        self.args = args
+        self.Nbin = N
 
-        with fitsio.FITS(fitspath) as fitsfile:
-            for hdu in fitsfile[1:]:
-                ci = counts[qind]
-                data = hdu.read()
-                
-                total_fisher   += data['fisher']*ci[:, None, None]
-                total_power_b4 += data['power']*ci[:, None]
-                
-                qind+=1
-                if qind%perc==0:
-                    print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
+    def __call__(self, pe):
+        fname = ospath_join(self.args.BootDirectory, f"bootresults-{pe}.dat")
 
-        print("Results from {:s} are read and added.".format(fitspath), flush=True)
+        # Read fishers and powers
+        fishers, powers = readBootFile(fname)
+        nspec = powers.shape[0]
+        assert (powers.shape[1] == self.Nbin)
 
-    print("Calculating bootstrapped inverse Fisher and power...", flush=True)
-    for bi in range(bootnum):
-        inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
-        total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
-    
-    return total_power
+        # Create zeros for bootstrap results
+        this_fisher   = np.zeros((self.args.bootnum, self.Nbin*self.Nbin))
+        this_power_b4 = np.zeros((self.args.bootnum, self.Nbin))
 
-# This function assumes one Fp_fits file under one directory.
-def qmleBootRun(booted_indices, no_spectra, N, inputdir, bootnum, fp_file):
-    total_fisher   = np.zeros((bootnum, N, N))
-    total_power_b4 = np.zeros((bootnum, N))
-    total_power    = np.zeros((bootnum, N))
-    
-    perc = int(no_spectra/20)
+        # Each file has a different seed for multiprocessing
+        RND = np.random.default_rng(self.args.seed + pe)
+        booted_indices = RND.randint(nspec, size=(self.args.bootnum, nspec))
+        counts = getCounts(booted_indices, self.args.bootnum, nspec)
 
-    # counts shape (no_spectra, bootnum)
-    print("Getting repetitions...", flush=True)
-    counts = getCounts(booted_indices, bootnum, no_spectra)
+        for ispec in range(nspec):
+            ci = counts[ispec]
 
-    qind = 0 
-    fitspath = ospath_join(inputdir, fp_file)
-    print("Reading {:s}...".format(fitspath), flush=True)
+            total_fisher   += fishers[ispec]*ci[:, None]
+            total_power_b4 += powers[ispec]*ci[:, None]
 
-    with fitsio.FITS(fitspath) as fitsfile:
-        for hdu in fitsfile[1:]:
-            ci = counts[qind]
-            data = hdu.read()
-            
-            total_fisher   += data['fisher']*ci[:, None, None]
-            total_power_b4 += data['power']*ci[:, None]
-            
-            qind+=1
-            if qind%perc==0:
-                print("Progress: {:4.1f}%".format(100*qind/no_spectra), flush=True)
-
-    print("Results from {:s} are read and added.".format(fitspath), flush=True)
-
-    print("Calculating bootstrapped inverse Fisher and power...", flush=True)
-    for bi in range(bootnum):
-        inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
-        total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
-    
-    return total_power
-
-def qmleBootQSO(RND, N, inputdir, bootnum, fp_file):
-    total_fisher   = np.zeros((bootnum, N, N))
-    total_power_b4 = np.zeros((bootnum, N))
-    total_power    = np.zeros((bootnum, N))
-
-    qind = 0 
-    fitspath = ospath_join(inputdir, fp_file)
-    print("Reading {:s}...".format(fitspath), flush=True)
-
-    with fitsio.FITS(fitspath) as fitsfile:
-        no_qso = len(fitsfile) - 1
-        booted_indices = RND.randint(no_qso, size=(bootnum, no_qso))
-
-        print("Getting repetitions...", flush=True)
-        counts = getCounts(booted_indices, bootnum, no_qso)
-
-        perc = int(no_qso/20)
-
-        for hdu in fitsfile[1:]:
-            ci = counts[qind]
-            data = hdu.read()
-            
-            total_fisher   += np.sum(data['fisher'], axis=0) * ci[:, None, None]
-            total_power_b4 += np.sum(data['power'], axis=0) * ci[:, None]
-            
-            qind+=1
-            if qind%perc==0:
-                print("Progress: {:4.1f}%".format(100*qind/no_qso), flush=True)
-
-    print("Results from {:s} are read and added.".format(fitspath), flush=True)
-
-    print("Calculating bootstrapped inverse Fisher and power...", flush=True)
-    for bi in range(bootnum):
-        inv_total_fisher = np.linalg.inv(total_fisher[bi]) 
-        total_power[bi] = 0.5 * inv_total_fisher @ total_power_b4[bi]
-    
-    return total_power
-
+        return total_fisher, total_power_b4
+        
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
-    parser.add_argument("ConfigFile", help="Config file")
-    parser.add_argument("--by-qso", action="store_true")
+    parser.add_argument("BootDirectory", help="Directory where bootresults-N.dat are present.")
+    parser.add_argument("OutputFile", help="Output file relative to BootDirectory.")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
-    parser.add_argument("--desilite-mocks", action="store_true")
-    parser.add_argument("--fp-file", default="combined_Fp.fits.gz")
+    parser.add_argument("--nproc", type=int, default=1)
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
     args = parser.parse_args()
 
-    config_qmle = qio.ConfigQMLE(args.ConfigFile)
-    output_dir  = config_qmle.parameters['OutputDir']
-    output_base = config_qmle.parameters['OutputFileBase']
+    # Set up log
+    logging.basicConfig(filename=ospath_join(args.BootDirectory, 'bootstrapping.log'), \
+        level=logging.INFO)
+    logging.info(" ".join(sys_argv))
 
-    N = (config_qmle.k_nlin + config_qmle.k_nlog) * config_qmle.z_n
-    print("Config file is read.")
+    # Find the number of bootstrapping files
+    bootfiles = glob.glob(ospath_join(args.BootDirectory, "bootresults-*.dat"))
+    nbootfiles = len(bootfiles)
+    logging.info("There are %d bootresults files.", nbootfiles)
 
-    # Read qso filenames into a list, then convert to numpy array
-    with open(config_qmle.qso_list, 'r') as file_qsolist:
-        header = file_qsolist.readline()
-        qso_filename_list = [ospath_join(config_qmle.qso_dir, x.rstrip()) \
-            for x in file_qsolist]
+    pcounter = Progress(nbootfiles)
+    N = getNfromBootfile(bootfiles[0])
+    total_fisher   = np.zeros((args.bootnum, N*N))
+    total_power_b4 = np.zeros((args.bootnum, N))
+    total_power    = np.zeros((args.bootnum, N))
 
-    no_spectra = len(qso_filename_list)
-    print("Filenames of {:d} spectra are stored.".format(no_spectra))
-        
-    # Generate random indices as bootstrap
-    RND = np.random.RandomState(args.seed)
+    with Pool(processes=args.nproc) as pool:
+        imap_it = pool.imap(Booter(N, args), range(nbootfiles))
 
-    if args.by_qso:
-        print("Running analysis...", flush=True)
-        bootresult=qmleBootQSO(RND, N, config_qmle.qso_dir, args.bootnum, args.fp_file)
-    else:
-        booted_indices = RND.randint(no_spectra, size=(args.bootnum, no_spectra))
-        print("{:d} bootstrap realisations are generated.".format(args.bootnum))
-        print("Here's the first realisation:", booted_indices[0], flush=True)
-        print("Here's the repetitions for index 0:", \
-            np.count_nonzero(booted_indices==0, axis=1), flush=True)
+        for (fisher1, power1) in imap_it:
+            total_fisher   += fisher1
+            total_power_b4 += power1
 
-        if args.desilite_mocks:
-            bootresult=qmleBootRunDESI(booted_indices, qso_filename_list, N, \
-                config_qmle.qso_dir, args.bootnum, args.fp_file)
-        else:
-            bootresult=qmleBootRun(booted_indices, no_spectra, N, \
-                config_qmle.qso_dir, args.bootnum, args.fp_file)
+            pcounter.increase()
+
+    logging.info("Calculating bootstrapped inverse Fisher and power...")
+    for bi in range(args.bootnum):
+        total_power[bi] = 0.5 * np.linalg.inv(total_fisher[bi].reshape(N,N)) @ total_power_b4[bi]
 
     # Save power to a file
-    power_filename = ospath_join(output_dir, output_base \
-        +"-bootstrap-power-n%d-s%d.txt" % (args.bootnum, args.seed))
-    np.savetxt(power_filename, bootresult)
-    print("Power saved as ", power_filename)
+    # Set up output file
+    output_fname = ospath_join(args.BootDirectory, args.OutputFile)
+    np.savetxt(output_fname, total_power)
+    logging.info("Power saved as ", output_fname)
 
     # If time allows, run many bootstraps and save its covariance
     # when save-cov passed
     if args.save_cov:
-        bootstrap_cov = np.cov(bootresult, rowvar=False)
-        cov_filename = ospath_join(output_dir, output_base \
-            +"-bootstrap-cov-n%d-s%d.txt" % (args.bootnum, args.seed))
+        bootstrap_cov = np.cov(total_power, rowvar=False)
+        cov_filename = oospath_join(args.BootDirectory, f"cov-{args.OutputFile}")
         np.savetxt(cov_filename, bootstrap_cov)
-        print("Covariance saved as ", cov_filename)
-
-
+        logging.info("Covariance saved as ", cov_filename)
 
