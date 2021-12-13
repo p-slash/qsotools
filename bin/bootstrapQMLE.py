@@ -97,10 +97,10 @@ class Booter(object):
         for ispec in range(nspec):
             ci = counts[ispec]
 
-            total_fisher   += fishers[ispec]*ci[:, None]
-            total_power_b4 += powers[ispec]*ci[:, None]
+            this_fisher   += fishers[ispec]*ci[:, None]
+            this_power_b4 += powers[ispec]*ci[:, None]
 
-        return total_fisher, total_power_b4
+        return this_fisher, this_power_b4
         
 if __name__ == '__main__':
     # Arguments passed to run the script
