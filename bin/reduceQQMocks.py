@@ -6,7 +6,7 @@ import time
 import logging
 from multiprocessing import Pool
 
-from os      import walk as os_walk, makedirs as os_makedirs
+from os      import walk as os_walk, makedirs as os_makedirs, remove as os_remove
 from os.path import join as ospath_join, basename as ospath_base
 
 import numpy as np
@@ -66,8 +66,7 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     if args.oversample_rmat>1:
         hdr_dict['OVERSAMP'] = args.oversample_rmat
 
-    if not args.nosave:
-        fdelta.write(data, header=hdr_dict)
+    fdelta.write(data, header=hdr_dict)
 
 class Reducer(object):
     def openFITSFiles(self, fname):
@@ -76,13 +75,13 @@ class Reducer(object):
         self.fitsfiles['Truth'] = fitsio.FITS(rreplace(fname, "/truth-"))
         self.fitsfiles['Zbest'] = fitsio.FITS(rreplace(fname, "/zbest-"))
 
-        fdname = rreplace(fname, "/delta-")
+        self.fname_delta = rreplace(fname, "/delta-")
         if self.args.output_dir != self.args.Directory:
-            fdname = ospath_base(fdname)
-            fdname = ospath_join(self.args.output_dir, fdname)
+            self.fname_delta = ospath_base(self.fname_delta)
+            self.fname_delta = ospath_join(self.args.output_dir, self.fname_delta)
 
         if not (args.nosave or args.compute_mean_flux):
-            self.fitsfiles['Delta'] = fitsio.FITS(fdname, "rw", clobber=True)
+            self.fitsfiles['Delta'] = fitsio.FITS(self.fname_delta, "rw", clobber=True)
 
     def closeFITSFiles(self):
         self.fitsfiles['Spec'].close()
@@ -90,6 +89,9 @@ class Reducer(object):
         self.fitsfiles['Zbest'].close()
         if not (args.nosave or args.compute_mean_flux):
             self.fitsfiles['Delta'].close()
+
+            if self.no_saved_spec == 0:
+                os_remove(self.fname_delta)
 
     def forEachArm(self, arm, fbrmap):
         ARM_WAVE   = self.fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
@@ -169,10 +171,14 @@ class Reducer(object):
                 saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, \
                     self.fitsfiles['Delta'], self.args)
 
+                self.no_saved_spec += 1
+
     def __init__(self, args):
         self.args = args
         self.fitsfiles = {}
         self.bad_spectra = []
+        self.fname_delta = ""
+        self.no_saved_spec = 0
         self.local_meanflux_hist = so.MeanFluxHist(args.z_forest_min, args.z_forest_max)
 
     def __call__(self, fname):

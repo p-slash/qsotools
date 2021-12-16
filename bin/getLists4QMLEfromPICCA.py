@@ -70,7 +70,12 @@ class GetNCopy(object):
     def __init__(self, args):
         self.args = args
     def __call__(self, f):
-        return getFlistFromOne(f, self.args)
+        try:
+            return getFlistFromOne(f, self.args)
+        except Exception as e:
+            print(e)
+            return [], set()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
