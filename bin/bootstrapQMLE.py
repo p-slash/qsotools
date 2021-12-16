@@ -107,7 +107,7 @@ if __name__ == '__main__':
     # We will need indices for each file
     nspec_total = 0
     indices     = np.empty(nbootfiles+1)
-    Nbins       = getNfromBootfile(bootfiles[0])
+    Nbins       = getNumbersfromBootfile(bootfiles[0])
 
     indices[0]  = 0
     for pe in range(nbootfiles):
