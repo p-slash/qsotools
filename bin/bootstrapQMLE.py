@@ -53,12 +53,16 @@ def readBootFile(fname):
 
     return fishers, powers
 
-def getCounts(booted_indices, bootnum, no_spectra):
-    # Does sorting helps with add.at?
-    booted_indices.sort(axis=1)
-    counts = np.zeros((bootnum, no_spectra), dtype=np.int)
-    for i, btdi in enumerate(booted_indices):
-        np.add.at(counts[i], btdi, 1)
+def getCounts(booted_indices):
+    bootnum, no_spectra = booted_indices.shape
+    # # Does sorting helps with add.at?
+    # booted_indices.sort(axis=1)
+    # counts = np.zeros((bootnum, no_spectra), dtype=int)
+    # for i, btdi in enumerate(booted_indices):
+    #     np.add.at(counts[i], btdi, 1)
+    counts = np.empty((bootnum, no_spectra), dtype=int)
+    for b in range(bootnum):
+        counts[b] = np.bincount(booted_indices[b], minlength=no_spectra)
 
     return counts
 
@@ -120,11 +124,12 @@ if __name__ == '__main__':
         indices[pe+1] = nspec_total
 
     logging.info("There are %d spectra.", nspec_total)
+    print(indices)
 
     # Generate bootstrap realizations through indexes
     RND            = np.random.default_rng(args.seed)
     booted_indices = RND.integers(low=0, high=nspec_total, size=(args.bootnum, nspec_total))
-    boot_counts    = getCounts(booted_indices, args.bootnum, nspec_total)
+    boot_counts    = getCounts(booted_indices)
     logging.info(f"Generated boot indices.")
 
     # Allocate memory for matrices
