@@ -124,7 +124,6 @@ if __name__ == '__main__':
         indices[pe+1] = nspec_total
 
     logging.info("There are %d spectra.", nspec_total)
-    print(indices)
 
     # Generate bootstrap realizations through indexes
     RND            = np.random.default_rng(args.seed)
@@ -153,7 +152,8 @@ if __name__ == '__main__':
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
     for bi in range(args.bootnum):
-        total_power[bi] = 0.5 * np.linalg.inv(total_fisher[bi].reshape(N,N)) @ total_power_b4[bi]
+        Finv = np.linalg.inv(total_fisher[bi].reshape(Nbins,Nbins))
+        total_power[bi] = 0.5 * Finv @ total_power_b4[bi]
 
     # Save power to a file
     # Set up output file
