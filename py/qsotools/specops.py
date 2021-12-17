@@ -270,9 +270,10 @@ def getOversampledRMat(rmat, oversampling=3):
     def getPaddedRow(i):
         xvec = [(j,i+offsets[j]) for j in reversed(range(ndiags))]
         if i < noff:
-            xvec[:noff] = reversed(xvec[noff+1:])
+            xvec[:noff-i] = reversed(xvec[noff+1+i:])
         elif i > nrows-noff-1:
-            xvec[noff+1:] = reversed(xvec[:noff])
+            j=(nrows-1)-i
+            xvec[j + noff+1:] = reversed(xvec[:noff-j])
         return np.array([rmat[x] for x in xvec])
 
     for i in range(nrows):
