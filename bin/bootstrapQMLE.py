@@ -135,7 +135,7 @@ if __name__ == '__main__':
     # Set up progress tracker
     pcounter = Progress(nbootfiles)
     for pe in range(nbootfiles):
-        fname     = ospath_join(args.BootDirectory, f"bootresults-{pe}.dat")
+        fname = ospath_join(args.BootDirectory, f"bootresults-{pe}.dat")
 
         # Read fishers and powers
         fishers, powers = readBootFile(fname)
@@ -143,6 +143,8 @@ if __name__ == '__main__':
 
         total_fisher   += this_counts @ fishers
         total_power_b4 += this_counts @ powers
+
+        pcounter.increase()
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
     for bi in range(args.bootnum):
