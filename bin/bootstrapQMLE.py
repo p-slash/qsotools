@@ -109,8 +109,8 @@ if __name__ == '__main__':
     # Generating bootstrap realizations by file, constains the fluctuations
     # Generate one big boot array, each file gets their parts
     # We will need indices for each file
-    nspec_total = 0
-    indices     = np.empty(nbootfiles+1)
+    nspec_total = int(0)
+    indices     = np.empty(nbootfiles+1, dtype=int)
     Nbins, nspec= getNumbersfromBootfile(bootfiles[0])
 
     indices[0]  = 0
