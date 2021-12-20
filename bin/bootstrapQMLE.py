@@ -32,7 +32,7 @@ def getNumbersfromBootfile(fname):
 # fishers.shape = (nspec, N*N)
 # powers.shape = (nspec, N)
 def readBootFile(fname, N):
-    dt = np.dtype([('id', int), ('fisher', 'f8', N*N), ('power', 'f8', N)])
+    dt = np.dtype([('id', 'i4'), ('fisher', 'f8', N*N), ('power', 'f8', N)])
 
     with open(fname, "rb") as bootfile:
         spectra = np.fromfile(bootfile, offset=struct.calcsize('i'), dtype=dt)
@@ -128,7 +128,7 @@ if __name__ == '__main__':
         fname = ospath_join(args.BootDirectory, f"bootresults-{pe}.dat")
 
         # Read fishers and powers
-        spectra     = readBootFile(fname)
+        spectra     = readBootFile(fname, Nbins)
         this_counts = boot_counts[:, indices[pe]:indices[pe+1]]
 
         total_fisher   += this_counts @ spectra['fisher']
@@ -137,9 +137,8 @@ if __name__ == '__main__':
         pcounter.increase()
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
-    for bi in range(args.bootnum):
-        Finv = np.linalg.inv(total_fisher[bi].reshape(Nbins,Nbins))
-        total_power[bi] = 0.5 * Finv @ total_power_b4[bi]
+    F = total_fisher.reshape((args.bootnum, Nbins, Nbins))
+    total_power = 0.5 * np.linalg.solve(F, total_power_b4)
 
     # Save power to a file
     # Set up output file
