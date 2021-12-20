@@ -20,38 +20,24 @@ def getNumbersfromBootfile(fname):
     with open(fname, "rb") as f:
         N = int(struct.unpack('i', f.read(struct.calcsize('i')))[0])
 
-        id_size     = struct.calcsize('i')
-        fisher_size = struct.calcsize('d'*N*N)
-        power_size  = struct.calcsize('d'*N)
-        aspec_size  = id_size+fisher_size+power_size
-        nspec = int((filesize-struct.calcsize('i'))/aspec_size)
+    id_size     = struct.calcsize('i')
+    fisher_size = struct.calcsize('d'*N*N)
+    power_size  = struct.calcsize('d'*N)
+    aspec_size  = id_size+fisher_size+power_size
+    nspec = int((filesize-struct.calcsize('i'))/aspec_size)
 
     return N, nspec
 
 # Returns fishers, powers
 # fishers.shape = (nspec, N*N)
 # powers.shape = (nspec, N)
-def readBootFile(fname):
-    filesize = ospath_getsize(fname)
+def readBootFile(fname, N):
+    dt = np.dtype([('id', int), ('fisher', 'f8', N*N), ('power', 'f8', N)])
 
     with open(fname, "rb") as bootfile:
-        N = int(struct.unpack('i', bootfile.read(struct.calcsize('i')))[0])
+        spectra = np.fromfile(bootfile, offset=struct.calcsize('i'), dtype=dt)
 
-        id_size     = struct.calcsize('i')
-        fisher_size = struct.calcsize('d'*N*N)
-        power_size  = struct.calcsize('d'*N)
-        aspec_size  = id_size+fisher_size+power_size
-        nspec = int((filesize-struct.calcsize('i'))/aspec_size)
-
-        powers  = np.empty((nspec, N))
-        fishers = np.empty((nspec, N*N))
-
-        for ispec in range(nspec):
-            temp_data = bootfile.read(aspec_size)
-            fishers[ispec] = struct.unpack('d'*N*N, temp_data[id_size:id_size+fisher_size])
-            powers[ispec]  = struct.unpack('d'*N, temp_data[id_size+fisher_size:])
-
-    return fishers, powers
+    return spectra
 
 def getCounts(booted_indices):
     bootnum, no_spectra = booted_indices.shape
@@ -142,11 +128,11 @@ if __name__ == '__main__':
         fname = ospath_join(args.BootDirectory, f"bootresults-{pe}.dat")
 
         # Read fishers and powers
-        fishers, powers = readBootFile(fname)
-        this_counts     = boot_counts[:, indices[pe]:indices[pe+1]]
+        spectra     = readBootFile(fname)
+        this_counts = boot_counts[:, indices[pe]:indices[pe+1]]
 
-        total_fisher   += this_counts @ fishers
-        total_power_b4 += this_counts @ powers
+        total_fisher   += this_counts @ spectra['fisher']
+        total_power_b4 += this_counts @ spectra['power']
 
         pcounter.increase()
 
