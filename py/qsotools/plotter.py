@@ -492,7 +492,7 @@ class PowerPlotter(object):
         save_figure(outplot_fname)
 
     def getChiSquare(self, zbin=None, fisher=None, kmin=None, kmax=None):
-        if fisher is not None:
+        if isinstance(fisher, np.ndarray):
             invcov = fisher
         else:
             invcov = self.fisher
