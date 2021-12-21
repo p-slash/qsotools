@@ -145,7 +145,7 @@ if __name__ == '__main__':
     output_fname = ospath_join(args.BootDirectory, 
         "bootstrap-power-n%d-s%d.txt" % (args.bootnum, args.seed))
     np.savetxt(output_fname, total_power)
-    logging.info("Power saved as %s.", output_fname)
+    logging.info(f"Power saved as {output_fname}.")
 
     # If time allows, run many bootstraps and save its covariance
     # when save-cov passed
@@ -154,5 +154,5 @@ if __name__ == '__main__':
         output_fname = ospath_join(args.BootDirectory, 
             "bootstrap-cov-n%d-s%d.txt" % (args.bootnum, args.seed))
         np.savetxt(output_fname, bootstrap_cov)
-        logging.info("Covariance saved as %s.", output_fname)
+        logging.info(f"Covariance saved as {output_fname}.")
 
