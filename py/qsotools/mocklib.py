@@ -77,7 +77,7 @@ def lognMeanFluxGH(z):
 def lognVarianceFluxGH(z):
     XIXI, ZZ = np.meshgrid(gausshermite_xi_deg25, z)
 
-    Y = Flux_d_z(XIXI*np.sqrt(2*lm.sigma2), ZZ)
+    Y = Flux_d_z(XIXI*np.sqrt(2*sigma2), ZZ)
     F2_mean = np.dot(Y**2, gausshermite_wi_deg25) / np.sqrt(np.pi)
     F_mean  = np.dot(Y, gausshermite_wi_deg25) / np.sqrt(np.pi)
 
