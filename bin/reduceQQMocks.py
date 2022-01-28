@@ -134,14 +134,24 @@ class Reducer(object):
             flux = ARM_FLUXES[i][forest_pixels] / cont
             ivar = ARM_IVAR[i][forest_pixels] * cont**2
             mask = ARM_MASK[i][forest_pixels]
+            # Cut rmat forest region, but keep individual bad pixel values in
+            rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
 
             if args.compute_mean_flux:
                 try:
-                    qso = Spectrum(wave, flux, 1./np.sqrt(ivar), z_qso, 5000, 1.0, {'RA':ra, 'DEC':dec})
+                    R_kms = so.fitGaussian2RMat(thid, wave, rmat)
+                    R_int = fid.LIGHT_SPEED / R_kms / fid.ONE_SIGMA_2_FWHM
+                    dv = np.mean(np.diff(fid.LIGHT_SPEED * np.log(wave)))
+                    qso = Spectrum(wave, flux, 1./np.sqrt(ivar), z_qso, R_int, dv, {'RA':ra, 'DEC':dec})
                     # zscore masking skews the resulting mean flux
                     # qso.setZScoreMask(fsigma=1, esigma=3.5)
                     # qso.applyMask()
-                    self.local_meanflux_hist.addSpectrum(qso, weight=1)
+                    if args.use_invvar_weights:
+                        qso.addLyaFlucErrors() # This adds variance based on fit to data
+                        weight = 1./qso.error**2
+                    else:
+                        weight = 1
+                    self.local_meanflux_hist.addSpectrum(qso, weight=weight)
                 except Exception as e:
                     print(e)
                 continue
@@ -155,8 +165,6 @@ class Reducer(object):
             delta[mask] = 0
             ivar[mask]  = 0
 
-            # Cut rmat forest region, but keep individual bad pixel values in
-            rmat = np.delete(ARM_RESOM, ~forest_pixels, axis=1)
             if self.args.oversample_rmat>1:
                 try:
                     rmat = so.getOversampledRMat(rmat, self.args.oversample_rmat)
@@ -250,6 +258,8 @@ if __name__ == '__main__':
         type=float, default=4.3)
     parser.add_argument("--compute-mean-flux", action="store_true", \
         help="Does not reduce to delta.")
+    parser.add_argument("--use-invvar-weights", action="store_true", \
+        help="Assigns weights wrt inv var pipeline for mean flux.")
 
     parser.add_argument("--oversample-rmat", help="Oversampling factor for resolution matrix. "\
         "Pass >1 to get finely spaced response function.", type=int, default=1)
