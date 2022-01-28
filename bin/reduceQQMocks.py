@@ -141,7 +141,7 @@ class Reducer(object):
                 try:
                     R_kms = so.fitGaussian2RMat(thid, wave, rmat)
                     R_int = fid.LIGHT_SPEED / R_kms / fid.ONE_SIGMA_2_FWHM
-                    dv = np.mean(np.diff(fid.LIGHT_SPEED * np.log(wave)))
+                    dv = fid.LIGHT_SPEED * np.mean(np.diff(np.log(wave)))
                     qso = Spectrum(wave, flux, 1./np.sqrt(ivar), z_qso, R_int, dv, {'RA':ra, 'DEC':dec})
                     # zscore masking skews the resulting mean flux
                     # qso.setZScoreMask(fsigma=1, esigma=3.5)
