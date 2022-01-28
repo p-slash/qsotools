@@ -69,7 +69,7 @@ gausshermite_xi_deg25, gausshermite_wi_deg25 = np.polynomial.hermite.hermgauss(2
 def lognMeanFluxGH(z):
     XIXI, ZZ = np.meshgrid(gausshermite_xi_deg25, z)
 
-    Y = Flux_d_z(XIXI*np.sqrt(2*lm.sigma2), ZZ)
+    Y = Flux_d_z(XIXI*np.sqrt(2*sigma2), ZZ)
     result = np.dot(Y, gausshermite_wi_deg25)
 
     return result / np.sqrt(np.pi)
