@@ -315,7 +315,7 @@ class MeanFluxHist():
         self.total_flux = np.zeros(nz)
         self.total_error2 = np.zeros(nz)
         self.scatter_error = np.zeros(self.nz)
-        self.counts = np.zeros(nz+2)
+        self.counts = np.zeros(nz)
         self.z_hist = np.zeros(nz)
 
         self.all_flux_values = np.empty((nz,), dtype=list)
