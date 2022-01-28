@@ -335,18 +335,19 @@ class MeanFluxHist():
         flux  = qso.flux[lya_ind]
         error = qso.error[lya_ind]
 
-        fi, _, binnumber = binned_statistic(z, flux, statistic='sum', bins=self.hist_redshift_edges)
-        ci = np.bincount(binnumber, minlength=len(self.hist_redshift_edges)+1)
-        
-        e2i = binned_statistic(z, error**2, statistic='sum', bins=self.hist_redshift_edges)[0]
+        fi, _, binnumber = binned_statistic(z, flux*weight, statistic='sum', bins=self.hist_redshift_edges)
+        ci, _, binnumber = binned_statistic(z, np.ones_like(flux)*weight, statistic='sum', bins=self.hist_redshift_edges)
+        # ci = np.bincount(binnumber, minlength=len(self.hist_redshift_edges)+1)
+
+        e2i = binned_statistic(z, (error*weight)**2, statistic='sum', bins=self.hist_redshift_edges)[0]
 
         # Pixel statistics: Pixel redshift Histogram
         zi, _= np.histogram(z, bins=self.hist_redshift_edges)
 
         self.z_hist += zi
-        self.total_flux += fi * weight
-        self.total_error2 += e2i * weight**2
-        self.counts += ci * weight
+        self.total_flux += fi 
+        self.total_error2 += e2i 
+        self.counts += ci
 
         if compute_scatter:
             for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1])
