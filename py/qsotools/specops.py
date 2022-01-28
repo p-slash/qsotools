@@ -336,7 +336,7 @@ class MeanFluxHist():
         error = qso.error[lya_ind]
 
         fi, _, binnumber = binned_statistic(z, flux*weight, statistic='sum', bins=self.hist_redshift_edges)
-        ci, _, binnumber = binned_statistic(z, np.ones_like(flux)*weight, statistic='sum', bins=self.hist_redshift_edges)
+        ci = binned_statistic(z, np.ones_like(flux)*weight, statistic='sum', bins=self.hist_redshift_edges)[0]
         # ci = np.bincount(binnumber, minlength=len(self.hist_redshift_edges)+1)
 
         e2i = binned_statistic(z, (error*weight)**2, statistic='sum', bins=self.hist_redshift_edges)[0]
@@ -353,8 +353,8 @@ class MeanFluxHist():
             for i in range(self.nz): self.all_flux_values[i].extend(flux[binnumber==i+1])
 
     def getMeanStatistics(self, compute_scatter=False):
-        self.mean_flux = self.total_flux / self.counts[1:-1]
-        self.mean_error2 = np.sqrt(self.total_error2) / self.counts[1:-1]
+        self.mean_flux = self.total_flux / self.counts
+        self.mean_error2 = np.sqrt(self.total_error2) / self.counts
 
         if compute_scatter:
             for i in range(self.nz): self.all_flux_values[i] = np.asarray(self.all_flux_values[i])
