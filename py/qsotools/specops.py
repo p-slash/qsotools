@@ -334,6 +334,8 @@ class MeanFluxHist():
         z     = qso.wave[lya_ind] / LYA_WAVELENGTH - 1
         flux  = qso.flux[lya_ind]
         error = qso.error[lya_ind]
+        if isinstance(weight, np.ndarray):
+            weight = weight[lya_ind]
 
         fi, _, binnumber = binned_statistic(z, flux*weight, statistic='sum', bins=self.hist_redshift_edges)
         ci = binned_statistic(z, np.ones_like(flux)*weight, statistic='sum', bins=self.hist_redshift_edges)[0]
