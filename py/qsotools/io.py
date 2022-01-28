@@ -218,6 +218,7 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
 
+    # Adds variance on Flux not delta
     def addLyaFlucErrors(self):
         R_kms = fid.LIGHT_SPEED / self.specres / fid.ONE_SIGMA_2_FWHM
         z = self.wave / fid.LYA_WAVELENGTH - 1
@@ -588,6 +589,11 @@ class ConfigQMLE:
 
         self.sq_vlength = float(self.parameters['VelocityLength'])
         self.sq_dvgrid  = self.sq_vlength / (int(self.parameters['NumberVPoints'])-1)
+
+        if 'InputIsPicca' in self.parameters and int(self.parameters['InputIsPicca'])>0:
+            self.picca_input = True
+        else:
+            self.picca_input = False
 
 # ------------------------------------------
 # --------------- KODIAQ -------------------
