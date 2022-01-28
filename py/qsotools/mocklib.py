@@ -47,6 +47,7 @@ a2_z   = lambda zp: 58.6 * np.power((1. + zp) / 4., -2.82)
 t_of_z = lambda zp: 0.55 * np.power((1. + zp) / 4., 5.1)
 # Define x(z)
 x_of_z = lambda zp: t_of_z(zp) * np.exp(- a2_z(zp) * sigma2)
+Flux_d_z = lambda delta_g, z: np.exp(-x_of_z(z) * np.exp(2 * np.sqrt(a2_z(z)) * delta_g))
 
 def lognMeanFluxSaddle(z):
     sigma2z = a2_z(z) * sigma2
@@ -67,12 +68,20 @@ gausshermite_xi_deg25, gausshermite_wi_deg25 = np.polynomial.hermite.hermgauss(2
 # Assume z is 1d array
 def lognMeanFluxGH(z):
     XIXI, ZZ = np.meshgrid(gausshermite_xi_deg25, z)
-    sigmaz = np.sqrt(a2_z(ZZ) * sigma2)
-    tempxz = x_of_z(ZZ)
-    
-    result = np.dot(np.exp(-tempxz * np.exp(2 * np.sqrt(2) * sigmaz * XIXI)), gausshermite_wi_deg25)
-    
+
+    Y = Flux_d_z(XIXI*np.sqrt(2*lm.sigma2), ZZ)
+    result = np.dot(Y, gausshermite_wi_deg25)
+
     return result / np.sqrt(np.pi)
+
+def lognVarianceFluxGH(z):
+    XIXI, ZZ = np.meshgrid(gausshermite_xi_deg25, z)
+
+    Y = Flux_d_z(XIXI*np.sqrt(2*lm.sigma2), ZZ)
+    F2_mean = np.dot(Y**2, gausshermite_wi_deg25) / np.sqrt(np.pi)
+    F_mean  = np.dot(Y, gausshermite_wi_deg25) / np.sqrt(np.pi)
+
+    return F2_mean - F_mean**2 
 
 # z is 1d array or list
 def lognPowerSpGH(z, numvpoints=2**18, dv=1., corr=False):
@@ -106,9 +115,14 @@ def lognPowerSpGH(z, numvpoints=2**18, dv=1., corr=False):
         delta1 = YY1 * sigmaz * 2 * np.sqrt(2)
         delta2 = YY2_XI_VEC_WEIGHTED * sigmaz * 2 * np.sqrt(2)
 
-        tempfunc = WW1*WW2*np.exp(-tempxz * (np.exp(delta1) + np.exp(delta2)))
-        
-        xi_ln_f = np.transpose(np.sum(tempfunc, axis=(1,2)) / np.pi / mean_flux_z**2 - 1)
+        fofdeltag = lambda delta_g: np.exp(-tempxz * np.exp(delta_g))
+        F1 = fofdeltag(delta1)
+        F2 = fofdeltag(delta2)
+        D1 = F1/mean_flux_z-1
+        D2 = F2/mean_flux_z-1
+        tempfunc = WW1*WW2*D1*D2
+
+        xi_ln_f = np.transpose(np.sum(tempfunc, axis=(1,2)) / np.pi)
         if corr:
             corr_results_arr[zi] = xi_ln_f
         else:
