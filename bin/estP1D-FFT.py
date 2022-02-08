@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import argparse
 from os.path import join as ospath_join
+import logging
+from multiprocessing import Pool
+from itertools import groupby
 
 import numpy as np
 from scipy.stats import binned_statistic
@@ -34,6 +37,85 @@ def binCorrelations(raw_v, raw_c, r_edges):
 
     return binned_corr, counts
 
+def decomposePiccaFname(picca_fname):
+    i1 = picca_fname.rfind('[')+1
+    i2 = picca_fname.rfind(']')
+
+    basefname = picca_fname[:i1-1]
+    hdunum = int(picca_fname[i1:i2])+1
+
+    return (basefname, hdunum)
+
+class FFTEstimator(object):
+    def __init__(self, args, config_qmle):
+        self.args = args
+        self.config_qmle = config_qmle
+
+        self.power = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
+        self.counts = np.zeros_like(power)
+        self.mean_resolution = np.zeros(self.config_qmle.z_n)
+        self.counts_meanreso = np.zeros_like(mean_resolution)
+
+        self.r_edges = np.arange(args.nrbins+1) * args.dr
+        self.corr_fn = np.zeros((self.config_qmle.z_n, args.nrbins))
+        self.counts_corr = np.zeros_like(corr_fn)
+
+    def getEstimates(self, qso):
+        z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
+        z_bin_no = int((z_med - self.config_qmle.z_0) / self.config_qmle.z_d)
+
+        if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
+            return
+
+        v_arr = fid.LIGHT_SPEED * np.log(qso.wave)
+        delta_f, dv = interpolate2Grid(v_arr, qso.flux)
+
+        # Add to mean resolution
+        self.mean_resolution[z_bin_no] += qso.specres
+        self.counts_meanreso[z_bin_no] += 1
+
+        # Compute & bin power
+        p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
+        this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
+        if self.args.deconv_window:
+            p1d_f /= getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
+
+        # ignore k=0 mode
+        p, c = binPowerSpectra(this_k_arr[1:], p1d_f[1:], config_qmle.k_edges)
+        
+        self.power[z_bin_no] += p
+        self.counts[z_bin_no] += c[1:-1]
+
+        # Compute and bin correlations
+        corr1d_f = np.abs(np.fft.irfft(p1d_f)) / dv
+        new_varr = np.arange(corr1d_f.size)*dv
+        c, cc = binCorrelations(new_varr, corr1d_f, self.r_edges)
+
+        self.corr_fn[z_bin_no] += c
+        self.counts_corr[z_bin_no] += cc[1:-1] 
+
+    def __call__(self, fnames):
+        if self.config_qmle.picca_input:
+            decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
+            decomp_list.sort(key=lambda x: x[0])
+            for base, hdus in groupby(decomp_list, lambda x: x[0]):
+                f = ospath_join(self.config_qmle.qso_dir, base)
+                pfile = qio.PiccaFile(f, 'r', clobber=False)
+                for hdu in hdus:
+                    qso = pfile.readSpectrum(hdu[1])
+                    self.getEstimates(qso)
+                pfile.close()
+        else:
+            for fl in fnames:
+                f = ospath_join(self.config_qmle.qso_dir, fl.rstrip())
+                bq = qio.BinaryQSO(f, 'r')
+
+                self.getEstimates(bq)
+
+        return self.power, self.counts, self.corr_fn, self.counts_corr, \
+            self.mean_resolution, self.counts_meanreso
+
+
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
@@ -43,6 +125,8 @@ if __name__ == '__main__':
     # parser.add_argument("--correlation", help="Compute correlation fn instead.")
     parser.add_argument("--dr", type=float, default=30.0)
     parser.add_argument("--nrbins", type=int, default=100)
+    parser.add_argument("--nproc", type=int, default=1)
+
     args = parser.parse_args()
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
@@ -63,44 +147,20 @@ if __name__ == '__main__':
     corr_fn = np.zeros((config_qmle.z_n, args.nrbins))
     counts_corr = np.zeros_like(corr_fn)
 
-    for fl in file_list:
-        print("Reading", fl.rstrip())
-        f = ospath_join(config_qmle.qso_dir, fl.rstrip())
-        bq = qio.BinaryQSO(f, 'r')
+    nfchunk = int(len(file_list)/args.nproc)
+    indices = np.arange(args.nproc+1)*nfchunk
+    indices[-1] = len(file_list)
+    file_list = [file_list[indices[i]:indices[i+1]] for i in range(args.nproc)]
+    with Pool(processes=args.nproc) as pool:
+        imap_it = pool.imap(FFTEstimator(args, config_qmle), fname_spectra)
 
-        z_med = bq.wave[int(bq.size/2)] / fid.LYA_WAVELENGTH - 1
-        z_bin_no = int((z_med - config_qmle.z_0) / config_qmle.z_d)
-        print("Median redshift:", z_med)
-
-        if z_bin_no < 0 or z_bin_no > config_qmle.z_n-1:
-            continue
-
-        v_arr = fid.LIGHT_SPEED * np.log(bq.wave)
-        delta_f, dv = interpolate2Grid(v_arr, bq.flux)
-
-        # Add to mean resolution
-        mean_resolution[z_bin_no] += bq.specres
-        counts_meanreso[z_bin_no] += 1
-
-        # Compute & bin power
-        p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
-        this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
-        if args.deconv_window:
-            p1d_f /= getSpectographWindow_k(this_k_arr, bq.specres, bq.dv)**2
-
-        # ignore k=0 mode
-        p, c = binPowerSpectra(this_k_arr[1:], p1d_f[1:], config_qmle.k_edges)
-        
-        power[z_bin_no] += p
-        counts[z_bin_no] += c[1:-1]
-
-        # Compute and bin correlations
-        corr1d_f = np.abs(np.fft.irfft(p1d_f)) / dv
-        new_varr = np.arange(corr1d_f.size)*dv
-        c, cc = binCorrelations(new_varr, corr1d_f, r_edges)
-
-        corr_fn[z_bin_no] += c
-        counts_corr[z_bin_no] += cc[1:-1]
+        for p1, c1, corfn, cnts_crr, mean_res, counts_mreso in imap_it:
+            power += p1
+            counts += c1
+            mean_resolution += mean_res
+            counts_meanreso += counts_mreso
+            corr_fn += corfn
+            counts_corr += cnts_crr
 
     # Loop is done. Now average results
     power /= counts
