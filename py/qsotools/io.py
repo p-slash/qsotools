@@ -1587,6 +1587,19 @@ class PiccaFile():
 
         return f"{self.fname}[{self.no_spectra}]"
 
+    def readSpectrum(self, hdu):
+        hdr = self.fitsfile[hdu].read_header()
+        data = self.fitsfile[hdu].read()
+
+        wave = 10**data['LOGLAM']
+        delta = data['DELTA']
+        error = 1/np.sqrt(data['IVAR']+1e-16)
+        specres = fid.LIGHT_SPEED/hdr['MEANRESO']/fid.ONE_SIGMA_2_FWHM
+        dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
+        qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv, {'RA': hdr['RA'], 'DEC': hdr['DEC']})
+
+        return qso
+
     def close(self):
         self.fitsfile.close()
 
