@@ -42,7 +42,7 @@ def decomposePiccaFname(picca_fname):
     i2 = picca_fname.rfind(']')
 
     basefname = picca_fname[:i1-1]
-    hdunum = int(picca_fname[i1:i2])+1
+    hdunum = int(picca_fname[i1:i2])
 
     return (basefname, hdunum)
 
