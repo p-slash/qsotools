@@ -147,12 +147,13 @@ if __name__ == '__main__':
     corr_fn = np.zeros((config_qmle.z_n, args.nrbins))
     counts_corr = np.zeros_like(corr_fn)
 
-    nfchunk = int(len(file_list)/args.nproc)
+    fnames_spectra = file_list.readlines()
+    nfchunk = int(len(fnames_spectra)/args.nproc)
     indices = np.arange(args.nproc+1)*nfchunk
-    indices[-1] = len(file_list)
-    file_list = [file_list[indices[i]:indices[i+1]] for i in range(args.nproc)]
+    indices[-1] = len(fnames_spectra)
+    fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
     with Pool(processes=args.nproc) as pool:
-        imap_it = pool.imap(FFTEstimator(args, config_qmle), fname_spectra)
+        imap_it = pool.imap(FFTEstimator(args, config_qmle), fnames_spectra)
 
         for p1, c1, corfn, cnts_crr, mean_res, counts_mreso in imap_it:
             power += p1
