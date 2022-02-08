@@ -76,6 +76,17 @@ class FFTEstimator(object):
 
         # Compute & bin power
         p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
+
+        if self.args.noise_realizations>0:
+            pnoise = np.zeros_like(p1d_f)
+            for _ in range(self.args.noise_realizations):
+                delta_noise = np.random.default_rng().normal(0, qso.error)
+                delta_noise, dv1 = interpolate2Grid(v_arr, delta_noise)
+                pnoise += np.abs(np.fft.rfft(delta_noise) * dv1)**2 / (dv1*delta_noise.size)
+
+            pnoise /= self.args.noise_realizations
+            p1d_f -= pnoise
+
         this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
         if self.args.deconv_window:
             p1d_f /= getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
@@ -126,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument("--dr", type=float, default=30.0)
     parser.add_argument("--nrbins", type=int, default=100)
     parser.add_argument("--nproc", type=int, default=1)
-
+    parser.add_argument("--noise-realizations", type=int, default=100)
     args = parser.parse_args()
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
