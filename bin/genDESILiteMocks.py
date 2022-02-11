@@ -12,6 +12,7 @@ from os      import makedirs as os_makedirs
 import time
 import argparse
 import logging
+from multiprocessing import Pool
 
 import numpy as np
 import healpy
@@ -205,15 +206,133 @@ def getMetadata(args):
         npixels = 1
         metadata['PIXNUM'] = 0
 
-    if args.ithread == 0:
-        mstrfname = ospath_join(args.OutputDir, "master.fits")
-        qqfile = QQFile(mstrfname, 'rw')
-        qqfile.writeMetadata(metadata)
-        qqfile.close()
-        logging.info(f"Saved master metadata to {mstrfname}")
+    mstrfname = ospath_join(args.OutputDir, "master.fits")
+    qqfile = QQFile(mstrfname, 'rw')
+    qqfile.writeMetadata(metadata)
+    qqfile.close()
+    logging.info(f"Saved master metadata to {mstrfname}")
 
     return metadata, npixels
 
+class Progress(object):
+    """docstring for Progress"""
+    def __init__(self, total, percThres=5):
+        self.i = 0
+        self.total = total
+        self.percThres = percThres
+        self.last_progress = 0
+        self.start_time = time.time()
+
+    def increase(self):
+        self.i+=1
+        curr_progress = int(100*self.i/self.total)
+        print_condition = (curr_progress-self.last_progress >= self.percThres) or (self.i == 0)
+
+        if print_condition:
+            etime = (time.time()-self.start_time)/60 # min
+            logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
+            self.last_progress = curr_progress
+
+class MockGenerator(object):
+    """docstring for MockGenerator"""
+    def __init__(self, args):
+        self.args = args
+        self.TURNOFF_ZEVO = args.fixed_zforest is not None
+        # Set up DESI observed wavelength grid
+        self.DESI_WAVEGRID, self.DESI_WAVEEDGES = getDESIwavegrid(args)
+
+    def __call__(self, ipix_meta):
+        ipix, meta1 = ipix_meta
+        ntemp = meta1['MOCKID'].size
+        z_qso = meta1['Z'][:, None]
+
+        if ntemp == 0:
+            return []
+
+        # ------------------------------
+        # Change the seed with thread no for different randoms across processes
+        lya_m = lm.LyaMocks(self.args.seed+ipix, N_CELLS=2**self.args.log2ngrid, DV_KMS=self.args.griddv, \
+            GAUSSIAN_MOCKS=self.args.gauss, REDSHIFT_ON=not self.TURNOFF_ZEVO)
+        if self.TURNOFF_ZEVO:
+            lya_m.setCentralRedshift(self.args.fixed_zforest)
+        else:
+            lya_m.setCentralRedshift(3.0)
+
+        if self.args.gauss:
+            mean_flux_function = fid.meanFluxFG08
+        else:
+            mean_flux_function = lm.lognMeanFluxGH
+
+        wave, fluxes, errors = lya_m.resampledMocks(ntemp, err_per_final_pixel=self.args.sigma_per_pixel, \
+            spectrograph_resolution=self.args.specres, obs_wave_edges=self.DESI_WAVEEDGES, \
+            keep_empty_bins=self.args.keep_nolya_pixels)
+
+        # Remove absorption above Lya
+        nonlya_ind = wave > fid.LYA_WAVELENGTH * (1+z_qso)
+        for i in range(ntemp):
+            fluxes[i][nonlya_ind[i]] = 1
+
+        if not self.args.save_full_flux:
+            if self.TURNOFF_ZEVO:
+                spectrum_z = self.args.fixed_zforest
+            else:
+                spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
+            true_mean_flux = mean_flux_function(spectrum_z)
+
+            fluxes  = fluxes / true_mean_flux - 1
+            errors /= true_mean_flux
+
+        # If save-qqfile option is passed, do not save as BinaryQSO files
+        # This also means no chunking or removing pixels
+        if not self.args.nosave and self.args.save_qqfile:
+            fname = saveQQFile(ipix, meta1, wave, fluxes, self.args)
+
+            return [fname]
+        
+        # Cut Lyman-alpha forest region
+        if not self.args.keep_nolya_pixels:
+            lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
+                wave <= fid.LYA_LAST_WVL * (1+z_qso))
+            forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
+                wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
+            lya_ind = np.logical_and(lya_ind, forst_bnd)
+            waves  = [wave[lya_ind[i]] for i in range(ntemp)]
+            fluxes = [fluxes[i][lya_ind[i]] for i in range(ntemp)]
+            errors = [errors[i][lya_ind[i]] for i in range(ntemp)]
+        else:
+            waves = [wave for i in range(ntemp)]
+
+        if self.args.save_picca:
+            pcfname = ospath_join(self.args.OutputDir, f"delta-{ipix}.fits.gz")
+            pcfile  = PiccaFile(pcfname, 'rw')
+        else:
+            pcfile = None
+
+        for i in range(ntemp):
+            wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso)
+
+            nchunks = len(wave_c)
+            nid = meta1['MOCKID'][i]
+
+            if not self.args.save_picca:
+                fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
+                % (args.seed, nid, nc, z_qso[i], settings_txt) for nc in range(nchunks)]
+            else:
+                assert nchunks == 1
+                if RESOMAT is None:
+                    RESOMAT = setResolutionMatrix(wave_c[0], args)
+                fname = None
+
+            if not self.args.nosave:
+                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], 
+                    meta1['RA'][i], args, pcfile)
+
+            if args.plot:
+                save_plots(wave_c, flux_c, err_c, fname, args)
+
+            return fname
+
+        
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("OutputDir", help="Output directory")
@@ -289,10 +408,7 @@ if __name__ == '__main__':
         help="Use RING pixel ordering. Default is NESTED.")
 
     # parallel support
-    parser.add_argument("--nthreads", type=int, default=1, \
-        help="Must be < # heal pixels. Default: %(default)s")
-    parser.add_argument("--ithread", type=int, default=0, \
-        help="Must be < nthreads. Default: %(default)s")
+    parser.add_argument("--nproc", type=int, default=None)
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
     
@@ -301,17 +417,11 @@ if __name__ == '__main__':
     # Create/Check directory
     os_makedirs(args.OutputDir, exist_ok=True)
     RESOMAT = None
-    TURNOFF_ZEVO = args.fixed_zforest is not None
 
-    logging.basicConfig(filename=ospath_join(args.OutputDir, f'genthread{args.ithread}.log'), \
+    logging.basicConfig(filename=ospath_join(args.OutputDir, f'genthread.log'), \
         level=logging.DEBUG if args.debug else logging.INFO)
 
     metadata, npixels = getMetadata(args)
-    # Set up DESI observed wavelength grid
-    DESI_WAVEGRID, DESI_WAVEEDGES = getDESIwavegrid(args)
-
-    assert args.ithread < args.nthreads
-    assert args.nthreads <= npixels
 
     if args.save_qqfile:
         args.sigma_per_pixel = 0
@@ -326,24 +436,7 @@ if __name__ == '__main__':
 
     txt_basefilename  = "%s/desilite_seed%d%s" % (args.OutputDir, args.seed, settings_txt)
 
-    # ------------------------------
-    # Change the seed with thread no for different randoms across processes
-    lya_m = lm.LyaMocks(args.seed+args.ithread, N_CELLS=2**args.log2ngrid, DV_KMS=args.griddv, \
-        GAUSSIAN_MOCKS=args.gauss, REDSHIFT_ON=not TURNOFF_ZEVO)
-    if TURNOFF_ZEVO:
-        lya_m.setCentralRedshift(args.fixed_zforest)
-    else:
-        lya_m.setCentralRedshift(3.0)
-
-    if args.gauss:
-        logging.info("Generating Gaussian mocks.")
-        mean_flux_function = fid.meanFluxFG08
-    else:
-        logging.info("Generating lognormal mocks.")
-        mean_flux_function = lm.lognMeanFluxGH
-
-    if args.ithread == 0:
-        save_parameters(txt_basefilename, args)
+    save_parameters(txt_basefilename, args)
 
     metadata.sort(order='PIXNUM')
     logging.info("Metadata sorted.")
@@ -351,106 +444,16 @@ if __name__ == '__main__':
     u_pix, s = np.unique(metadata['PIXNUM'], return_index=True)
     split_meta = np.split(metadata, s[1:])
     logging.info(f"Length of split metadata {len(split_meta)} vs npixels {npixels}.")
+    pcounter = Progress(len(split_meta))
 
-    # parallel support
-    dithr = int(len(u_pix)/args.nthreads)
-    i1 = dithr * args.ithread
-    i2 = len(u_pix) if (args.ithread == args.nthreads-1) else dithr * (1+args.ithread)
-
-    last_progress = 0
-    for ui in range(i1, i2):
-        ipix = u_pix[ui]
-        curr_progress = int(100*(ui-i1)/(i2-i1))
-        print_condition = (curr_progress-last_progress > 4) or (ui == i1)            
-
-        meta1 = split_meta[ui]
-        ntemp = meta1['MOCKID'].size
-        z_qso = meta1['Z'][:, None]
-
-        if print_condition:
-            logging.info(f"Working on pixel {ipix}. Number of qsos is {ntemp}.")
-            etime = (time.time()-start_time)/60 # min
-            logging.info(f"Progress: {curr_progress}%. Elapsed time {etime:.1f} mins.")
-            last_progress = curr_progress
-
-        if ntemp == 0:
-            continue
-
-        wave, fluxes, errors = lya_m.resampledMocks(ntemp, err_per_final_pixel=args.sigma_per_pixel, \
-            spectrograph_resolution=args.specres, obs_wave_edges=DESI_WAVEEDGES, \
-            keep_empty_bins=args.keep_nolya_pixels)
-
-        # Remove absorption above Lya
-        nonlya_ind = wave > fid.LYA_WAVELENGTH * (1+z_qso)
-        for i in range(ntemp):
-            fluxes[i][nonlya_ind[i]] = 1
-
-        if not args.save_full_flux:
-            if TURNOFF_ZEVO:
-                spectrum_z = args.fixed_zforest
-            else:
-                spectrum_z = np.array(wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
-            true_mean_flux = mean_flux_function(spectrum_z)
-
-            fluxes  = fluxes / true_mean_flux - 1
-            errors /= true_mean_flux
-
-        # If save-qqfile option is passed, do not save as BinaryQSO files
-        # This also means no chunking or removing pixels
-        if not args.nosave and args.save_qqfile:
-            fname = saveQQFile(ipix, meta1, wave, fluxes, args)
-            filename_list.extend([fname])
-
-            if print_condition:
-                logging.info(f"Saved file {fname}.")
-
-            continue
-        
-        # Cut Lyman-alpha forest region
-        if not args.keep_nolya_pixels:
-            lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
-                wave <= fid.LYA_LAST_WVL * (1+z_qso))
-            forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
-                wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
-            lya_ind = np.logical_and(lya_ind, forst_bnd)
-            waves  = [wave[lya_ind[i]] for i in range(ntemp)]
-            fluxes = [fluxes[i][lya_ind[i]] for i in range(ntemp)]
-            errors = [errors[i][lya_ind[i]] for i in range(ntemp)]
-        else:
-            waves = [wave for i in range(ntemp)]
-
-        if args.save_picca:
-            pcfname = ospath_join(args.OutputDir, f"delta-{ipix}.fits.gz")
-            pcfile  = PiccaFile(pcfname, 'rw')
-        else:
-            pcfile = None
-
-        for i in range(ntemp):
-            wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso)
-
-            nchunks = len(wave_c)
-            nid = meta1['MOCKID'][i]
-
-            if not args.save_picca:
-                fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
-                % (args.seed, nid, nc, z_qso[i], settings_txt) for nc in range(nchunks)]
-
-                filename_list.extend(fname)
-            else:
-                assert nchunks == 1
-                if RESOMAT is None:
-                    RESOMAT = setResolutionMatrix(wave_c[0], args)
-                fname = None
-
-            if not args.nosave:
-                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], 
-                    meta1['RA'][i], args, pcfile)
-
-            if args.plot:
-                save_plots(wave_c, flux_c, err_c, fname, args)
+    with Pool(processes=args.nproc) as pool:
+        imap_it = pool.imap(MockGenerator(args), zip(u_pix, split_meta))
+        for fname in imap_it:
+            filename_list.extend(fname)
+            pcounter.increase()
 
     # Save the list of files in a txt
-    temp_fname = ospath_join(args.OutputDir, f"file_list_qso-{args.ithread}.txt") 
+    temp_fname = ospath_join(args.OutputDir, f"file_list_qso.txt") 
     # "%s_filelist.txt" % txt_basefilename
     logging.info(f"Saving chunk spectra file list as {temp_fname}")
     toWrite = open(temp_fname, 'w')
