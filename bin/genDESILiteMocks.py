@@ -150,6 +150,13 @@ def getDESIwavegrid(args):
 
     return DESI_WAVEGRID, DESI_WAVEEDGES
 
+def _genRNDDec(RNST, N, dec1_deg, dec2_deg):
+    asin1 = np.sin(dec1_deg*np.pi/180.)
+    asin2 = np.sin(dec2_deg*np.pi/180.)
+    rnd_asin = (asin2-asin1)*RNST.random(N)+asin1
+
+    return np.arcsin(rnd_asin) * 180./np.pi
+
 # Returns metadata array and number of pixels
 def getMetadata(args):
     # The METADATA HDU contains a binary table with (at least) RA,DEC,Z,TARGETID
@@ -183,7 +190,9 @@ def getMetadata(args):
         # Generate coords in degrees
         metadata['RA']  = RNST.random(args.nmocks) * 360.
         # metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
-        metadata['DEC'] = np.arcsin(2*RNST.random(args.nmocks)-1) * 180./np.pi
+
+        dec1, dec2 = (-20., 80.) if args.desi_dec else (-90., 90.)
+        metadata['DEC'] = _genRNDDec(RNST, args.nmocks, dec1, dec2)
 
         if args.fixed_zqso:
             metadata['Z'] = args.fixed_zqso
@@ -371,6 +380,7 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=3600.)
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
+    parser.add_argument("--desi-dec", help="Limit dec to (-20, 80).", action="store_true")
     parser.add_argument("--z-quasar-min", type=float, default=2.1, \
         help="Lowest quasar redshift. Only when created from a catalog. Default: %(default)s")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
