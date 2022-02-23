@@ -231,7 +231,7 @@ class Spectrum:
         arrsize    = self.size+2*pad_size
         padded_arr = np.pad(clean_err, pad_size, mode='edge')
 
-        sigmapix  = sigma_A/np.mean(np.diff(wave))
+        sigmapix  = sigma_A/np.mean(np.diff(self.wave))
         kvals     = np.fft.rfftfreq(arrsize)
         kernel_k  = np.exp(-(kvals*sigmapix)**2/2.)
         smerror_k = np.fft.rfft(padded_arr)*kernel_k[:, None]
