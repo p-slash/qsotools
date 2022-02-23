@@ -211,7 +211,7 @@ class Spectrum:
             self.coord = SkyCoord(coord['RA'], coord['DEC'], unit=deg)
         
         self.size = len(self.wave)
-        self.mask = np.logical_and(error > 0, flux != 0)
+        self.mask = np.logical_and(error > 1e-7, flux != 0)
         self.s2n = 1/np.mean(error[self.mask])
         self.s2n_lya = self.getS2NLya()
 
@@ -247,7 +247,7 @@ class Spectrum:
         z = self.wave / fid.LYA_WAVELENGTH - 1
 
         err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms, on_flux=on_flux)
-        
+
         self.error = np.sqrt(err2_lya + self.error**2)
         self.s2n = 1/np.mean(self.error)
         self.s2n_lya = self.getS2NLya()

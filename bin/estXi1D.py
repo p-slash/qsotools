@@ -42,7 +42,7 @@ class Xi1DEstimator(object):
         qso.addLyaFlucErrors(on_flux=False)
 
         ivar = 1./qso.error**2
-        ivar[ivar<1e-10] = 0
+        ivar[~qso.mask] = 0
 
         return ivar
 
