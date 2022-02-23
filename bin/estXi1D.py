@@ -143,7 +143,8 @@ if __name__ == '__main__':
 
     fnames_spectra = file_list.readlines()
     if config_qmle.picca_input:
-        decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
+        logging.info("Decomposing filenames to a list of (base, list(hdus)).")
+        decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
         decomp_list.sort(key=lambda x: x[0])
 
         new_fnames = []
@@ -151,6 +152,7 @@ if __name__ == '__main__':
             new_fnames.append((base, list(map(lambda x: x[1], hdus))))
 
         fnames_spectra = new_fnames
+        logging.info("Example element", fnames_spectra[0])
 
     # nfchunk = int(len(fnames_spectra)/args.nproc)
     # indices = np.arange(args.nproc+1)*nfchunk
@@ -158,6 +160,7 @@ if __name__ == '__main__':
     # fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
 
     pcounter = Progress(len(fnames_spectra))
+    logging.info(f"There are {len(fnames_spectra)} files.")
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Xi1DEstimator(args, config_qmle), fnames_spectra)
 
