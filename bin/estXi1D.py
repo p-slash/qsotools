@@ -29,9 +29,9 @@ class Xi1DEstimator(object):
         self.r_edges = np.arange(args.nrbins+1) * args.dr
         self.rmax = self.r_edges[-1]
         self.xi1d = np.zeros((self.config_qmle.z_n, args.nrbins))
-        self.counts = np.zeros_like(xi1d)
+        self.counts = np.zeros_like(self.xi1d)
         self.mean_resolution = np.zeros(self.config_qmle.z_n)
-        self.counts_meanreso = np.zeros_like(mean_resolution)
+        self.counts_meanreso = np.zeros_like(self.mean_resolution)
 
     def getIVAR(self, qso):
         # Smooth qso.error
