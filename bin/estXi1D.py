@@ -152,7 +152,6 @@ if __name__ == '__main__':
             new_fnames.append((base, list(map(lambda x: x[1], hdus))))
 
         fnames_spectra = new_fnames
-        logging.info("Example element", fnames_spectra[0])
 
     # nfchunk = int(len(fnames_spectra)/args.nproc)
     # indices = np.arange(args.nproc+1)*nfchunk
