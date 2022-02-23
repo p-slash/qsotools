@@ -82,23 +82,31 @@ class Xi1DEstimator(object):
             self.xi1d[z_bin_no] += binned_xi1d
             self.counts[z_bin_no] += binned_w1d
 
-    def __call__(self, fnames):
+    def __call__(self, fname):
         if self.config_qmle.picca_input:
-            decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
-            decomp_list.sort(key=lambda x: x[0])
-            for base, hdus in groupby(decomp_list, lambda x: x[0]):
-                f = ospath_join(self.config_qmle.qso_dir, base)
-                pfile = qio.PiccaFile(f, 'r', clobber=False)
-                for hdu in hdus:
-                    qso = pfile.readSpectrum(hdu[1])
-                    self.getEstimates(qso)
-                pfile.close()
+            # decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
+            # decomp_list.sort(key=lambda x: x[0])
+            # for base, hdus in groupby(decomp_list, lambda x: x[0]):
+            #     f = ospath_join(self.config_qmle.qso_dir, base)
+            #     pfile = qio.PiccaFile(f, 'r', clobber=False)
+            #     for hdu in hdus:
+            #         qso = pfile.readSpectrum(hdu[1])
+            #         self.getEstimates(qso)
+            #     pfile.close()
+            base = fname[0]
+            hdus = fname[1]
+            f = ospath_join(self.config_qmle.qso_dir, base)
+            pfile = qio.PiccaFile(f, 'r', clobber=False)
+            for hdu in hdus:
+                qso = pfile.readSpectrum(hdu)
+                self.getEstimates(qso)
+            pfile.close()
         else:
-            for fl in fnames:
-                f = ospath_join(self.config_qmle.qso_dir, fl.rstrip())
-                bq = qio.BinaryQSO(f, 'r')
+            # for fl in fnames:
+            f = ospath_join(self.config_qmle.qso_dir, fname.rstrip())
+            bq = qio.BinaryQSO(f, 'r')
 
-                self.getEstimates(bq)
+            self.getEstimates(bq)
 
         return self.xi1d, self.counts, self.mean_resolution, self.counts_meanreso
 
@@ -134,10 +142,20 @@ if __name__ == '__main__':
     counts_corr = np.zeros_like(corr_fn)
 
     fnames_spectra = file_list.readlines()
-    nfchunk = int(len(fnames_spectra)/args.nproc)
-    indices = np.arange(args.nproc+1)*nfchunk
-    indices[-1] = len(fnames_spectra)
-    fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
+    if config_qmle.picca_input:
+        decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
+        decomp_list.sort(key=lambda x: x[0])
+
+        new_fnames = []
+        for base, hdus in groupby(decomp_list, lambda x: x[0]):
+            new_fnames.append((base, list(map(lambda x: x[1], hdus))))
+
+        fnames_spectra = new_fnames
+
+    # nfchunk = int(len(fnames_spectra)/args.nproc)
+    # indices = np.arange(args.nproc+1)*nfchunk
+    # indices[-1] = len(fnames_spectra)
+    # fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
 
     pcounter = Progress(len(fnames_spectra))
     with Pool(processes=args.nproc) as pool:
