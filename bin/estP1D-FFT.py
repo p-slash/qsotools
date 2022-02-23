@@ -52,13 +52,13 @@ class FFTEstimator(object):
         self.config_qmle = config_qmle
 
         self.power = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
-        self.counts = np.zeros_like(power)
+        self.counts = np.zeros_like(self.power)
         self.mean_resolution = np.zeros(self.config_qmle.z_n)
-        self.counts_meanreso = np.zeros_like(mean_resolution)
+        self.counts_meanreso = np.zeros_like(self.mean_resolution)
 
         self.r_edges = np.arange(args.nrbins+1) * args.dr
         self.corr_fn = np.zeros((self.config_qmle.z_n, args.nrbins))
-        self.counts_corr = np.zeros_like(corr_fn)
+        self.counts_corr = np.zeros_like(self.corr_fn)
 
     def getEstimates(self, qso):
         z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
