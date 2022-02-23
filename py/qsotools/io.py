@@ -233,8 +233,7 @@ class Spectrum:
 
         sigmapix  = sigma_A/np.mean(np.diff(self.wave))
         kvals     = np.fft.rfftfreq(arrsize)
-        kernel_k  = np.exp(-(kvals*sigmapix)**2/2.)
-        smerror_k = np.fft.rfft(padded_arr)*kernel_k[:, None]
+        smerror_k = np.fft.rfft(padded_arr)*np.exp(-(kvals*sigmapix)**2/2.)
 
         clean_err = np.fft.irfft(smerror_k, n=arrsize)[pad_size:-pad_size]
 
