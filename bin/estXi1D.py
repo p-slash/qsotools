@@ -61,7 +61,7 @@ class Xi1DEstimator(object):
 
         ivar = self.getIVAR(qso)
         # Weighted deltas
-        qso.delta *= ivar
+        qso.flux *= ivar
 
         # Compute and bin correlations
         for i in range(qso.size):
@@ -72,7 +72,7 @@ class Xi1DEstimator(object):
 
             vdiff = v_arr[i:][vrange] - v_arr[i]
 
-            sub_xi1d = qso.delta[i]*qso.delta[i:][vrange]
+            sub_xi1d = qso.flux[i]*qso.flux[i:][vrange]
             sub_w1d  = ivar[i]*ivar[i:][vrange]
 
             binned_xi1d = binned_statistic(vdiff, sub_xi1d, statistic='sum', bins=self.r_edges)[0]
