@@ -11,6 +11,7 @@ from astropy.table import Table
 
 import qsotools.io as qio
 import qsotools.fiducial as fid
+from qsotools.utils import Progress
 
 def decomposePiccaFname(picca_fname):
     i1 = picca_fname.rfind('[')+1
@@ -118,6 +119,9 @@ if __name__ == '__main__':
     output_dir  = config_qmle.parameters['OutputDir']
     output_base = config_qmle.parameters['OutputFileBase']
 
+    logging.basicConfig(filename=ospath_join(output_dir, f'est-xi1d.log'), \
+        level=logging.INFO)
+
     file_list = open(config_qmle.qso_list, 'r')
     header = file_list.readline()
 
@@ -134,6 +138,8 @@ if __name__ == '__main__':
     indices = np.arange(args.nproc+1)*nfchunk
     indices[-1] = len(fnames_spectra)
     fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
+
+    pcounter = Progress(len(fnames_spectra))
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Xi1DEstimator(args, config_qmle), fnames_spectra)
 
@@ -142,6 +148,8 @@ if __name__ == '__main__':
             counts_meanreso += counts_mreso
             corr_fn += corfn
             counts_corr += cnts_crr
+
+            pcounter.increase()
 
     # Loop is done. Now average results
     corr_fn /= counts_corr
@@ -152,7 +160,7 @@ if __name__ == '__main__':
     meanres_table = Table([config_qmle.z_bins, mean_resolution], names=('z', 'R'))
     meanres_table.write(meanres_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'R':'%d'}, overwrite=True)
-    print("Mean R saved as ", meanres_filename)
+    logging.info(f"Mean R saved as {meanres_filename}")
 
     # Save correlation fn
     corr_filename = ospath_join(output_dir, output_base+"-corr1d-weighted-estimate.txt")
@@ -162,7 +170,9 @@ if __name__ == '__main__':
     corr_table = Table([zarr_repeated, rarr_repeated, corr_fn.ravel()], names=('z', 'r', 'Xi1D'))
     corr_table.write(corr_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e'}, overwrite=True)
-    print("Corr fn saved as ", corr_filename)
+    logging.info(f"Corr fn saved as {corr_filename}")
+
+    logging.info("DONE!")
 
 
 
