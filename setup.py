@@ -6,7 +6,7 @@ setup(
     name="qsotools",
     version="1.1",
     packages=['qsotools'],
-    package_dir={'qsotools': 'py/qsotools'},
+    package_dir={'': 'py/'},
     package_data={"qsotools": ["tables/*"]},
     include_package_data=True,
     scripts=binscripts,
