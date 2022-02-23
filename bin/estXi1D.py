@@ -22,6 +22,11 @@ def decomposePiccaFname(picca_fname):
 
     return (basefname, hdunum)
 
+def _findVMaxj(arr, rmax):
+    for j in range(arr.size):
+        if arr[j] > rmax:
+            return j
+
 class Xi1DEstimator(object):
     def __init__(self, args, config_qmle):
         self.args = args
@@ -54,7 +59,7 @@ class Xi1DEstimator(object):
         if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
             return
 
-        v_arr = fid.LIGHT_SPEED * np.log(qso.wave)
+        v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
 
         # Add to mean resolution
         self.mean_resolution[z_bin_no] += qso.specres
@@ -65,16 +70,15 @@ class Xi1DEstimator(object):
         qso.flux *= ivar
 
         # Compute and bin correlations
+        last_max_j = 0
         for i in range(qso.size):
-            vrange = (v_arr[i:]-v_arr[i]) < self.rmax
+            last_max_j += _findVMaxj(v_arr[last_max_j:], self.rmax+v_arr[i])
+            vrange = slice(i, last_max_j)
 
-            if not np.any(vrange):
-                break
+            vdiff = v_arr[vrange] - v_arr[i]
 
-            vdiff = v_arr[i:][vrange] - v_arr[i]
-
-            sub_xi1d = qso.flux[i]*qso.flux[i:][vrange]
-            sub_w1d  = ivar[i]*ivar[i:][vrange]
+            sub_xi1d = qso.flux[i]*qso.flux[vrange]
+            sub_w1d  = ivar[i]*ivar[vrange]
 
             binned_xi1d = binned_statistic(vdiff, sub_xi1d, statistic='sum', bins=self.r_edges)[0]
             binned_w1d  = binned_statistic(vdiff, sub_w1d, statistic='sum', bins=self.r_edges)[0]
@@ -84,15 +88,6 @@ class Xi1DEstimator(object):
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
-            # decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
-            # decomp_list.sort(key=lambda x: x[0])
-            # for base, hdus in groupby(decomp_list, lambda x: x[0]):
-            #     f = ospath_join(self.config_qmle.qso_dir, base)
-            #     pfile = qio.PiccaFile(f, 'r', clobber=False)
-            #     for hdu in hdus:
-            #         qso = pfile.readSpectrum(hdu[1])
-            #         self.getEstimates(qso)
-            #     pfile.close()
             base = fname[0]
             hdus = fname[1]
             f = ospath_join(self.config_qmle.qso_dir, base)
@@ -102,7 +97,6 @@ class Xi1DEstimator(object):
                 self.getEstimates(qso)
             pfile.close()
         else:
-            # for fl in fnames:
             f = ospath_join(self.config_qmle.qso_dir, fname.rstrip())
             bq = qio.BinaryQSO(f, 'r')
 
@@ -152,11 +146,6 @@ if __name__ == '__main__':
             new_fnames.append((base, list(map(lambda x: x[1], hdus))))
 
         fnames_spectra = new_fnames
-
-    # nfchunk = int(len(fnames_spectra)/args.nproc)
-    # indices = np.arange(args.nproc+1)*nfchunk
-    # indices[-1] = len(fnames_spectra)
-    # fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
 
     pcounter = Progress(len(fnames_spectra))
     logging.info(f"There are {len(fnames_spectra)} files.")
