@@ -1617,6 +1617,8 @@ class PiccaFile():
         wave = 10**data['LOGLAM']
         delta = data['DELTA']
         error = 1/np.sqrt(data['IVAR']+1e-16)
+        error[data['IVAR']==0] = 0
+
         specres = fid.LIGHT_SPEED/hdr['MEANRESO']/fid.ONE_SIGMA_2_FWHM
         dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
         qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv, {'RA': hdr['RA'], 'DEC': hdr['DEC']})
