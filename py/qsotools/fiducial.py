@@ -223,7 +223,7 @@ def fitBecker13MeanFlux(z, F, e):
 """
 return variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
 """
-def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000):
+def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000, on_flux=True):
     window_fn = lambda k: np.sinc(k*dv/2/np.pi) * np.exp(-k**2 * R_kms**2/2)
     kPpi      = lambda k, z1: k * evaluatePD13W17Fit(k,z1) / np.pi
 
@@ -232,7 +232,9 @@ def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000):
     klog = np.linspace(logk1*np.log(10), logk2*np.log(10), npoints)
     ZZ, KK = np.meshgrid(z, klog, indexing='ij')
     
-    err2_lya = scipy_trapz(flnk(KK, ZZ), KK) * meanFluxFG08(z)**2
+    err2_lya = scipy_trapz(flnk(KK, ZZ), KK)
+    if on_flux:
+        err2_lya *= meanFluxFG08(z)**2
 
     return err2_lya
 
