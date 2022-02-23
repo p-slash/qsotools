@@ -218,12 +218,35 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
 
+    def smoothNoise(self, sigma_A=20., pad_size=25, esigma=3.5):
+        # Isolate masked pixels as they have high noise
+        zsc_mask_e = Spectrum.modifiedZScore(self.error) < esigma
+        good_pixels = self.mask & zsc_mask_e
+
+        # Replace bad pixels with the median
+        clean_err = np.where(good_pixels, self.error, np.median(self.error))
+
+        # Pad the input array to get rid of annoying edge effects
+        # Pad values are set to the edge value
+        arrsize    = self.size+2*pad_size
+        padded_arr = np.pad(clean_err, pad_size, mode='edge')
+
+        sigmapix  = sigma_A/np.mean(np.diff(wave))
+        kvals     = np.fft.rfftfreq(arrsize)
+        kernel_k  = np.exp(-(kvals*sigmapix)**2/2.)
+        smerror_k = np.fft.rfft(padded_arr)*kernel_k[:, None]
+
+        clean_err = np.fft.irfft(smerror_k, n=arrsize)[pad_size:-pad_size]
+
+        # Restore values of bad pixels
+        self.error = np.where(good_pixels, clean_err, self.error)
+
     # Adds variance on Flux not delta
-    def addLyaFlucErrors(self):
+    def addLyaFlucErrors(self, on_flux=True):
         R_kms = fid.LIGHT_SPEED / self.specres / fid.ONE_SIGMA_2_FWHM
         z = self.wave / fid.LYA_WAVELENGTH - 1
 
-        err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms)
+        err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms, on_flux=on_flux)
         
         self.error = np.sqrt(err2_lya + self.error**2)
         self.s2n = 1/np.mean(self.error)
