@@ -36,7 +36,7 @@ class Xi1DEstimator(object):
     def getIVAR(self, qso):
         # Smooth qso.error
         if args.smooth_noise_sigmaA > 0:
-            qso.smoothNoise(sigma_A=args.smooth_noise_sigma_a)
+            qso.smoothNoise(sigma_A=args.smooth_noise_sigmaA)
 
         # Add LSS to qso.error**2
         qso.addLyaFlucErrors(on_flux=False)
@@ -107,8 +107,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("ConfigFile", help="Config file")
 
-    parser.add_argument("--dr", type=float, default=30.0)
-    parser.add_argument("--nrbins", type=int, default=100)
+    parser.add_argument("--dr", help="Default: %(default)s km/s", type=float, default=30.0)
+    parser.add_argument("--nrbins", help="Default: %(default)s", type=int, default=100)
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates. Default: %(default)s A")
     parser.add_argument("--nproc", type=int, default=1)
