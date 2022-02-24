@@ -22,8 +22,8 @@ def decomposePiccaFname(picca_fname):
 
     return (basefname, hdunum)
 
-def _findVMaxj(arr, rmax):
-    for j in range(arr.size):
+def _findVMaxj(arr, j1, rmax):
+    for j in range(j1, arr.size):
         if arr[j] > rmax:
             return j
 
@@ -72,7 +72,7 @@ class Xi1DEstimator(object):
         # Compute and bin correlations
         last_max_j = 0
         for i in range(qso.size):
-            last_max_j += _findVMaxj(v_arr[last_max_j:], self.rmax+v_arr[i])
+            last_max_j = _findVMaxj(v_arr, last_max_j, self.rmax+v_arr[i])
             vrange = slice(i, last_max_j)
 
             vdiff = v_arr[vrange] - v_arr[i]
