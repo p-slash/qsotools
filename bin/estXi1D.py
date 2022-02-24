@@ -11,7 +11,7 @@ from astropy.table import Table
 
 import qsotools.io as qio
 import qsotools.fiducial as fid
-from qsotools.utils import Progress
+from qsotools.utils import Progress, SubsampleCov
 
 def decomposePiccaFname(picca_fname):
     i1 = picca_fname.rfind('[')+1
@@ -110,6 +110,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("ConfigFile", help="Config file")
 
+    parser.add_argument("--nsubsamples", type=int, default=100, \
+        help="Number of subsamples if input is not Picca.")
     parser.add_argument("--dr", help="Default: %(default)s km/s", type=float, default=30.0)
     parser.add_argument("--nrbins", help="Default: %(default)s", type=int, default=100)
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
@@ -127,13 +129,8 @@ if __name__ == '__main__':
     file_list = open(config_qmle.qso_list, 'r')
     header = file_list.readline()
 
-    mean_resolution = np.zeros(config_qmle.z_n)
-    counts_meanreso = np.zeros_like(mean_resolution)
-
     r_edges = np.arange(args.nrbins+1) * args.dr
     r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
-    corr_fn = np.zeros((config_qmle.z_n, args.nrbins))
-    counts_corr = np.zeros_like(corr_fn)
 
     fnames_spectra = file_list.readlines()
     if config_qmle.picca_input:
@@ -147,28 +144,32 @@ if __name__ == '__main__':
 
         fnames_spectra = new_fnames
 
-    pcounter = Progress(len(fnames_spectra))
-    logging.info(f"There are {len(fnames_spectra)} files.")
+    nfiles = len(fnames_spectra)
+    nsubsamples = nfiles if config_qmle.picca_input else args.nsubsamples
+    reso_samples = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
+    xi1d_samples = SubsampleCov(config_qmle.z_n*args.nrbins, nsubsamples, is_weighted=True)
+
+    pcounter = Progress(nfiles)
+    logging.info(f"There are {nfiles} files.")
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Xi1DEstimator(args, config_qmle), fnames_spectra)
 
         for corfn, cnts_crr, mean_res, counts_mreso in imap_it:
-            mean_resolution += mean_res
-            counts_meanreso += counts_mreso
-            corr_fn += corfn
-            counts_corr += cnts_crr
+            reso_samples.addMeasurement(mean_res, counts_mreso)
+            xi1d_samples.addMeasurement(corfn.ravel(), cnts_crr.ravel())
 
             pcounter.increase()
 
     # Loop is done. Now average results
-    corr_fn /= counts_corr
+    mean_xi1d, cov_xi1d = xi1d_samples.getMeanNCov()
+    mean_reso, cov_reso = reso_samples.getMeanNCov()
 
     # Mean resolution
-    mean_resolution /= counts_meanreso
+    err_reso = np.sqrt(cov_reso.diagonal())
     meanres_filename = ospath_join(output_dir, output_base+"-mean-resolution.txt")
-    meanres_table = Table([config_qmle.z_bins, mean_resolution], names=('z', 'R'))
+    meanres_table = Table([config_qmle.z_bins, mean_resolution, err_reso], names=('z', 'R', 'e_R'))
     meanres_table.write(meanres_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'R':'%d'}, overwrite=True)
+        formats={'z':'%.1f', 'R':'%.1f', 'e_R':'%.1f'}, overwrite=True)
     logging.info(f"Mean R saved as {meanres_filename}")
 
     # Save correlation fn
@@ -176,12 +177,37 @@ if __name__ == '__main__':
     zarr_repeated = np.repeat(config_qmle.z_bins, r_bins.size)
     rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
-    corr_table = Table([zarr_repeated, rarr_repeated, corr_fn.ravel()], names=('z', 'r', 'Xi1D'))
+    err_xi1d = np.sqrt(cov_xi1d.diagonal())
+    corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d], names=('z', 'r', 'Xi1D'))
     corr_table.write(corr_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e'}, overwrite=True)
     logging.info(f"Corr fn saved as {corr_filename}")
 
+    # Save covariance
+    cov_filename = ospath_join(output_dir, output_base+"-covariance-xi1d-weighted-estimate.txt")
+    np.savetxt(cov_filename, cov_xi1d)
+
     logging.info("DONE!")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
