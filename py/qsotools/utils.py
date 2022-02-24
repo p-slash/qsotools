@@ -34,6 +34,7 @@ class SubsampleCov(object):
         if self.is_weighted:
             self.all_weights = np.zeros((nsamples, nbins))
 
+    # The measurement provided (xvec) should not be normalized
     def addMeasurement(self, xvec, wvec=None):
         if (wvec is None) and self.is_weighted:
             raise RuntimeError("SubsampleCov requires weights")
@@ -50,7 +51,7 @@ class SubsampleCov(object):
     def getMean(self):
         aweights = self.all_weights if self.is_weighted else 1./self.nsamples
 
-        mean_xvec = np.sum(self.all_measurements * aweights, axis=0)
+        mean_xvec = np.sum(self.all_measurements, axis=0)
 
         if self.is_weighted:
             norm = np.sum(aweights, axis=0)
@@ -67,7 +68,7 @@ class SubsampleCov(object):
 
         mean_xvec = self.getMean()
 
-        weighted_xdiff = aweights * (self.all_measurements - mean_xvec)
+        weighted_xdiff = self.all_measurements - aweights * mean_xvec
         cov = weighted_xdiff.T.dot(weighted_xdiff)
 
         if self.is_weighted:
