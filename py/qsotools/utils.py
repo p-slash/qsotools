@@ -29,12 +29,14 @@ class SubsampleCov(object):
         self.nsamples = nsamples
         self.isample = 0
         self.is_weighted = is_weighted
+        self.is_normalized = False
 
         self.all_measurements = np.zeros((nsamples, nbins))
         if self.is_weighted:
             self.all_weights = np.zeros((nsamples, nbins))
 
-    # The measurement provided (xvec) should not be normalized
+    # The measurement provided (xvec) should already be weighted and
+    # not normalized if wvec passed
     def addMeasurement(self, xvec, wvec=None):
         if (wvec is None) and self.is_weighted:
             raise RuntimeError("SubsampleCov requires weights")
@@ -48,37 +50,31 @@ class SubsampleCov(object):
 
         self.isample = (self.isample+1)%self.nsamples
 
-    def getMean(self):
-        aweights = self.all_weights if self.is_weighted else 1./self.nsamples
-
-        mean_xvec = np.sum(self.all_measurements, axis=0)
-
+    def _normalize(self):
         if self.is_weighted:
-            norm = np.sum(aweights, axis=0)
-            norm[norm <= 0] = 1
+            self.all_measurements /= self.all_weights + np.finfo(float).eps
+            self.all_weights /= np.sum(self.all_weights, axis=0) + np.finfo(float).eps
         else:
-            norm = 1
+            self.all_weights = np.ones(self.nsamples)/self.nsamples
 
-        mean_xvec /= norm
+        self.is_normalized = True
+
+    def getMean(self):
+        if not self.is_normalized:
+            self._normalize()
+
+        mean_xvec = np.sum(self.all_measurements*self.all_weights, axis=0)
 
         return mean_xvec
 
     def getMeanNCov(self):
-        aweights = self.all_weights if self.is_weighted else 1./self.nsamples
+        if not self.is_normalized:
+            self._normalize()
 
         mean_xvec = self.getMean()
 
-        weighted_xdiff = self.all_measurements - aweights * mean_xvec
+        weighted_xdiff = self.all_weights * (self.all_measurements - mean_xvec)
         cov = weighted_xdiff.T.dot(weighted_xdiff)
-
-        if self.is_weighted:
-            norm = np.sum(aweights, axis=0)
-            norm[norm <= 0] = 1
-            norm2 = norm * norm[:, None]
-        else:
-            norm2 = 1
-
-        cov /= norm2
 
         return mean_xvec, cov
 
