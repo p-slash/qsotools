@@ -25,6 +25,7 @@ import qsotools.mocklib  as lm
 import qsotools.specops  as so
 from qsotools.io import BinaryQSO, QQFile, PiccaFile
 import qsotools.fiducial as fid
+from qsotools.utils import Progress
 
 PKG_ICDF_Z_TABLE = resource_filename('qsotools', 'tables/invcdf_nz_qso_zmin2.1_zmax4.4.dat')
 
