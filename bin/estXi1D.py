@@ -135,6 +135,7 @@ if __name__ == '__main__':
     r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
 
     fnames_spectra = file_list.readlines()
+    fnames_spectra = fnames_spectra[:int(header)]
     if config_qmle.picca_input:
         logging.info("Decomposing filenames to a list of (base, list(hdus)).")
         decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
