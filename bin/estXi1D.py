@@ -170,7 +170,7 @@ if __name__ == '__main__':
     # Mean resolution
     err_reso = np.sqrt(cov_reso.diagonal())
     meanres_filename = ospath_join(output_dir, output_base+"-mean-resolution.txt")
-    meanres_table = Table([config_qmle.z_bins, mean_resolution, err_reso], names=('z', 'R', 'e_R'))
+    meanres_table = Table([config_qmle.z_bins, mean_reso, err_reso], names=('z', 'R', 'e_R'))
     meanres_table.write(meanres_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'R':'%.1f', 'e_R':'%.1f'}, overwrite=True)
     logging.info(f"Mean R saved as {meanres_filename}")
@@ -181,9 +181,9 @@ if __name__ == '__main__':
     rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
     err_xi1d = np.sqrt(cov_xi1d.diagonal())
-    corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d], names=('z', 'r', 'Xi1D'))
+    corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d, err_xi1d], names=('z', 'r', 'Xi1D', 'e_xi1d'))
     corr_table.write(corr_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e'}, overwrite=True)
+        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e', 'e_xi1d':'%.5e'}, overwrite=True)
     logging.info(f"Corr fn saved as {corr_filename}")
 
     # Save covariance
