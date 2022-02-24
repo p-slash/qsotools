@@ -27,6 +27,8 @@ def _findVMaxj(arr, j1, rmax):
         if arr[j] > rmax:
             return j
 
+    return arr.size
+
 class Xi1DEstimator(object):
     def __init__(self, args, config_qmle):
         self.args = args
