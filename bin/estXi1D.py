@@ -52,7 +52,7 @@ def _splitQSO(qso, z_edges):
         tmp_qso = qio.Spectrum(wave, flux, error, qso.z_qso, \
             qso.specres, qso.dv, qso.coord)
 
-        if tmp_qso.s2n > 0:
+        if tmp_qso.s2n > 0 and wave.size > 10:
             split_qsos.append(tmp_qso)
 
     return split_qsos
