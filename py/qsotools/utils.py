@@ -73,8 +73,10 @@ class SubsampleCov(object):
 
         mean_xvec = self.getMean()
 
-        weighted_xdiff = self.all_weights * (self.all_measurements - mean_xvec)
-        cov = weighted_xdiff.T.dot(weighted_xdiff)
+        xdiff = self.all_measurements - mean_xvec
+        nddof = 1 - np.sum(self.all_weights**2, axis=0)
+        # weighted_xdiff = self.all_weights * (self.all_measurements - mean_xvec)
+        cov = xdiff.T.dot(xdiff*self.all_weights)/nddof
 
         return mean_xvec, cov
 
