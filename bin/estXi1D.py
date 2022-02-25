@@ -37,10 +37,11 @@ def _splitQSO(qso, z_edges):
 
     assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
 
+    print(np.hsplit(qso.wave, sp_indx))
     wave_chunks  = [w for w in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in w.shape]
     flux_chunks  = [f for f in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in f.shape]
     error_chunks = [e for e in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in e.shape]
-
+    print(wave_chunks)
     split_qsos =[]
     for i in range(len(wave_chunks)):
         wave = wave_chunks[i]
