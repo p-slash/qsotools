@@ -239,7 +239,7 @@ Returns the VARIANCE.
 dynamically chooses lnk2 for a given dv & R
 if on_flux=True, returns variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
 """
-@jit
+@jit(nopython=True)
 def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-1*np.log(10), dlnk=0.01, on_flux=True):
     if not isinstance(z, np.ndarray):
         raise RuntimeError("z should be numpy array.")
