@@ -35,7 +35,7 @@ def _splitQSO(qso, z_edges):
     z = qso.wave/fid.LYA_WAVELENGTH-1
     sp_indx = np.searchsorted(z, z_edges)
 
-    assert len(np.hsplit(wave, sp_indx)) == len(sp_indx)+1
+    assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
 
     wave_chunks  = [w for w in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in w.shape]
     flux_chunks  = [f for f in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in f.shape]
