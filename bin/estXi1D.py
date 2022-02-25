@@ -7,7 +7,6 @@ from itertools import groupby
 
 import numpy as np
 from numba import jit
-from scipy.stats import binned_statistic
 from astropy.table import Table
 
 import qsotools.io as qio
@@ -22,14 +21,6 @@ def decomposePiccaFname(picca_fname):
     hdunum = int(picca_fname[i1:i2])
 
     return (basefname, hdunum)
-
-@jit
-def _findVMaxj(arr, j1, rmax):
-    for j in range(j1, arr.size):
-        if arr[j] > rmax:
-            return j
-
-    return arr.size
 
 def _splitQSO(qso, z_edges):
     z = qso.wave/fid.LYA_WAVELENGTH-1
@@ -57,13 +48,46 @@ def _splitQSO(qso, z_edges):
 
     return split_qsos
 
+@jit
+def _findVMaxj(arr, j1, rmax):
+    for j in range(j1, arr.size):
+        if arr[j] > rmax:
+            return j
+
+    return arr.size
+
+@jit(nopython=True)
+def _getXi1D(v_arr, flux, ivar, r_edges):
+    rmax = r_edges[-1]
+
+    last_max_j = 0
+
+    # 2d array to store results
+    # 0 : Xi_1d , 1 : Weights
+    bin_res = np.zeros((2, r_edges.size-1))
+
+    # Compute and bin correlations
+    for i in range(v_arr.size):
+        last_max_j = _findVMaxj(v_arr, last_max_j, rmax+v_arr[i])
+        vrange = slice(i, last_max_j)
+
+        vdiff = v_arr[vrange] - v_arr[i]
+
+        sub_xi1d = flux[i]*flux[vrange]
+        sub_w1d  = ivar[i]*ivar[vrange]
+
+        sp_indx = np.searchsorted(r_edges, vdiff)
+        bin_res[0] += np.bincount(sp_indx, weights=sub_xi1d, minlength=r_edges.size+1)[1:-1]
+        bin_res[1] += np.bincount(sp_indx, weights=sub_w1d, minlength=r_edges.size+1)[1:-1]
+
+    return bin_res
+
 class Xi1DEstimator(object):
     def __init__(self, args, config_qmle):
         self.args = args
         self.config_qmle = config_qmle
 
         self.r_edges = np.arange(args.nrbins+1) * args.dr
-        self.rmax = self.r_edges[-1]
         self.xi1d = np.zeros((self.config_qmle.z_n, args.nrbins))
         self.counts = np.zeros_like(self.xi1d)
         self.mean_resolution = np.zeros(self.config_qmle.z_n)
@@ -99,22 +123,9 @@ class Xi1DEstimator(object):
         # Weighted deltas
         qso.flux *= ivar
 
-        # Compute and bin correlations
-        last_max_j = 0
-        for i in range(qso.size):
-            last_max_j = _findVMaxj(v_arr, last_max_j, self.rmax+v_arr[i])
-            vrange = slice(i, last_max_j)
-
-            vdiff = v_arr[vrange] - v_arr[i]
-
-            sub_xi1d = qso.flux[i]*qso.flux[vrange]
-            sub_w1d  = ivar[i]*ivar[vrange]
-
-            binned_xi1d = binned_statistic(vdiff, sub_xi1d, statistic='sum', bins=self.r_edges)[0]
-            binned_w1d  = binned_statistic(vdiff, sub_w1d, statistic='sum', bins=self.r_edges)[0]
-
-            self.xi1d[z_bin_no] += binned_xi1d
-            self.counts[z_bin_no] += binned_w1d
+        binres = _getXi1D(v_arr, qso.flux, ivar, self.r_edges)
+        self.xi1d[z_bin_no]   += binres[0]
+        self.counts[z_bin_no] += binres[1]
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
