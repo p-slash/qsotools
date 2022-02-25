@@ -212,7 +212,12 @@ class Spectrum:
         
         self.size = len(self.wave)
         self.mask = np.logical_and(error > 1e-7, flux != 0)
-        self.s2n = 1/np.mean(error[self.mask])
+
+        if self.wave[self.mask].size == 0:
+            self.s2n = -1
+        else:
+            self.s2n = 1/np.mean(error[self.mask])
+
         self.s2n_lya = self.getS2NLya()
 
         self.z_dlas = None
