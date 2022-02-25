@@ -6,6 +6,7 @@ from multiprocessing import Pool
 from itertools import groupby
 
 import numpy as np
+from numba import jit
 from scipy.stats import binned_statistic
 from astropy.table import Table
 
@@ -22,6 +23,7 @@ def decomposePiccaFname(picca_fname):
 
     return (basefname, hdunum)
 
+@jit
 def _findVMaxj(arr, j1, rmax):
     for j in range(j1, arr.size):
         if arr[j] > rmax:
