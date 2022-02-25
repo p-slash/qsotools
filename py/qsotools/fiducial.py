@@ -1,7 +1,7 @@
 import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
-from scipy.integrate import trapz as scipy_trapz
+from numba import jit
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -173,11 +173,13 @@ KODIAQ_MFLUX_PARAMS = 0.48554307, 4.85845246, 0.12878244
 UVES_MFLUX_PARAMS   = 0.46741625, 4.3688714,  0.21242962
 XQ100_MFLUX_PARAMS  = 2.        , 0.94134713, -1.45586003
 
+@jit
 def meanFluxFG08(z):
     tau = 0.001845 * np.power(1. + z, 3.924)
 
     return np.exp(-tau)
 
+@jit
 def evaluateBecker13MeanFlux(z, tau0, beta, C, z0=BECKER13_parameters[-1]):
     x0 = (1+z) / (1+z0)
 
@@ -220,19 +222,39 @@ def fitBecker13MeanFlux(z, F, e):
 # Mean flux ends
 # -----------------------------------------------------
 
-"""
-return variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
-"""
-def getLyaFlucErrors(z, dv, R_kms, logk1=-6, logk2=1, npoints=1000, on_flux=True):
-    window_fn = lambda k: np.sinc(k*dv/2/np.pi) * np.exp(-k**2 * R_kms**2/2)
-    kPpi      = lambda k, z1: k * evaluatePD13W17Fit(k,z1) / np.pi
+@jit
+def _evalPD13LorentzFit(k, z):
+    A, n, alpha, B, beta, lmd = PDW_FIT_PARAMETERS
+    q0 = k/PD13_PIVOT_K + 1e-10
 
-    flnk = lambda lnk, z1: kPpi(np.exp(lnk), z1) * window_fn(np.exp(lnk))**2
-
-    klog = np.linspace(logk1*np.log(10), logk2*np.log(10), npoints)
-    ZZ, KK = np.meshgrid(z, klog, indexing='ij')
+    result = (A*np.pi/PD13_PIVOT_K) * np.power(q0, 2. + n + alpha*np.log(q0)) / (1. + lmd * k**2)
     
-    err2_lya = scipy_trapz(flnk(KK, ZZ), KK)
+    x0 = (1. + z) / (1. + PD13_PIVOT_Z)
+    result *= np.power(q0, beta * np.log(x0)) * np.power(x0, B)
+    
+    return result
+
+"""
+Returns the VARIANCE.
+dynamically chooses lnk2 for a given dv & R
+if on_flux=True, returns variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
+"""
+@jit
+def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-1*np.log(10), dlnk=0.01, on_flux=True):
+    if not isinstance(z, np.ndarray):
+        raise RuntimeError("z should be numpy array.")
+
+    lnk2 = max(lnk2, np.log(1.5*np.pi/np.sqrt(R_kms**2+dv**2)))
+    Nkpoints = int((lnk2 - lnk1)/dlnk)+1
+    k = np.exp(np.arange(Nkpoints)*dlnk + lnk1)
+
+    window_fn_2 = np.sinc(k*dv/2/np.pi)**2 * np.exp(-k**2 * R_kms**2)
+
+    kPpiW2 = np.empty((z.size, k.size))
+    for i, z1 in enumerate(z):
+        kPpiW2[i] = k * _evalPD13LorentzFit(k, z1) / np.pi * window_fn_2
+
+    err2_lya = np.trapz(kPpiW2, dx=dlnk)
     if on_flux:
         err2_lya *= meanFluxFG08(z)**2
 
