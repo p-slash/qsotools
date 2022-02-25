@@ -157,7 +157,7 @@ if __name__ == '__main__':
     output_base = config_qmle.parameters['OutputFileBase']
 
     logging.basicConfig(filename=ospath_join(output_dir, f'est-xi1d.log'), \
-        level=level=logging.DEBUG if args.debug else logging.INFO)
+        level=logging.DEBUG if args.debug else logging.INFO)
 
     file_list = open(config_qmle.qso_list, 'r')
     header = file_list.readline()
