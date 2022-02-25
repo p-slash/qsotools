@@ -37,11 +37,12 @@ def _splitQSO(qso, z_edges):
 
     assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
 
-    print(np.hsplit(qso.wave, sp_indx))
+    logging.debug(", ".join(np.hsplit(qso.wave, sp_indx)))
     wave_chunks  = [w for w in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in w.shape]
     flux_chunks  = [f for f in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in f.shape]
     error_chunks = [e for e in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in e.shape]
-    print(wave_chunks)
+    logging.debug(", ".join(wave_chunks))
+
     split_qsos =[]
     for i in range(len(wave_chunks)):
         wave = wave_chunks[i]
@@ -148,6 +149,7 @@ if __name__ == '__main__':
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates. Default: %(default)s A")
     parser.add_argument("--nproc", type=int, default=1)
+    parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
@@ -155,7 +157,7 @@ if __name__ == '__main__':
     output_base = config_qmle.parameters['OutputFileBase']
 
     logging.basicConfig(filename=ospath_join(output_dir, f'est-xi1d.log'), \
-        level=logging.INFO)
+        level=level=logging.DEBUG if args.debug else logging.INFO)
 
     file_list = open(config_qmle.qso_list, 'r')
     header = file_list.readline()
