@@ -31,6 +31,26 @@ def _findVMaxj(arr, j1, rmax):
 
     return arr.size
 
+def _splitQSO(qso, z_edges):
+    z = qso.wave/fid.LYA_WAVELENGTH-1
+    sp_indx = np.searchsorted(z, z_edges)
+
+    assert len(np.hsplit(wave, sp_indx)) == len(sp_indx)+1
+
+    wave_chunks  = [w for w in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in w.shape]
+    flux_chunks  = [f for f in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in f.shape]
+    error_chunks = [e for e in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in e.shape]
+
+    split_qsos =[]
+    for i in range(len(wave_chunks)):
+        wave = wave_chunks[i]
+        flux = flux_chunks[i]
+        error= error_chunks[i]
+        split_qsos.append(Spetrum(wave, flux, error, qso.z_qso, \
+            qso.specres, qso.dv, qso.coord))
+
+    return split_qsos
+
 class Xi1DEstimator(object):
     def __init__(self, args, config_qmle):
         self.args = args
@@ -98,7 +118,9 @@ class Xi1DEstimator(object):
             pfile = qio.PiccaFile(f, 'r', clobber=False)
             for hdu in hdus:
                 qso = pfile.readSpectrum(hdu)
-                self.getEstimates(qso)
+                split_qsos = _splitQSO(qso, self.config_qmle.z_edges)
+                for qso in split_qsos:
+                    self.getEstimates(qso)
             pfile.close()
         else:
             f = ospath_join(self.config_qmle.qso_dir, fname.rstrip())
