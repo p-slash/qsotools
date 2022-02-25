@@ -46,8 +46,12 @@ def _splitQSO(qso, z_edges):
         wave = wave_chunks[i]
         flux = flux_chunks[i]
         error= error_chunks[i]
-        split_qsos.append(qio.Spectrum(wave, flux, error, qso.z_qso, \
-            qso.specres, qso.dv, qso.coord))
+
+        tmp_qso = qio.Spectrum(wave, flux, error, qso.z_qso, \
+            qso.specres, qso.dv, qso.coord)
+
+        if tmp_qso.s2n > 0:
+            split_qsos.append(tmp_qso)
 
     return split_qsos
 
