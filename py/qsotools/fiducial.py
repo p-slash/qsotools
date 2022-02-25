@@ -241,8 +241,8 @@ if on_flux=True, returns variance on mean flux from LSS fluctuations, i.e. multi
 """
 @jit(nopython=True)
 def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-1*np.log(10), dlnk=0.01, on_flux=True):
-    if not isinstance(z, np.ndarray):
-        raise RuntimeError("z should be numpy array.")
+    # if not isinstance(z, np.ndarray):
+    #     raise RuntimeError("z should be numpy array.")
 
     lnk2 = max(lnk2, np.log(1.5*np.pi/np.sqrt(R_kms**2+dv**2)))
     Nkpoints = int((lnk2 - lnk1)/dlnk)+1
