@@ -58,16 +58,13 @@ def _findVMaxj(arr, j1, rmax):
 
 @jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
 def _getXi1D(v_arr, flux, ivar, r_edges):
-    # rmax = r_edges[-1]
-
-    last_max_j = int(0)
-
     # 1d array to store results
     # first N : Xi_1d , second N : Weights
     Nbins = r_edges.size-1
     bin_res = np.zeros(2*Nbins)
 
     # Compute and bin correlations
+    last_max_j = int(0)
     for i in range(v_arr.size):
         last_max_j = _findVMaxj(v_arr, last_max_j, r_edges[-1]+v_arr[i])
         vrange = slice(i, last_max_j)
@@ -130,15 +127,17 @@ class Xi1DEstimator(object):
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
-            base = fname[0]
-            hdus = fname[1]
+            base, hdus = fname
             f = ospath_join(self.config_qmle.qso_dir, base)
             pfile = qio.PiccaFile(f, 'r', clobber=False)
+
             for hdu in hdus:
                 qso = pfile.readSpectrum(hdu)
                 split_qsos = _splitQSO(qso, self.config_qmle.z_edges)
+
                 for qso in split_qsos:
                     self.getEstimates(qso)
+
             pfile.close()
         else:
             f = ospath_join(self.config_qmle.qso_dir, fname.rstrip())
@@ -164,21 +163,27 @@ if __name__ == '__main__':
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
 
+    # Read Config file
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
     output_dir  = config_qmle.parameters['OutputDir']
     output_base = config_qmle.parameters['OutputFileBase']
 
+    # Set up logger
     logging.basicConfig(filename=ospath_join(output_dir, f'est-xi1d.log'), \
         level=logging.DEBUG if args.debug else logging.INFO)
 
-    file_list = open(config_qmle.qso_list, 'r')
-    header = file_list.readline()
-
+    # Set up velocity bin edges
     r_edges = np.arange(args.nrbins+1) * args.dr
     r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
 
+    # Read file list file
+    file_list = open(config_qmle.qso_list, 'r')
+    header = file_list.readline() # First line: Number of spectra to read
     fnames_spectra = file_list.readlines()
-    fnames_spectra = fnames_spectra[:int(header)]
+    fnames_spectra = fnames_spectra[:int(header)] # Read only first N spectra
+
+    # If files are in Picca format, decompose filename list into
+    # Main file & hdus to read in that main file
     if config_qmle.picca_input:
         logging.info("Decomposing filenames to a list of (base, list(hdus)).")
         decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
@@ -191,11 +196,13 @@ if __name__ == '__main__':
         fnames_spectra = new_fnames
 
     nfiles = len(fnames_spectra)
+    # Use subsampling to estimate covariance
     nsubsamples = nfiles if config_qmle.picca_input else args.nsubsamples
+    # Set up subsampling class to store results
     reso_samples = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
     xi1d_samples = SubsampleCov(config_qmle.z_n*args.nrbins, nsubsamples, is_weighted=True)
 
-    pcounter = Progress(nfiles)
+    pcounter = Progress(nfiles) # Progress tracker
     logging.info(f"There are {nfiles} files.")
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Xi1DEstimator(args, config_qmle), fnames_spectra)
