@@ -48,7 +48,7 @@ def _splitQSO(qso, z_edges):
 
     return split_qsos
 
-@jit(nopython=True) # "i8(f8[:], i8, f8)", 
+@jit("i8(f8[:], i8, f8)", nopython=True)
 def _findVMaxj(arr, j1, rmax):
     for j in range(j1, arr.size):
         if arr[j] > rmax:
@@ -56,11 +56,11 @@ def _findVMaxj(arr, j1, rmax):
 
     return arr.size
 
-@jit(nopython=True) # "f8[:](f8[:], f8[:], f8[:], f8[:])", 
+@jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
 def _getXi1D(v_arr, flux, ivar, r_edges):
     # rmax = r_edges[-1]
 
-    last_max_j = 0
+    last_max_j = int(0)
 
     # 1d array to store results
     # 0 N : Xi_1d , 1 : Weights
@@ -122,9 +122,9 @@ class Xi1DEstimator(object):
 
         ivar = self.getIVAR(qso)
         # Weighted deltas
-        qso.flux *= ivar
+        wflux = qso.flux * ivar
 
-        binres = _getXi1D(v_arr, qso.flux, ivar, self.r_edges)
+        binres = _getXi1D(v_arr, wflux, ivar, self.r_edges)
         self.xi1d[z_bin_no]   += binres[:self.args.nbins]
         self.counts[z_bin_no] += binres[self.args.nbins:]
 
