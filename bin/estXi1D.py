@@ -48,7 +48,7 @@ def _splitQSO(qso, z_edges):
 
     return split_qsos
 
-@jit("i8(f8[:], i8, f8)", nopython=True)
+@jit(nopython=True) # "i8(f8[:], i8, f8)", 
 def _findVMaxj(arr, j1, rmax):
     for j in range(j1, arr.size):
         if arr[j] > rmax:
@@ -56,20 +56,20 @@ def _findVMaxj(arr, j1, rmax):
 
     return arr.size
 
-@jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
+@jit(nopython=True) # "f8[:](f8[:], f8[:], f8[:], f8[:])", 
 def _getXi1D(v_arr, flux, ivar, r_edges):
-    rmax = r_edges[-1]
+    # rmax = r_edges[-1]
 
     last_max_j = 0
 
     # 1d array to store results
-    # first N : Xi_1d , 1 : Weights
+    # 0 N : Xi_1d , 1 : Weights
     Nbins = r_edges.size-1
     bin_res = np.zeros(2*Nbins)
 
     # Compute and bin correlations
     for i in range(v_arr.size):
-        last_max_j = _findVMaxj(v_arr, last_max_j, rmax+v_arr[i])
+        last_max_j = _findVMaxj(v_arr, last_max_j, r_edges[-1]+v_arr[i])
         vrange = slice(i, last_max_j)
 
         vdiff = v_arr[vrange] - v_arr[i]
