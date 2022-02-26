@@ -48,7 +48,7 @@ def _splitQSO(qso, z_edges):
 
     return split_qsos
 
-@jit
+@jit("i8(f8[:], i8, f8)", nopython=True)
 def _findVMaxj(arr, j1, rmax):
     for j in range(j1, arr.size):
         if arr[j] > rmax:
@@ -56,7 +56,7 @@ def _findVMaxj(arr, j1, rmax):
 
     return arr.size
 
-@jit(nopython=True)
+@jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
 def _getXi1D(v_arr, flux, ivar, r_edges):
     rmax = r_edges[-1]
 
