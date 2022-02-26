@@ -63,7 +63,7 @@ def _getXi1D(v_arr, flux, ivar, r_edges):
     last_max_j = int(0)
 
     # 1d array to store results
-    # 0 N : Xi_1d , 1 : Weights
+    # first N : Xi_1d , second N : Weights
     Nbins = r_edges.size-1
     bin_res = np.zeros(2*Nbins)
 
@@ -125,8 +125,8 @@ class Xi1DEstimator(object):
         wflux = qso.flux * ivar
 
         binres = _getXi1D(v_arr, wflux, ivar, self.r_edges)
-        self.xi1d[z_bin_no]   += binres[:self.args.nbins]
-        self.counts[z_bin_no] += binres[self.args.nbins:]
+        self.xi1d[z_bin_no]   += binres[:self.args.nrbins]
+        self.counts[z_bin_no] += binres[self.args.nrbins:]
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
