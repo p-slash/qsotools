@@ -56,15 +56,16 @@ def _findVMaxj(arr, j1, rmax):
 
     return arr.size
 
-@jit("f8[2, :](f8[:], f8[:], f8[:], f8[:])", nopython=True)
+@jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
 def _getXi1D(v_arr, flux, ivar, r_edges):
     rmax = r_edges[-1]
 
     last_max_j = 0
 
-    # 2d array to store results
-    # 0 : Xi_1d , 1 : Weights
-    bin_res = np.zeros((2, r_edges.size-1))
+    # 1d array to store results
+    # first N : Xi_1d , 1 : Weights
+    Nbins = r_edges.size-1
+    bin_res = np.zeros(2*Nbins)
 
     # Compute and bin correlations
     for i in range(v_arr.size):
@@ -77,8 +78,8 @@ def _getXi1D(v_arr, flux, ivar, r_edges):
         sub_w1d  = ivar[i]*ivar[vrange]
 
         sp_indx = np.searchsorted(r_edges, vdiff)
-        bin_res[0] += np.bincount(sp_indx, weights=sub_xi1d, minlength=r_edges.size+1)[1:-1]
-        bin_res[1] += np.bincount(sp_indx, weights=sub_w1d, minlength=r_edges.size+1)[1:-1]
+        bin_res[:Nbins] += np.bincount(sp_indx, weights=sub_xi1d, minlength=r_edges.size+1)[1:-1]
+        bin_res[Nbins:] += np.bincount(sp_indx, weights=sub_w1d, minlength=r_edges.size+1)[1:-1]
 
     return bin_res
 
@@ -124,8 +125,8 @@ class Xi1DEstimator(object):
         qso.flux *= ivar
 
         binres = _getXi1D(v_arr, qso.flux, ivar, self.r_edges)
-        self.xi1d[z_bin_no]   += binres[0]
-        self.counts[z_bin_no] += binres[1]
+        self.xi1d[z_bin_no]   += binres[:self.args.nbins]
+        self.counts[z_bin_no] += binres[self.args.nbins:]
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
