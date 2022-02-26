@@ -56,7 +56,7 @@ def _findVMaxj(arr, j1, rmax):
 
     return arr.size
 
-@jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
+@jit("f8[2, :](f8[:], f8[:], f8[:], f8[:])", nopython=True)
 def _getXi1D(v_arr, flux, ivar, r_edges):
     rmax = r_edges[-1]
 
