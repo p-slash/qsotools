@@ -192,7 +192,7 @@ def getMetadata(args):
         metadata['RA']  = RNST.random(args.nmocks) * 360.
         # metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
 
-        dec1, dec2 = (-20., 80.) if args.desi_dec else (-90., 90.)
+        dec1, dec2 = (-25., 85.) if args.desi_dec else (-90., 90.)
         metadata['DEC'] = _genRNDDec(RNST, args.nmocks, dec1, dec2)
 
         if args.fixed_zqso:
@@ -362,7 +362,7 @@ if __name__ == '__main__':
         "Default: %(default)s A"), type=float, default=3600.)
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
-    parser.add_argument("--desi-dec", help="Limit dec to (-20, 80).", action="store_true")
+    parser.add_argument("--desi-dec", help="Limit dec to (-25, 85).", action="store_true")
     parser.add_argument("--z-quasar-min", type=float, default=2.1, \
         help="Lowest quasar redshift. Only when created from a catalog. Default: %(default)s")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
