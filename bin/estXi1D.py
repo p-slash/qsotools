@@ -155,8 +155,8 @@ if __name__ == '__main__':
 
     parser.add_argument("--nsubsamples", type=int, default=100, \
         help="Number of subsamples if input is not Picca.")
-    parser.add_argument("--dr", help="Default: %(default)s km/s", type=float, default=30.0)
-    parser.add_argument("--nrbins", help="Default: %(default)s", type=int, default=100)
+    parser.add_argument("--dr", help="Default: %(default)s km/s", type=float, default=70.0)
+    parser.add_argument("--nrbins", help="Default: %(default)s", type=int, default=60)
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates. Default: %(default)s A")
     # parser.add_argument("--project-out", action="store_true", \
@@ -236,8 +236,8 @@ if __name__ == '__main__':
     err_xi1d = np.sqrt(cov_xi1d.diagonal())
     corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d, mean_xi1d_biascorr, err_xi1d], \
         names=('z', 'r', 'Xi1D', 'Xi1D-bcor', 'e_xi1d'))
-    corr_table.write(corr_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e', 'e_xi1d':'%.5e'}, overwrite=True)
+    corr_table.write(corr_filename, format='ascii.fixed_width', overwrite=True, \
+        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e', 'Xi1D-bcor':'%.5e', 'e_xi1d':'%.5e'})
     logging.info(f"Corr fn saved as {corr_filename}")
 
     # Save covariance
