@@ -67,22 +67,27 @@ class SubsampleCov(object):
 
         return mean_xvec
 
-    def getMeanNCov(self):
+    # This is a jackknife estimate of the variance
+    def getMeanNCov(self, bias_correct=False):
         if not self.is_normalized:
             self._normalize()
 
         mean_xvec = self.getMean()
 
-        xdiff = self.all_measurements - mean_xvec
-        # # w2sum = np.sum(self.all_weights**2, axis=0)
-        # nddof = 1 - np.sum(self.all_weights**2, axis=0)
+        # remove one measurement, then renormalize
+        jack_i = (mean_xvec - self.all_measurements*self.all_weights)/(1-self.all_weights)
+        mean_jack = np.mean(jack_i, axis=0)
 
-        # cov = np.dot((self.all_weights*xdiff).T, xdiff)/nddof
-        # cov = self.all_weights @ cov @ self.all_weights.T
+        if bias_correct:
+            bias_jack = (self.nsamples-1) * (mean_jack-mean_xvec)
+            mean_xvec -= bias_jack
 
-        wxdiff = self.all_weights*xdiff
-        cov = np.dot(wxdiff.T, wxdiff)
+        xdiff = jack_i - mean_jack
+
+        cov = np.dot(xdiff.T, xdiff)*(self.nsamples-1)/self.nsamples
+
         return mean_xvec, cov
+
 
 
 
