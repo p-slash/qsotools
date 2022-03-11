@@ -159,6 +159,8 @@ if __name__ == '__main__':
     parser.add_argument("--nrbins", help="Default: %(default)s", type=int, default=100)
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates. Default: %(default)s A")
+    # parser.add_argument("--project-out", action="store_true", \
+    #     help="Projects out mean and slope modes.")
     parser.add_argument("--nproc", type=int, default=1)
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
@@ -215,6 +217,7 @@ if __name__ == '__main__':
 
     # Loop is done. Now average results
     mean_xi1d, cov_xi1d = xi1d_samples.getMeanNCov()
+    mean_xi1d_biascorr, _ = xi1d_samples.getMeanNCov(bias_correct=True)
     mean_reso, cov_reso = reso_samples.getMeanNCov()
 
     # Mean resolution
@@ -231,7 +234,8 @@ if __name__ == '__main__':
     rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
     err_xi1d = np.sqrt(cov_xi1d.diagonal())
-    corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d, err_xi1d], names=('z', 'r', 'Xi1D', 'e_xi1d'))
+    corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d, mean_xi1d_biascorr, err_xi1d], \
+        names=('z', 'r', 'Xi1D', 'Xi1D-bcor', 'e_xi1d'))
     corr_table.write(corr_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e', 'e_xi1d':'%.5e'}, overwrite=True)
     logging.info(f"Corr fn saved as {corr_filename}")
