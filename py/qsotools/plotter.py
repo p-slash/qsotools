@@ -498,11 +498,11 @@ class PowerPlotter(object):
             invcov = self.fisher
 
         d = (self.power_qmle-self.power_true).ravel()
-        to_remove = np.zeros_like(d, dtype=np.bool)
+        to_remove = np.zeros_like(d, dtype=bool)
 
-        if kmax and kmax > 0:
+        if kmax is not None and np.all(kmax > 0):
             to_remove |= (self.karray > kmax)
-        if kmin and kmin > 0:
+        if kmin is not None and np.all(kmin > 0):
             to_remove |= (self.karray < kmin)
 
         if zbin is not None:
