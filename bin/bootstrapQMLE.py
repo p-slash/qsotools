@@ -6,13 +6,16 @@
 
 import argparse
 import sys
-from os.path import join as ospath_join, getsize as ospath_getsize
+from os.path import join as ospath_join, \
+    getsize as ospath_getsize, dirname as ospath_dir
+
 import glob
 import struct
 import time
 import logging
 
 import numpy as np
+from numba import jit
 
 from qsotools.utils import Progress
 
@@ -20,35 +23,62 @@ def getNumbersfromBootfile(fname):
     filesize = ospath_getsize(fname)
 
     with open(fname, "rb") as f:
-        N = int(struct.unpack('i', f.read(struct.calcsize('i')))[0])
+        Nk = int(struct.unpack('i', f.read(struct.calcsize('i')))[0])
+        Nz = int(struct.unpack('i', f.read(struct.calcsize('i')))[0])
+        Nd = int(struct.unpack('i', f.read(struct.calcsize('i')))[0])
 
-    id_size     = struct.calcsize('i')
-    fisher_size = struct.calcsize('d'*N*N)
-    power_size  = struct.calcsize('d'*N)
-    aspec_size  = id_size+fisher_size+power_size
-    nspec = int((filesize-struct.calcsize('i'))/aspec_size)
+    total_nkz = Nk*Nz
 
-    return N, nspec
+    if Nd == 3:
+        cf_size = 3*total_nkz - Nk - 1
+    else:
+        cf_size = total_nkz*ndiags - (ndiags*(ndiags-1))/2
 
-# Returns fishers, powers
-# fishers.shape = (nspec, N*N)
-# powers.shape = (nspec, N)
+    elems_count   = cf_size + total_nkz;
+    one_data_size = struct.calcsize('d'*elems_count)
+
+    nspec = int((filesize-3*struct.calcsize('i'))/one_data_size)
+
+    return Nk, Nz, Nd, total_nkz, elems_count, nspec
+
+# Returns data
+# First Nkz is power, rest is fisher that needs to be reshaped
 def readBootFile(fname, N):
-    dt = np.dtype([('id', 'i4'), ('fisher', 'f8', N*N), ('power', 'f8', N)])
+    dt = np.dtype(('f8', N))
 
     with open(fname, "rb") as bootfile:
-        spectra = np.fromfile(bootfile, offset=struct.calcsize('i'), dtype=dt)
+        spectra = np.fromfile(bootfile, offset=3*struct.calcsize('i'), dtype=dt)
 
     return spectra
 
+@jit("Tuple((f8[:, :], f8[:, :, :]))(f8[:, :], i8, i8, i8)", nopython=True)
+def getPSandFisher(v, nk, nd, total_nkz):
+    nboot = v.shape[0]
+    power = v[:, :total_nkz]
+    fisher = np.zeros((nboot, total_nkz, total_nkz))
+
+    farr = v[:, total_nkz:]
+
+    if nd == 3:
+        diag_idx = np.array([0, 1, nk])
+    else:
+        diag_idx = np.arange(nd)
+
+    fari = 0
+    for did in diag_idx:
+        for jj in range(total_nkz-did):
+            fisher[:, jj, jj+did] = farr[:, fari+jj]
+            fisher[:, jj+did, jj] = farr[:, fari+jj]
+
+        fari += total_nkz-did
+
+    return power, fisher
+
+@jit("i8[:, :](i8[:, :])", nopython=True)
 def getCounts(booted_indices):
     bootnum, no_spectra = booted_indices.shape
-    # # Does sorting helps with add.at?
-    # booted_indices.sort(axis=1)
-    # counts = np.zeros((bootnum, no_spectra), dtype=int)
-    # for i, btdi in enumerate(booted_indices):
-    #     np.add.at(counts[i], btdi, 1)
-    counts = np.empty((bootnum, no_spectra), dtype=int)
+   
+    counts = np.empty_like(booted_indices)
     for b in range(bootnum):
         counts[b] = np.bincount(booted_indices[b], minlength=no_spectra)
 
@@ -57,75 +87,41 @@ def getCounts(booted_indices):
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
-    parser.add_argument("BootDirectory", help="Directory where bootresults-N.dat are present.")
+    parser.add_argument("Bootfile", help="File as described in QMLE.")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
     args = parser.parse_args()
 
+    outdir = ospath_dir(args.Bootfile)
     # Set up log
-    logging.basicConfig(filename=ospath_join(args.BootDirectory, 'bootstrapping.log'), \
+    logging.basicConfig(filename=ospath_join(outdir, 'bootstrapping.log'), \
         level=logging.INFO)
     logging.info(" ".join(sys.argv))
 
-    # Find the number of bootstrapping files
-    bootfiles = glob.glob(ospath_join(args.BootDirectory, "bootresults-*.dat"))
-    nbootfiles = len(bootfiles)
-
-    logging.info("There are %d bootresults files.", nbootfiles)
-
-    # Generating bootstrap realizations by file, constains the fluctuations
-    # Generate one big boot array, each file gets their parts
-    # We will need indices for each file
-    nspec_total = int(0)
-    indices     = np.empty(nbootfiles+1, dtype=int)
-    Nbins, nspec= getNumbersfromBootfile(bootfiles[0])
-
-    indices[0]  = 0
-    for pe in range(nbootfiles):
-        fname     = ospath_join(args.BootDirectory, f"bootresults-{pe}.dat")
-        N1, nspec = getNumbersfromBootfile(fname)
-
-        assert (N1 == Nbins)
-
-        nspec_total  += nspec
-        indices[pe+1] = nspec_total
-
-    logging.info("There are %d spectra.", nspec_total)
+    Nk, Nz, Nd, total_nkz, elems_count, nspec = getNumbersfromBootfile(args.Bootfile)
+    logging.info("There are %d subsamples.", nspec)
 
     # Generate bootstrap realizations through indexes
     RND            = np.random.default_rng(args.seed)
-    booted_indices = RND.integers(low=0, high=nspec_total, size=(args.bootnum, nspec_total))
+    booted_indices = RND.integers(low=0, high=nspec, size=(args.bootnum, nspec))
     boot_counts    = getCounts(booted_indices)
     logging.info(f"Generated boot indices.")
 
     # Allocate memory for matrices
-    total_fisher   = np.zeros((args.bootnum, Nbins*Nbins))
-    total_power_b4 = np.zeros((args.bootnum, Nbins))
-    total_power    = np.zeros((args.bootnum, Nbins))
+    total_data = np.empty((args.bootnum, elems_count))
+    spectra    = readBootFile(args.Bootfile, elems_count)
 
-    # Set up progress tracker
-    pcounter = Progress(nbootfiles)
-    for pe in range(nbootfiles):
-        fname = ospath_join(args.BootDirectory, f"bootresults-{pe}.dat")
-
-        # Read fishers and powers
-        spectra     = readBootFile(fname, Nbins)
-        this_counts = boot_counts[:, indices[pe]:indices[pe+1]]
-
-        total_fisher   += this_counts @ spectra['fisher']
-        total_power_b4 += this_counts @ spectra['power']
-
-        pcounter.increase()
+    total_data = boot_counts @ spectra
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
-    F = total_fisher.reshape((args.bootnum, Nbins, Nbins))
+    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz)
     total_power = 0.5 * np.linalg.solve(F, total_power_b4)
 
     # Save power to a file
     # Set up output file
-    output_fname = ospath_join(args.BootDirectory, 
+    output_fname = ospath_join(outdir, 
         "bootstrap-power-n%d-s%d.txt" % (args.bootnum, args.seed))
     np.savetxt(output_fname, total_power)
     logging.info(f"Power saved as {output_fname}.")
@@ -134,7 +130,7 @@ if __name__ == '__main__':
     # when save-cov passed
     if args.save_cov:
         bootstrap_cov = np.cov(total_power, rowvar=False)
-        output_fname = ospath_join(args.BootDirectory, 
+        output_fname = ospath_join(outdir, 
             "bootstrap-cov-n%d-s%d.txt" % (args.bootnum, args.seed))
         np.savetxt(output_fname, bootstrap_cov)
         logging.info(f"Covariance saved as {output_fname}.")
