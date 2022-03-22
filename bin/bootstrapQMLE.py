@@ -91,7 +91,7 @@ if __name__ == '__main__':
     parser.add_argument("Bootfile", help="File as described in QMLE.")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
-    parser.add_argument("--remove-last-nz-bins", "-rem-nz", default=0, type=int, \
+    parser.add_argument("--remove-last-nz-bins", default=0, type=int, \
         help="Remove last nz bins to obtain invertable Fisher.")
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     total_data = boot_counts @ spectra
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
-    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.rem_nz)
+    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
     total_power = 0.5 * np.linalg.solve(F, total_power_b4)
 
     # Save power to a file
