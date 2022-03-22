@@ -130,6 +130,9 @@ if __name__ == '__main__':
     output_fname = ospath_join(outdir, "bootstrap-original-power.txt")
     np.savetxt(output_fname, total_power[0])
     logging.info(f"Original power saved as {output_fname}.")
+    output_fname = ospath_join(outdir, "bootstrap-original-fisher.txt")
+    np.savetxt(output_fname, F[0])
+    logging.info(f"Original fisher saved as {output_fname}.")
 
     if args.bootnum == 0:
         logging.info(f"Exiting. Only calculated the original power.")
