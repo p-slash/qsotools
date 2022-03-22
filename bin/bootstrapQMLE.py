@@ -51,11 +51,12 @@ def readBootFile(fname, N):
 
     return spectra
 
-@jit("Tuple((f8[:, :], f8[:, :, :]))(f8[:, :], i8, i8, i8)", nopython=True)
-def getPSandFisher(v, nk, nd, total_nkz):
+@jit("Tuple((f8[:, :], f8[:, :, :]))(f8[:, :], i8, i8, i8, i8)", nopython=True)
+def getPSandFisher(v, nk, nd, total_nkz, rem_nz=0):
     nboot = v.shape[0]
-    power = v[:, :total_nkz]
-    fisher = np.zeros((nboot, total_nkz, total_nkz))
+    newsize = total_nkz-rem_nz*nk
+    power = v[:, :newsize]
+    fisher = np.zeros((nboot, newsize, newsize))
 
     farr = v[:, total_nkz:]
 
@@ -66,7 +67,7 @@ def getPSandFisher(v, nk, nd, total_nkz):
 
     fari = 0
     for did in diag_idx:
-        for jj in range(total_nkz-did):
+        for jj in range(newsize-did):
             fisher[:, jj, jj+did] = farr[:, fari+jj]
             fisher[:, jj+did, jj] = farr[:, fari+jj]
 
@@ -90,6 +91,8 @@ if __name__ == '__main__':
     parser.add_argument("Bootfile", help="File as described in QMLE.")
     parser.add_argument("--bootnum", default=1000, type=int, \
         help="Number of bootstrap resamples. Default: %(default)s")
+    parser.add_argument("--remove-last-nz-bins", "-rem-nz", default=0, type=int, \
+        help="Remove last nz bins to obtain invertable Fisher.")
     parser.add_argument("--seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
     args = parser.parse_args()
@@ -119,7 +122,7 @@ if __name__ == '__main__':
     total_data = boot_counts @ spectra
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
-    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz)
+    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.rem_nz)
     total_power = 0.5 * np.linalg.solve(F, total_power_b4)
 
     # Save power to a file
