@@ -106,11 +106,14 @@ if __name__ == '__main__':
     # Generate bootstrap realizations through indexes
     RND            = np.random.default_rng(args.seed)
     booted_indices = RND.integers(low=0, high=nspec, size=(args.bootnum, nspec))
-    boot_counts    = getCounts(booted_indices)
+    # Save original estimate to first array
+    boot_counts    = np.empty((args.bootnum+1, nspec))
+    boot_counts[0] = 1
+    boot_counts[1:]= getCounts(booted_indices)
     logging.info(f"Generated boot indices.")
 
     # Allocate memory for matrices
-    total_data = np.empty((args.bootnum, elems_count))
+    total_data = np.empty((args.bootnum+1, elems_count))
     spectra    = readBootFile(args.Bootfile, elems_count)
 
     total_data = boot_counts @ spectra
@@ -121,15 +124,23 @@ if __name__ == '__main__':
 
     # Save power to a file
     # Set up output file
+    output_fname = ospath_join(outdir, "bootstrap-original-power.txt")
+    np.savetxt(output_fname, total_power[0])
+    logging.info(f"Original power saved as {output_fname}.")
+
+    if args.bootnum == 0:
+        logging.info(f"Exiting. Only calculated the original power.")
+        exit()
+
     output_fname = ospath_join(outdir, 
         "bootstrap-power-n%d-s%d.txt" % (args.bootnum, args.seed))
-    np.savetxt(output_fname, total_power)
+    np.savetxt(output_fname, total_power[1:])
     logging.info(f"Power saved as {output_fname}.")
 
     # If time allows, run many bootstraps and save its covariance
     # when save-cov passed
     if args.save_cov:
-        bootstrap_cov = np.cov(total_power, rowvar=False)
+        bootstrap_cov = np.cov(total_power[1:], rowvar=False)
         output_fname = ospath_join(outdir, 
             "bootstrap-cov-n%d-s%d.txt" % (args.bootnum, args.seed))
         np.savetxt(output_fname, bootstrap_cov)
