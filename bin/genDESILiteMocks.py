@@ -29,9 +29,6 @@ from qsotools.utils import Progress
 
 PKG_ICDF_Z_TABLE = resource_filename('qsotools', 'tables/invcdf_nz_qso_zmin2.1_zmax4.4.dat')
 
-filename_list = []
-RESOMAT = None
-
 def setResolutionMatrix(wave, args, ndiags=11):
     assert args.save_picca
     assert args.fixed_zqso
@@ -94,16 +91,18 @@ def save_plots(wch, fch, ech, fnames, args):
         plt.plot(w, e, 'r-')
         plt.savefig(ospath_join(args.OutputDir, fname[:-3]+"png"), bbox_inches='tight', dpi=150)
 
-def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args, picca=None):
+def save_data(wave, fmocks, emocks, fnames, z_qso, dec, ra, args, rmat, picca, tid):
     if picca:
+        fnames = []
         for (w, f, e) in zip(wave, fmocks, emocks):
-            fname=picca.writeSpectrum(w, f, e, args.specres, z_qso, ra, dec, RESOMAT.T, \
+            fname=picca.writeSpectrum(tid, w, f, e, args.specres, z_qso, ra, dec, rmat.T, \
                 islinbin=not args.use_logspaced_wave, oversampling=args.oversample_rmat)
-            filename_list.append(fname)
+            fnames.append(fname)
     else:
         for (w, f, e, fname) in zip(wave, fmocks, emocks, fnames):
             mfile = BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
             mfile.save(w, f, e, len(w), z_qso, dec, ra, 0., args.specres, args.pixel_dv)
+    return fnames
 
 def saveQQFile(ipix, meta1, wave, fluxes, args):
     P = int(ipix/100)
@@ -118,7 +117,7 @@ def saveQQFile(ipix, meta1, wave, fluxes, args):
 
     return fname
 
-def chunkHelper(i, waves, fluxes, errors, z_qso):
+def chunkHelper(i, waves, fluxes, errors, z_qso, args):
     wave_c, flux_c, err_c = waves[i], fluxes[i], errors[i]
 
     if args.chunk_dyn:
@@ -284,8 +283,8 @@ class MockGenerator(object):
         if not self.args.keep_nolya_pixels:
             lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
                 wave <= fid.LYA_LAST_WVL * (1+z_qso))
-            forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+args.z_forest_min), \
-                wave <= fid.LYA_WAVELENGTH*(1+args.z_forest_max))
+            forst_bnd = np.logical_and(wave >= fid.LYA_WAVELENGTH*(1+self.args.z_forest_min), \
+                wave <= fid.LYA_WAVELENGTH*(1+self.args.z_forest_max))
             lya_ind = np.logical_and(lya_ind, forst_bnd)
             waves  = [wave[lya_ind[i]] for i in range(ntemp)]
             fluxes = [fluxes[i][lya_ind[i]] for i in range(ntemp)]
@@ -300,26 +299,25 @@ class MockGenerator(object):
             pcfile = None
 
         for i in range(ntemp):
-            wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso)
+            wave_c, flux_c, err_c = chunkHelper(i, waves, fluxes, errors, z_qso, self.args)
 
             nchunks = len(wave_c)
             nid = meta1['MOCKID'][i]
 
             if not self.args.save_picca:
                 fname = ["desilite_seed%d_id%d_%d_z%.1f%s.dat" \
-                % (args.seed, nid, nc, z_qso[i], settings_txt) for nc in range(nchunks)]
+                % (self.args.seed, nid, nc, z_qso[i], settings_txt) for nc in range(nchunks)]
             else:
                 assert nchunks == 1
-                if RESOMAT is None:
-                    RESOMAT = setResolutionMatrix(wave_c[0], args)
+                RESOMAT = setResolutionMatrix(wave_c[0], self.args)
                 fname = None
 
             if not self.args.nosave:
-                save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], 
-                    meta1['RA'][i], args, pcfile)
+                fname = save_data(wave_c, flux_c, err_c, fname, z_qso[i], meta1['DEC'][i], 
+                    meta1['RA'][i], self.args, RESOMAT, pcfile, meta1['MOCKID'][i])
 
-            if args.plot:
-                save_plots(wave_c, flux_c, err_c, fname, args)
+            if self.args.plot:
+                save_plots(wave_c, flux_c, err_c, fname, self.args)
 
             return fname
 
@@ -408,7 +406,6 @@ if __name__ == '__main__':
 
     # Create/Check directory
     os_makedirs(args.OutputDir, exist_ok=True)
-    RESOMAT = None
 
     logging.basicConfig(filename=ospath_join(args.OutputDir, f'genthread.log'), \
         level=logging.DEBUG if args.debug else logging.INFO)
@@ -438,6 +435,7 @@ if __name__ == '__main__':
     logging.info(f"Length of split metadata {len(split_meta)} vs npixels {npixels}.")
     pcounter = Progress(len(split_meta))
 
+    filename_list = []
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(MockGenerator(args), zip(u_pix, split_meta))
         for fname in imap_it:
