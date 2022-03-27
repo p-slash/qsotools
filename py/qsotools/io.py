@@ -1584,7 +1584,7 @@ class PiccaFile():
         self.no_spectra = 0
         self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
     
-    def writeSpectrum(self, wave, delta, error, specres, z_qso, ra, dec, \
+    def writeSpectrum(self, tid, wave, delta, error, specres, z_qso, ra, dec, \
         rmat=None, islinbin=False, oversampling=1):
         if rmat is not None:
             ndiags = rmat.shape[1]
@@ -1601,7 +1601,7 @@ class PiccaFile():
         if rmat is not None:
             data['RESOMAT'] = rmat
 
-        hdr_dict = {'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
+        hdr_dict = {'TARGETID':tid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
             'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
             'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': islinbin, \
             'DLL':np.median(np.diff(data['LOGLAM'])) , 'DLAMBDA':np.median(np.diff(wave))}
