@@ -43,7 +43,7 @@ def getFlistFromOne(f, args):
         if hdr['MEANSNR'] < args.snr_cut:
             continue
 
-        if hdr['DLL']:
+        if 'DLL' in hdu.get_colnames():
             dll = hdr['DLL']
         else:
             dll = None
