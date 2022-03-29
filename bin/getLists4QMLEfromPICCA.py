@@ -16,8 +16,12 @@ from qsotools.specops import getOversampledRMat
 LN10 = np.log(10)
 
 def roundSpecRes(Rkms, dll):
-    dv = int(np.round(dll*LIGHT_SPEED*LN10/5)*5);
-    Rint = int(LIGHT_SPEED/Rkms/ONE_SIGMA_2_FWHM/100 + 0.5)*100;
+    if dll:
+        dv = int(np.round(dll*LIGHT_SPEED*LN10/5)*5)
+    else:
+        dv = int(np.round(Rkms/5)*5);
+
+    Rint = int(LIGHT_SPEED/Rkms/ONE_SIGMA_2_FWHM/100 + 0.5)*100
 
     return Rint, dv
 
@@ -39,7 +43,11 @@ def getFlistFromOne(f, args):
         if hdr['MEANSNR'] < args.snr_cut:
             continue
 
-        Rint, dv = roundSpecRes(hdr['MEANRESO'], hdr['DLL'])
+        if hdr['DLL']:
+            dll = hdr['DLL']
+        else:
+            dll = None
+        Rint, dv = roundSpecRes(hdr['MEANRESO'], dll)
 
         slst.add((Rint, dv))
         flst.append(f"{f}[{i}]")
