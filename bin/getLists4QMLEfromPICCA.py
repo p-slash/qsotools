@@ -147,10 +147,10 @@ if __name__ == '__main__':
             all_flst.extend(flst)
             all_slst = all_slst.union(slst)
 
-    temp_fname = ospath_join(args.Directory, f"specres_list-{args.outsuffix}.txt")
+    temp_fname = ospath_join(args.Directory, f"specres_list-{args.out_suffix}.txt")
     print("Saving spectral resolution values as ", temp_fname)
     saveListByLine(all_slst, temp_fname)
 
-    temp_fname = ospath_join(args.Directory, f"fname_list-{args.outsuffix}.txt")
+    temp_fname = ospath_join(args.Directory, f"fname_list-{args.out_suffix}.txt")
     print("Saving spectra file list as ", temp_fname)
     saveListByLine(all_flst, temp_fname)
