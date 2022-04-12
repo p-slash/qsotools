@@ -1618,13 +1618,19 @@ class PiccaFile():
         hdr = self.fitsfile[hdu].read_header()
         data = self.fitsfile[hdu].read()
 
-        wave = 10**data['LOGLAM']
+        if "LAMBDA" in self.fitsfile[hdu].get_colnames():
+            wave = data['LAMBDA']
+        else:
+            wave = 10**data['LOGLAM']
         delta = data['DELTA']
         error = 1/np.sqrt(data['IVAR']+1e-16)
         error[data['IVAR']==0] = 0
 
         specres = fid.LIGHT_SPEED/hdr['MEANRESO']/fid.ONE_SIGMA_2_FWHM
-        dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
+        if 'DLL' in hdr.keys():
+            dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
+        else:
+            dv = hdr['MEANRESO']
         qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv, {'RA': hdr['RA'], 'DEC': hdr['DEC']})
 
         return qso
