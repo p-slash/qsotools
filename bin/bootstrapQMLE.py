@@ -32,7 +32,7 @@ def getNumbersfromBootfile(fname):
     if Nd == 3:
         cf_size = 3*total_nkz - Nk - 1
     else:
-        cf_size = total_nkz*Nd - (Nd*(Nd-1))/2
+        cf_size = int(total_nkz*Nd - (Nd*(Nd-1))/2)
 
     elems_count   = cf_size + total_nkz;
     one_data_size = struct.calcsize('d'*elems_count)
