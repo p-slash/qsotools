@@ -73,6 +73,10 @@ def getPSandFisher(v, nk, nd, total_nkz, rem_nz=0):
 
         fari += total_nkz-did
 
+    for jj in range(newsize):
+        if fisher[jj, jj] == 0:
+            fisher[jj, jj] = 1
+
     return power, fisher
 
 @jit("i8[:, :](i8[:, :])", nopython=True)
