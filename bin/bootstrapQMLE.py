@@ -74,8 +74,7 @@ def getPSandFisher(v, nk, nd, total_nkz, rem_nz=0):
         fari += total_nkz-did
 
     for jj in range(newsize):
-        if fisher[jj, jj] == 0:
-            fisher[jj, jj] = 1
+        fisher[:, jj, jj] = np.where(fisher[:, jj, jj]==0, 1, fisher[:, jj, jj])
 
     return power, fisher
 
