@@ -10,7 +10,6 @@ dependencies:
   - astropy
   - ipython
   - plotly
-  - setuptools
   - jupyter
   - fitsio
   - healpy
