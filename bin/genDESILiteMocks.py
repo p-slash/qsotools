@@ -215,9 +215,10 @@ def getMetadata(args):
         npixels = 1
         metadata['PIXNUM'] = 0
 
+    header = {'HPXNSIDE': args.hp_nside, 'HPXNEST': not args.hp_ring}
     mstrfname = ospath_join(args.OutputDir, "master.fits")
     qqfile = QQFile(mstrfname, 'rw')
-    qqfile.writeMetadata(metadata)
+    qqfile.writeMetadata(metadata, header)
     qqfile.close()
     logging.info(f"Saved master metadata to {mstrfname}")
 
@@ -393,7 +394,7 @@ if __name__ == '__main__':
         type=float, default=2.)
 
     # healpix support
-    parser.add_argument("--hp-nside", type=int, default=0)
+    parser.add_argument("--hp-nside", type=int, default=16)
     parser.add_argument("--hp-ring", action="store_true", \
         help="Use RING pixel ordering. Default is NESTED.")
 

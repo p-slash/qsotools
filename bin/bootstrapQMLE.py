@@ -15,7 +15,7 @@ import time
 import logging
 
 import numpy as np
-from numba import jit
+from numba import njit
 
 from qsotools.utils import Progress
 
@@ -51,7 +51,7 @@ def readBootFile(fname, N):
 
     return spectra
 
-@jit("Tuple((f8[:, :], f8[:, :, :]))(f8[:, :], i8, i8, i8, i8)", nopython=True)
+@njit("Tuple((f8[:, :], f8[:, :, :]))(f8[:, :], i8, i8, i8, i8)")
 def getPSandFisher(v, nk, nd, total_nkz, rem_nz=0):
     nboot = v.shape[0]
     newsize = total_nkz-rem_nz*nk
@@ -78,7 +78,7 @@ def getPSandFisher(v, nk, nd, total_nkz, rem_nz=0):
 
     return power, fisher
 
-@jit("i8[:, :](i8[:, :])", nopython=True)
+@njit("i8[:, :](i8[:, :])")
 def getCounts(booted_indices):
     bootnum, no_spectra = booted_indices.shape
    

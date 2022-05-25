@@ -277,7 +277,7 @@ class LyaMocks():
     def setCentralRedshift(self, Z_C):
         self.Z_CENTER = Z_C
         self.z_values = (1 + self.Z_CENTER) * (1 + self.z0_values) - 1
-                
+
         if self.REDSHIFT_ON:
             self.evo_redshifts = self.z_values
         else:

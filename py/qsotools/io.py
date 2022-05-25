@@ -1483,8 +1483,8 @@ class QQFile():
 
         self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
 
-    def writeMetadata(self, metadata):
-        self.fitsfile.write(metadata, extname='METADATA')
+    def writeMetadata(self, metadata, metahdr):
+        self.fitsfile.write(metadata, extname='METADATA', header=metahdr)
 
     def writeWavelength(self, wave):
         data = np.array(wave, dtype='float32')
