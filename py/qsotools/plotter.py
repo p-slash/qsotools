@@ -5,6 +5,7 @@ import matplotlib.ticker as ticker
 from   matplotlib        import gridspec
 from   scipy.interpolate import RectBivariateSpline
 from   astropy.io        import ascii
+from   astropy.table     import Table
 
 TICK_LBL_FONT_SIZE = 18
 AXIS_LBL_FONT_SIZE = 20
@@ -233,6 +234,24 @@ class PowerPlotter(object):
 
     def setFisher(self, fisher):
         self.fisher = fisher
+
+    def saveAs(self, fname):
+        names = "z | k1 | k2 | kc | Pfid | ThetaP | Pest | ErrorP | d | b | t".split(" | ")
+        formats = {}
+        for name in names:
+            formats[name]='%.5e'
+        # formats['z'] = '%.3f'
+
+        # z | k1 | k2 | kc | Pfid | ThetaP | Pest | ErrorP | d | b | t
+        k1 = np.repeat(self.k_edges[:-1], self.nz)
+        k2 = np.repeat(self.k_edges[1:], self.nz)
+        thetap = np.ravel(self.power_qmle - self.power_fid)
+        power_table = Table([self.zarray, k1, k2, self.karray, \
+            self.power_fid.ravel(), thetap, self.power_qmle.ravel(), self.error.ravel(),\
+            self.power_qmle_fullravel(), self.power_qmle_noiseravel(), self.power_qmle_fidravel()], \
+            names=names)
+        power_table.write(fname, format='ascii', overwrite=True, \
+            formats=formats)
 
     def addTruePowerFile(self, filename):
         """Sets true power from given file. Saves it as .npy for future readings."""
