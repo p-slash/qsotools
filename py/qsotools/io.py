@@ -1624,7 +1624,7 @@ class PiccaFile():
             wave = 10**data['LOGLAM']
         delta = data['DELTA']
         error = 1/np.sqrt(data['IVAR']+1e-16)
-        error[data['IVAR']==0] = 0
+        error[data['IVAR']<1e-4] = 0
 
         specres = fid.LIGHT_SPEED/hdr['MEANRESO']/fid.ONE_SIGMA_2_FWHM
         if 'DLL' in hdr.keys():

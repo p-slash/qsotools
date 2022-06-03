@@ -66,6 +66,9 @@ def _getXi1D(v_arr, flux, ivar, r_edges):
     # Compute and bin correlations
     last_max_j = int(0)
     for i in range(v_arr.size):
+        if ivar[i] < 1e-4:
+            continue
+
         last_max_j = _findVMaxj(v_arr, last_max_j, r_edges[-1]+v_arr[i])
         vrange = slice(i, last_max_j)
 
