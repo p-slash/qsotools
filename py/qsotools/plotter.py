@@ -243,8 +243,8 @@ class PowerPlotter(object):
         # formats['z'] = '%.3f'
 
         # z | k1 | k2 | kc | Pfid | ThetaP | Pest | ErrorP | d | b | t
-        k1 = np.repeat(self.k_edges[:-1], self.nz)
-        k2 = np.repeat(self.k_edges[1:], self.nz)
+        k1 = np.tile(self.k_edges[:-1], self.nz)
+        k2 = np.tile(self.k_edges[1:], self.nz)
         thetap = np.ravel(self.power_qmle - self.power_fid)
         power_table = Table([self.zarray, k1, k2, self.karray, \
             self.power_fid.ravel(), thetap, self.power_qmle.ravel(), self.error.ravel(),\
