@@ -248,7 +248,7 @@ class PowerPlotter(object):
         thetap = np.ravel(self.power_qmle - self.power_fid)
         power_table = Table([self.zarray, k1, k2, self.karray, \
             self.power_fid.ravel(), thetap, self.power_qmle.ravel(), self.error.ravel(),\
-            self.power_qmle_fullravel(), self.power_qmle_noiseravel(), self.power_qmle_fidravel()], \
+            self.power_qmle_full.ravel(), self.power_qmle_noise.ravel(), self.power_qmle_fid.ravel()], \
             names=names)
         power_table.write(fname, format='ascii', overwrite=True, \
             formats=formats)
