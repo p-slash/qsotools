@@ -17,7 +17,6 @@ from multiprocessing import Pool
 import numpy as np
 import healpy
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
 
 from pkg_resources import resource_filename
 
@@ -172,6 +171,7 @@ def getMetadata(args):
 
         # Remove low redshift quasars
         zqso_cut_index       = master_file.metadata['Z'] > args.z_quasar_min
+        zqso_cut_index      &= master_file.metadata['Z'] < args.z_quasar_max
         master_file.metadata = master_file.metadata[zqso_cut_index]
         args.nmocks          = master_file.metadata.size
 
@@ -200,9 +200,10 @@ def getMetadata(args):
             # Read inverse cumulative distribution function
             # Generate uniform random numbers
             # Use inverse CDF to map these to QSO redshifts
-            invcdf, zcdf   = np.genfromtxt(args.invcdf_nz, unpack=True)
-            inv_cdf_interp = interp1d(invcdf, zcdf)
-            metadata['Z']  = inv_cdf_interp(RNST.uniform(size=args.nmocks))
+
+            GenZ = lm.RedshiftGenerator(args.invcdf_nz, \
+                args.z_quasar_min, args.z_quasar_max, args.use_analytic_cdf)
+            metadata['Z']  = GenZ.generate(RNST, args.nmocks)
 
     logging.info(f"Number of nside for heal pixels: {args.hp_nside}")
     if args.hp_nside:
@@ -328,7 +329,6 @@ if __name__ == '__main__':
     parser.add_argument("OutputDir", help="Output directory")
     parser.add_argument("--master-file", help="Master file location. Generate mocks with "\
         "the exact RA, DEC & Z distribution. nmocks option is ignored when this passed.")
-    parser.add_argument("--fixed-zqso", help="Generate QSOs at this redshift only.", type=float)
     parser.add_argument("--fixed-zforest", help="Generate forest at this redshift, " \
         "i.e. turns off redshift evolution.", type=float)
     parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
@@ -362,8 +362,15 @@ if __name__ == '__main__':
     parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
         "Default: %(default)s A"), type=float, default=9800.)
     parser.add_argument("--desi-dec", help="Limit dec to (-25, 85).", action="store_true")
+
+    parser.add_argument("--fixed-zqso", type=float, \
+        help="Generate QSOs at this redshift only. Overrides all.",)
+    parser.add_argument("--use-analytic-cdf", action="store_true", \
+        help="Uses an analytic CDF for quasar redshifts.")
     parser.add_argument("--z-quasar-min", type=float, default=2.1, \
-        help="Lowest quasar redshift. Only when created from a catalog. Default: %(default)s")
+        help="Lowest quasar redshift. Default: %(default)s")
+    parser.add_argument("--z-quasar-max", type=float, default=4.4, \
+        help="Maximum quasar redshift. Default: %(default)s")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.9)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
