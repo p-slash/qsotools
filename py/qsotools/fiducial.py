@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
+from scipy.special import erf
 from numba import jit
 
 warnings.simplefilter("error", OptimizeWarning)
@@ -274,7 +275,22 @@ def getNHIfromEquvalentWidthDLA(dw, z_dla):
     return 10**20 * n
 
 
+# -----------------------------------------------------
+# n(z) QSO begins
+# -----------------------------------------------------    
+def nzqso(z, N=1.17, a=-6.41, b=4.37, z0=2.2):
+    x = a*(z/z0)+b*(z/z0)**2
+    return N*np.exp(-x)
 
+def cdf_zqso_unnorm(z1, z2, a=-6.41, b=4.37, z0=2.2):
+    bsqrt = np.sqrt(b)
+    u0 = a/2/bsqrt
+
+    def _func(zp):
+        u = u0 + zp*bsqrt/z0
+        return erf(u)
+
+    return _func(z2)-_func(z1)
 
 
 

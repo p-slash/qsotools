@@ -143,6 +143,57 @@ def genContinuumError(wave, se0, se1):
 
     return se0 + se1 * slope
 
+class RedshiftGenerator(object):
+    """Quasar RedshiftGenerator. CDF can be read from file or 
+    analytically calculated. Rescales CDF wrt zmin and zmax if 
+    they are within the boundary.
+    """
+    def _getAnalytic(self, npoints=250):
+        norm = fid.cdf_zqso_unnorm(self.zmin, self.zmax)
+
+        self.zcdf = np.linspace(self.zmin, self.zmax, npoints)
+        self.cdf  = fid.cdf_zqso_unnorm(self.zmin, self.zcdf)/norm
+
+        return scipy_interp1d(self.cdf, self.zcdf)
+
+    def _getFromFile(self, npoints=250):
+        cdf, zcdf = np.genfromtxt(self.invcdf_file, unpack=True)
+        cdf_interp = scipy_interp1d(zcdf, cdf)
+
+        cdf1 = cdf[0]
+        cdf2 = cdf[-1]
+
+        if self.zmin > zcdf[0]:
+            cdf1 = cdf_interp(self.zmin)
+        else:
+            self.zmin = zcdf[0]
+
+        if self.zmax < zcdf[-1]:
+            cdf2 = cdf_interp(self.zmax)
+        else:
+            self.zmax = zcdf[-1]
+
+        norm = cdf2 - cdf1
+        self.zcdf = np.linspace(self.zmin, self.zmax, npoints)
+        self.cdf  = (cdf_interp(self.zcdf)-cdf1)/norm
+
+        return scipy_interp1d(self.cdf, self.zcdf)
+
+    def __init__(self, invcdf_file, zmin, zmax, use_analytic):
+        self.invcdf_file = invcdf_file
+        self.zmin = zmin
+        self.zmax = zmax
+        self.use_analytic = use_analytic
+
+        if use_analytic:
+            self.inv_cdf_interp = self._getAnalytic()
+        else:
+            self.inv_cdf_interp = self._getFromFile()
+
+    def generate(self, RNST, nmocks):
+        return self.inv_cdf_interp(RNST.uniform(size=nmocks))
+
+        
 class LyaMocks():
     """
     Generates lognormal mocks with a power spectrum similar to Lya 1D power spectrum 
