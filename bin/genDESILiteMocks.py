@@ -112,7 +112,8 @@ def saveQQFile(ipix, meta1, wave, fluxes, args):
     fname = ospath_join(dir2, f"lya-transmission-{args.hp_nside}-{ipix}.fits.gz")
 
     qqfile = QQFile(fname, 'rw')
-    qqfile.writeAll(meta1, wave, fluxes)
+    header = {'HPXNSIDE': args.hp_nside, 'HPXNEST': not args.hp_ring}
+    qqfile.writeAll(meta1, header, wave, fluxes)
 
     return fname
 
