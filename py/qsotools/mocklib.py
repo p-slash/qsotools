@@ -302,7 +302,7 @@ class LyaMocks():
 
     def __init__(self, SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, \
         GAUSSIAN_MOCKS=False, USE_LOG_V=True):
-        self.RNST           = np.random.RandomState(SEED)
+        self.RNST           = np.random.default_rng(SEED)
         self.N_CELLS        = N_CELLS
         self.DV_KMS         = DV_KMS
         self.REDSHIFT_ON    = REDSHIFT_ON
