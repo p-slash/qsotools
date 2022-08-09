@@ -1618,11 +1618,15 @@ class PiccaFile():
         hdr = self.fitsfile[hdu].read_header()
         data = self.fitsfile[hdu].read()
 
-        if "LAMBDA" in self.fitsfile[hdu].get_colnames():
+        colnames = self.fitsfile[hdu].get_colnames()
+
+        if "LAMBDA" in colnames:
             wave = data['LAMBDA']
         else:
             wave = 10**data['LOGLAM']
-        delta = data['DELTA']
+
+        delta_keys = set(['DELTA', 'DELTA_BLIND'])
+        delta = data[delta_keys.intersection(colnames).pop()]
         error = 1/np.sqrt(data['IVAR']+1e-16)
         error[data['IVAR']<1e-4] = 0
 
