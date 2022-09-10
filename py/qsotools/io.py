@@ -204,6 +204,7 @@ class Spectrum:
         self.error = error
         self.z_qso = z_qso
         self.specres = specres
+        self.rkms = fid.LIGHT_SPEED/specres/fid.ONE_SIGMA_2_FWHM
         self.dv = dv
         if isinstance(coord, SkyCoord):
             self.coord = coord
