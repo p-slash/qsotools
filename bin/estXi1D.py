@@ -109,7 +109,7 @@ class Xi1DEstimator(object):
 
     def getEstimates(self, qso):
         z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
-        z_bin_no = int((z_med - self.config_qmle.z_0) / self.config_qmle.z_d)
+        z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
         if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
             return
