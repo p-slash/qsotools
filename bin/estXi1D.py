@@ -117,7 +117,7 @@ class Xi1DEstimator(object):
         v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
 
         # Add to mean resolution
-        self.mean_resolution[z_bin_no] += qso.specres
+        self.mean_resolution[z_bin_no] += qso.rkms
         self.counts_meanreso[z_bin_no] += 1
 
         ivar = self.getIVAR(qso)
