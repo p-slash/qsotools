@@ -198,13 +198,14 @@ class Spectrum:
 
     """
 
-    def __init__(self, wave, flux, error, z_qso, specres, dv, coord):
+    def __init__(self, wave, flux, error, z_qso, specres, dv, coord, reso_kms=None):
         self.wave  = wave
         self.flux  = flux
         self.error = error
         self.z_qso = z_qso
         self.specres = specres
         self.rkms = fid.LIGHT_SPEED/specres/fid.ONE_SIGMA_2_FWHM
+        self.reso_kms = reso_kms
         self.dv = dv
         if isinstance(coord, SkyCoord):
             self.coord = coord
@@ -279,6 +280,7 @@ class Spectrum:
 
             try:
                 self.cont = self.cont[good_pixels]
+                self.reso_kms = self.reso_kms[good_pixels]
             except:
                 pass
 
@@ -1636,7 +1638,10 @@ class PiccaFile():
             dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
         else:
             dv = hdr['MEANRESO']
-        qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv, {'RA': hdr['RA'], 'DEC': hdr['DEC']})
+        reso_rkms = data['RESO']
+        qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv,
+            {'RA': hdr['RA'], 'DEC': hdr['DEC']},
+            reso_rkms)
 
         return qso
 

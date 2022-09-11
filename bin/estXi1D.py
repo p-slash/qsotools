@@ -29,9 +29,10 @@ def _splitQSO(qso, z_edges):
     assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
 
     # logging.debug(", ".join(np.hsplit(qso.wave, sp_indx)))
-    wave_chunks  = [w for w in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in w.shape]
-    flux_chunks  = [f for f in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in f.shape]
-    error_chunks = [e for e in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in e.shape]
+    wave_chunks  = [x for x in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in x.shape]
+    flux_chunks  = [x for x in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in x.shape]
+    error_chunks = [x for x in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in x.shape]
+    reso_chunks  = [x for x in np.hsplit(qso.reso_kms, sp_indx)[1:-1] if 0 not in x.shape]
     # logging.debug(", ".join(wave_chunks))
 
     split_qsos =[]
@@ -39,9 +40,10 @@ def _splitQSO(qso, z_edges):
         wave = wave_chunks[i]
         flux = flux_chunks[i]
         error= error_chunks[i]
+        reso_kms = reso_chunks[i]
 
         tmp_qso = qio.Spectrum(wave, flux, error, qso.z_qso, \
-            qso.specres, qso.dv, qso.coord)
+            qso.specres, qso.dv, qso.coord, reso_kms)
 
         if tmp_qso.s2n > 0 and wave.size > 10:
             split_qsos.append(tmp_qso)
@@ -117,8 +119,9 @@ class Xi1DEstimator(object):
         v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
 
         # Add to mean resolution
-        self.mean_resolution[z_bin_no] += qso.rkms
-        self.counts_meanreso[z_bin_no] += 1
+        w = qso.reso_kms > 0
+        self.mean_resolution[z_bin_no] += np.sum(qso.reso_kms[w])
+        self.counts_meanreso[z_bin_no] += np.sum(w)
 
         ivar = self.getIVAR(qso)
         # Weighted deltas
