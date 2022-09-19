@@ -223,39 +223,32 @@ def fitBecker13MeanFlux(z, F, e):
 # Mean flux ends
 # -----------------------------------------------------
 
-@jit
-def _evalPD13LorentzFit(k, z):
-    A, n, alpha, B, beta, lmd = PDW_FIT_PARAMETERS
-    q0 = k/PD13_PIVOT_K + 1e-10
-
-    result = (A*np.pi/PD13_PIVOT_K) * np.power(q0, 2. + n + alpha*np.log(q0)) / (1. + lmd * k**2)
-    
-    x0 = (1. + z) / (1. + PD13_PIVOT_Z)
-    result *= np.power(q0, beta * np.log(x0)) * np.power(x0, B)
-    
-    return result
-
 """
 Returns the VARIANCE.
-dynamically chooses lnk2 for a given dv & R
 if on_flux=True, returns variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
 """
-@jit(nopython=True)
-def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-1*np.log(10), dlnk=0.01, on_flux=True):
-    # if not isinstance(z, np.ndarray):
-    #     raise RuntimeError("z should be numpy array.")
+def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-0.5*np.log(10), dlnk=0.01, on_flux=True):
+    if isinstance(z, np.ndarray):
+        pass
+    elif isinstance(z, float):
+        z = np.array([z])
+    elif isinstance(z, list):
+        z = np.array(z)
+    else:
+        raise RuntimeError("z should be numpy array.")
 
-    lnk2 = max(lnk2, np.log(1.5*np.pi/np.sqrt(R_kms**2+dv**2)))
     Nkpoints = int((lnk2 - lnk1)/dlnk)+1
-    k = np.exp(np.arange(Nkpoints)*dlnk + lnk1)
+    k = np.exp(np.arange(Nkpoints)*dlnk + lnk1)[:, np.newaxis]
 
     window_fn_2 = np.sinc(k*dv/2/np.pi)**2 * np.exp(-k**2 * R_kms**2)
 
-    kPpiW2 = np.empty((z.size, k.size))
-    for i, z1 in enumerate(z):
-        kPpiW2[i] = k * _evalPD13LorentzFit(k, z1) / np.pi * window_fn_2
+    err2_lya = np.empty(z.size)
+    kv, zv = np.meshgrid(k, z, indexing='ij')
+    tp2 = evaluatePD13W17Fit(kv, zv)
+    tp2 *= k * window_fn_2 / np.pi
 
-    err2_lya = np.trapz(kPpiW2, dx=dlnk)
+    err2_lya = np.trapz(tp2, dx=dlnk, axis=0)
+
     if on_flux:
         err2_lya *= meanFluxFG08(z)**2
 
