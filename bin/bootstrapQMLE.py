@@ -131,10 +131,10 @@ if __name__ == '__main__':
 
     # Save power to a file
     # Set up output file
-    output_fname = ospath_join(outdir, f"{fbase}bootstrap-original-power.txt")
+    output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-power.txt")
     np.savetxt(output_fname, total_power[0])
     logging.info(f"Original power saved as {output_fname}.")
-    output_fname = ospath_join(outdir, f"{fbase}bootstrap-original-fisher.txt")
+    output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-fisher.txt")
     np.savetxt(output_fname, F[0])
     logging.info(f"Original fisher saved as {output_fname}.")
 
@@ -143,7 +143,7 @@ if __name__ == '__main__':
         exit()
 
     output_fname = ospath_join(outdir, 
-        f"{fbase}bootstrap-power-n{args.bootnum}-s{args.seed}.txt")
+        f"{args.fbase}bootstrap-power-n{args.bootnum}-s{args.seed}.txt")
     np.savetxt(output_fname, total_power[1:])
     logging.info(f"Power saved as {output_fname}.")
 
@@ -152,7 +152,7 @@ if __name__ == '__main__':
     if args.save_cov:
         bootstrap_cov = np.cov(total_power[1:], rowvar=False)
         output_fname = ospath_join(outdir, 
-            f"{fbase}bootstrap-cov-n{args.bootnum}-s{args.seed}.txt")
+            f"{args.fbase}bootstrap-cov-n{args.bootnum}-s{args.seed}.txt")
         np.savetxt(output_fname, bootstrap_cov)
         logging.info(f"Covariance saved as {output_fname}.")
 
