@@ -18,7 +18,7 @@ from qsotools.io import saveListByLine, Spectrum
 from qsotools.mocklib import lognMeanFluxGH as TRUE_MEAN_FLUX
 from qsotools.utils import Progress
 
-ARMS = ['B', 'R', 'Z']
+ARMS = ['B', 'R']
 
 # Simply returns redshift.
 # Do more if you want to check for errors etc.
@@ -50,10 +50,10 @@ def getForestAnalysisRegion(wave, z_qso, args):
 def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
     ndiags = rmat.shape[0]
 
-    data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'), \
+    data = np.zeros(wave.size, dtype=[('LAMBDA','f8'),('DELTA','f8'),('IVAR','f8'), \
         ('RESOMAT','f8', ndiags)])
 
-    data['LOGLAM'] = np.log10(wave)
+    data['LAMBDA'] = wave
     data['DELTA']  = delta
     data['IVAR']   = ivar
     data['RESOMAT']= rmat.T
@@ -61,8 +61,7 @@ def saveDelta(thid, wave, delta, ivar, z_qso, ra, dec, rmat, fdelta, args):
 
     hdr_dict = {'TARGETID': thid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
         'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
-        'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': True, \
-        'DLL':np.median(np.diff(data['LOGLAM'])), 'DLAMBDA':np.median(np.diff(wave)) }
+        'MEANSNR': np.mean(np.sqrt(data['IVAR'])) }
 
     if args.oversample_rmat>1:
         hdr_dict['OVERSAMP'] = args.oversample_rmat
