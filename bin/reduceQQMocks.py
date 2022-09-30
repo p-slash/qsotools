@@ -26,13 +26,12 @@ def getRedshift(i, fzbest):
     return fzbest['ZBEST']['Z'][i]
 
 def getForestAnalysisRegion(wave, z_qso, args):
-    lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
-        wave <= fid.LYA_LAST_WVL * (1+z_qso))
+    lya_ind = np.zeros(wave.size, dtype=bool)
 
-    w1 = max(fid.LYA_WAVELENGTH*(1+args.z_forest_min), args.desi_w1)
-    w2 = min(fid.LYA_WAVELENGTH*(1+args.z_forest_max), args.desi_w2)
-    forst_bnd = np.logical_and(wave >= w1, wave <= w2)
-    lya_ind = np.logical_and(lya_ind, forst_bnd)
+    w1 = max(fid.LYA_WAVELENGTH*(1+args.z_forest_min), args.desi_w1, fid.LYA_FIRST_WVL*(1+z_qso))
+    w2 = min(fid.LYA_WAVELENGTH*(1+args.z_forest_max), args.desi_w2, fid.LYA_LAST_WVL*(1+z_qso))
+    i1, i2 = np.searchsorted(wave, [w1, w2])
+    lya_ind[i1:i2] = True
 
     return lya_ind
 
