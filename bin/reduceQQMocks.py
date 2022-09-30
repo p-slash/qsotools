@@ -25,17 +25,6 @@ ARMS = ['B', 'R']
 def getRedshift(i, fzbest):
     return fzbest['ZBEST']['Z'][i]
 
-def getTrueContinuumInterp(i, ftruth):
-    hdr = ftruth['TRUE_CONT'].read_header()
-    w1 = hdr['WMIN']
-    w2 = hdr['WMAX']
-    dw = hdr['DWAVE']
-    n = int((w2-w1)/dw)+1
-    w = np.linspace(w1, w2, n)
-    C = ftruth['TRUE_CONT'][i][1]
-
-    return interp1d(w, C)
-
 def getForestAnalysisRegion(wave, z_qso, args):
     lya_ind = np.logical_and(wave >= fid.LYA_FIRST_WVL * (1+z_qso), \
         wave <= fid.LYA_LAST_WVL * (1+z_qso))
@@ -93,6 +82,19 @@ class Reducer(object):
             if self.no_saved_spec == 0:
                 os_remove(self.fname_delta)
 
+    def setContinuumParams(self):
+        hdr = self.fitsfiles['Truth']['TRUE_CONT'].read_header()
+        self.true_continua = self.fitsfiles['Truth']['TRUE_CONT'].read()
+        w1 = hdr['WMIN']
+        w2 = hdr['WMAX']
+        dw = hdr['DWAVE']
+        n = int((w2-w1)/dw)+1
+        self.true_cont_wave = np.linspace(w1, w2, n)
+
+    def getTrueInterpContinuum(self, wave, i):
+        C = self.true_continua[i]
+        return np.interp(wave, self.true_cont_wave, C)
+
     def forEachArm(self, arm, fbrmap):
         ARM_WAVE   = self.fitsfiles['Spec'][f'{arm}_WAVELENGTH'].read()
         nspectra   = self.fitsfiles['Spec'][f'{arm}_FLUX'].read_header()['NAXIS2']
@@ -100,6 +102,7 @@ class Reducer(object):
         ARM_IVAR   = self.fitsfiles['Spec'][f'{arm}_IVAR'].read()
         ARM_MASK   = np.array(self.fitsfiles['Spec'][f'{arm}_MASK'].read(), dtype=bool)
         ARM_RESOM  = self.fitsfiles['Truth'][f'{arm}_RESOLUTION'].read()
+        self.setContinuumParams()
 
         for i in range(nspectra):
             thid  = fbrmap['TARGETID'][i]
@@ -126,10 +129,8 @@ class Reducer(object):
                 # Short chunk
                 continue
 
-            cont_interp = getTrueContinuumInterp(i, self.fitsfiles['Truth'])
-
             z    = wave/fid.LYA_WAVELENGTH-1
-            cont = cont_interp(wave)
+            cont = self.getTrueInterpContinuum(wave, i)
 
             flux = ARM_FLUXES[i][forest_pixels] / cont
             ivar = ARM_IVAR[i][forest_pixels] * cont**2
