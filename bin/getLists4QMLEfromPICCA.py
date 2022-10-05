@@ -11,7 +11,6 @@ from os.path import join as ospath_join, basename as ospath_base
 
 from qsotools.fiducial import LIGHT_SPEED, ONE_SIGMA_2_FWHM
 from qsotools.io import saveListByLine
-from qsotools.specops import getOversampledRMat
 
 LN10 = np.log(10)
 
@@ -52,20 +51,14 @@ class GetNCopy(object):
     def getFlistFromOne(self, f):
         fts = fitsio.FITS(f)
 
-        # if args.oversample_rmat > 1:
-        #     f2 = ospath_join(args.osamp_dir, ospath_base(f))
-        #     newfits = fitsio.FITS(f2, 'rw', clobber=True)
-
         i=0
-        flst = []
+        high_flst = []
+        low_flst = []
         slst = set()
         for hdu in fts[1:]:
             i+=1
             hdr = hdu.read_header()
 
-            # S/N cut using MEANSNR in header
-            if hdr['MEANSNR'] < self.args.snr_cut:
-                continue
             # Exclude if in list
             if self._isIDexcluded(hdr):
                 continue
@@ -77,30 +70,17 @@ class GetNCopy(object):
 
             Rint, dv = roundSpecRes(hdr['MEANRESO'], dll)
 
+            # S/N cut using MEANSNR in header
+            if hdr['MEANSNR'] < self.args.snr_cut:
+                low_flst.append(f"{f}[{i}]")
+            else:
+                high_flst.append(f"{f}[{i}]")
+
             slst.add((Rint, dv))
-            flst.append(f"{f}[{i}]")
-
-            # if args.oversample_rmat > 1:
-            #     data = hdu.read()
-
-            #     newRmat = getOversampledRMat(data['RESOMAT'].T, args.oversample_rmat)
-            #     newdata = np.empty(data.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
-            #         ('RESOMAT','f8', newRmat.shape[0])])
-
-            #     newdata['LOGLAM']  = data['LOGLAM']
-            #     newdata['DELTA']   = data['DELTA']
-            #     newdata['IVAR']    = data['IVAR']
-            #     newdata['RESOMAT'] = newRmat.T
-
-            #     hdr['OVERSAMP'] = args.oversample_rmat
-
-            #     newfits.write(newdata, header=hdr)
 
         fts.close()
-        # if args.oversample_rmat > 1:
-        #     newfits.close()
 
-        return flst, slst
+        return high_flst, low_flst, slst
 
     def __call__(self, f):
         try:
@@ -114,43 +94,38 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory.")
     parser.add_argument("--out-suffix", default="0")
-    parser.add_argument("--flist", nargs='*', help="Only convert these delta files in Directory.")
     parser.add_argument("--snr-cut", help="S/N cut using MEANSNR in header.", default=0, type=float)
     parser.add_argument("--remove-targetid-list", help="txt file with targetid to exclude from final list.")
-    # parser.add_argument("--oversample-rmat", type=int, default=1, 
-    #     help="Oversampling factor for resolution matrix. "\
-    #     "Pass >1 to get finely space response function. It will save to osamp-dir")
-    # parser.add_argument("--osamp-dir", help="Folder to save new oversampled resomat.")
     parser.add_argument("--nproc", type=int, default=None)
     args = parser.parse_args()
 
-    # if args.oversample_rmat>1:
-    #     if not args.osamp_dir:
-    #         args.osamp_dir = ospath_join(args.Directory, "oversampled-deltas")
-
-    #     if args.osamp_dir == args.Directory:
-    #         args.osamp_dir = ospath_join(args.Directory, "oversampled-deltas")
-
-    #     os_makedirs(args.osamp_dir, exist_ok=True)
-
-    if args.flist:
-        all_deltas = [ospath_join(args.Directory, x) for x in args.flist]
-    else:
-        all_deltas = glob.iglob(ospath_join(args.Directory, "delta-*.fits*"))
     all_slst = set()
-    all_flst = []
+    all_high_flst = []
+    all_low_flst = []
 
+    all_deltas = glob.iglob(ospath_join(args.Directory, "delta-*.fits*"))
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(GetNCopy(args), all_deltas)
 
-        for (flst, slst) in imap_it:
-            all_flst.extend(flst)
+        for (hflst, lflst, slst) in imap_it:
+            all_high_flst.extend(hflst)
+            all_low_flst.extend(lflst)
             all_slst = all_slst.union(slst)
 
     temp_fname = ospath_join(args.Directory, f"specres_list-{args.out_suffix}.txt")
     print("Saving spectral resolution values as ", temp_fname)
     saveListByLine(all_slst, temp_fname)
 
-    temp_fname = ospath_join(args.Directory, f"fname_list-{args.out_suffix}.txt")
-    print("Saving spectra file list as ", temp_fname)
-    saveListByLine(all_flst, temp_fname)
+    if args.snr_cut <= 0 or not all_low_flst:
+        temp_fname = ospath_join(args.Directory, f"fname_list-{args.out_suffix}.txt")
+        print("Saving spectra file list as ", temp_fname)
+        saveListByLine(all_high_flst, temp_fname)
+    else:
+        temp_fname = ospath_join(args.Directory, f"fname_list-high-{args.out_suffix}.txt")
+        print("Saving high snr spectra file list as ", temp_fname)
+        saveListByLine(all_high_flst, temp_fname)
+
+        temp_fname = ospath_join(args.Directory, f"fname_list-low-{args.out_suffix}.txt")
+        print("Saving low snr  spectra file list as ", temp_fname)
+        saveListByLine(all_low_flst, temp_fname)
+
