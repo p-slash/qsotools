@@ -91,7 +91,7 @@ class Reducer(object):
         self.true_cont_wave = np.linspace(w1, w2, n)
 
     def getTrueInterpContinuum(self, wave, i):
-        C = self.true_continua[i]
+        C = self.true_continua[i][1]
         return np.interp(wave, self.true_cont_wave, C)
 
     def forEachArm(self, arm, fbrmap):
