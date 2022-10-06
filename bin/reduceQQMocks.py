@@ -225,7 +225,7 @@ def transversePFolder(P, args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("Directory", help="Directory. Saves next to spectra-X-X.fits as delta-X-X.fits")
-    parser.add_argument("--output-dir", help="Save results here if passed.")
+    parser.add_argument("--output-dir", help="Save results here if passed.", required=True)
     parser.add_argument("--P-folders", nargs='*', type=int, help="P folders to run test."
         " Default is all available folders. Leave space between numbers when specifying multiple.")
 
