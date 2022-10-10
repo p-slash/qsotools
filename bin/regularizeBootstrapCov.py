@@ -52,6 +52,8 @@ if __name__ == '__main__':
     parser.add_argument("--qmle-sparcity-cut", default=0.01, type=float, \
         help="Sparsity pattern to cut using QMLE Fisher matrix.")
     parser.add_argument("--use-qmle-evecs", action="store_true")
+    parser.add_argument("--iterations", type=int, default=1,
+        help="Number of iterations")
     parser.add_argument("--fbase", default="")
     args = parser.parse_args()
 
@@ -63,16 +65,20 @@ if __name__ == '__main__':
 
     if args.qmle_sparcity_cut > 0:
         qmle_fisher_sparcity = np.abs(normalized_qmle_fisher) > args.qmle_sparcity_cut
+    else:
+        qmle_fisher_sparcity = np.ones(qmle_fisher.shape, dtype=bool)
+
+    for _ in range(args.iterations):
         boostrap_fisher, _ = safe_inverse(bootstrap_covariance)
         bootstrap_covariance, _ = safe_inverse(boostrap_fisher*qmle_fisher_sparcity)
 
-    newcov = mcdonald_eval_fix(bootstrap_covariance, qmle_covariance, not args.use_qmle_evecs)
+        bootstrap_covariance = mcdonald_eval_fix(bootstrap_covariance, qmle_covariance, not args.use_qmle_evecs)
 
     for idx in qmle_zero_idx:
-        newcov[idx, idx] = 0
+        bootstrap_covariance[idx, idx] = 0
 
     basis_txt = "qmle" if args.use_qmle_evecs else "boot"
-    np.savetxt(f"{args.fbase}-regularized-bootstrap-cov-{basis_txt}-evecs.txt", newcov)
+    np.savetxt(f"{args.fbase}regularized-bootstrap-cov-{basis_txt}-evecs.txt", bootstrap_covariance)
 
 
 
