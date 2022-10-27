@@ -1638,7 +1638,12 @@ class PiccaFile():
             dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
         else:
             dv = hdr['MEANRESO']
-        reso_rkms = data['RESO']
+
+        try:
+            reso_rkms = data['RESO']
+        except:
+            reso_rkms = np.ones(wave.size)*dv
+
         qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv,
             {'RA': hdr['RA'], 'DEC': hdr['DEC']},
             reso_rkms)
