@@ -113,7 +113,7 @@ class FFTEstimator(object):
         if self.args.noise_realizations>0:
             pnoise = np.zeros_like(p1d_f)
             for _ in range(self.args.noise_realizations):
-                delta_noise = np.pad(np.random.default_rng().normal(0, qso.error), qso.size*pad_mult)
+                delta_noise = np.pad(np.random.default_rng().normal(0, qso.error), (0, qso.size*pad_mult))
                 pnoise += np.abs(np.fft.rfft(delta_noise))**2 * dlambda**2 / length_in_A
 
             pnoise /= self.args.noise_realizations
