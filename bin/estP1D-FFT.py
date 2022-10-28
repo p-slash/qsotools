@@ -127,7 +127,7 @@ class FFTEstimator(object):
             pcross /= window
 
         # ignore k=0 mode
-        jj = int(qso.flux.size/qso.size)
+        jj = 1 #int(qso.flux.size/qso.size)
         p, c = binPowerSpectra(this_k_arr[jj:], p1d_f[jj:], config_qmle.k_edges)
 
         # if qso_2 is not None:
