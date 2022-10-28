@@ -83,6 +83,7 @@ class FFTEstimator(object):
             raise Exception("non-equal wavelength grid in qso.")
 
         dlambda = dlambda[1]
+        qso.dv  = fid.LIGHT_SPEED*dlambda/qso.wave[int(qso.size/2)]
         
         # padd arrays
         qso.flux = np.pad(qso.flux, qso.size*pad_mult)
@@ -118,13 +119,16 @@ class FFTEstimator(object):
             p1d_f -= pnoise
 
         this_k_arr = 2*np.pi*np.fft.rfftfreq(qso.flux.size, dlambda)
+        if self.args.deconv_window:
+            # window = getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
+            window = np.exp(-(this_k_arr*dlambda)**2) * np.sinc(this_k_arr*dlambda/2/np.pi)**2
+            p1d_f /= window
+            pcross /= window
+
+        # Convert A to km/s
         conversion_A_kms = fid.LYA_WAVELENGTH*(1+z_med) / fid.LIGHT_SPEED # A/(km/s)
         this_k_arr *= conversion_A_kms
         p1d_f /= conversion_A_kms
-        if self.args.deconv_window:
-            window = getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
-            p1d_f /= window
-            pcross /= window
 
         # ignore k=0 mode
         jj = 1 #int(qso.flux.size/qso.size)
