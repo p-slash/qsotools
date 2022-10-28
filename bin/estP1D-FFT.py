@@ -69,7 +69,7 @@ class FFTEstimator(object):
         self.mean_resolution = np.zeros(self.config_qmle.z_n)
         self.counts_meanreso = np.zeros_like(self.mean_resolution)
 
-    def getEstimates(self, qso, qso_2, pad_mult=4):
+    def getEstimates(self, qso, qso_2, pad_mult=7):
         z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
@@ -84,13 +84,14 @@ class FFTEstimator(object):
 
         dlambda = dlambda[1]
         qso.dv  = fid.LIGHT_SPEED*dlambda/qso.wave[int(qso.size/2)]
-        
-        # padd arrays
-        qso.flux = np.pad(qso.flux, qso.size*pad_mult)
+
+        # pad arrays
+        qso.flux = np.pad(qso.flux, (0, qso.size*pad_mult))
+        # Need to use original size for proper normalization
+        # of the power spectrum
         length_in_A = dlambda * qso.size
         # length_in_kms = fid.LIGHT_SPEED*np.log(1+length_in_A/qso.wave[0])
 
-        # Add to mean resolution
         # Add to mean resolution
         w = qso.reso_kms > 0
         self.mean_resolution[z_bin_no] += np.sum(qso.reso_kms[w])
@@ -100,11 +101,11 @@ class FFTEstimator(object):
         delta_k = np.fft.rfft(qso.flux)
         p1d_f = np.abs(delta_k)**2 * dlambda**2 / length_in_A
         if qso_2 is not None:
-            qso_2.flux = np.pad(qso_2.flux, qso_2.size*pad_mult)
-            if qso.flux.size != qso_2.flux.size:
+            if qso.size != qso_2.size:
                 raise Exception("different sized cross delta file")
+            qso_2.flux = np.pad(qso_2.flux, (0, qso.size*pad_mult))
             delta_k_2 = np.fft.rfft(qso_2.flux)
-            pcross = np.abs(delta_k.conj() * delta_k_2 + delta_k_2.conj() * delta_k)/2
+            pcross = np.real(delta_k.conj() * delta_k_2)
             pcross *= dlambda**2 / length_in_A
         else:
             pcross = np.zeros_like(p1d_f)
@@ -121,7 +122,10 @@ class FFTEstimator(object):
         this_k_arr = 2*np.pi*np.fft.rfftfreq(qso.flux.size, dlambda)
         if self.args.deconv_window:
             # window = getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
-            window = np.exp(-(this_k_arr*dlambda)**2) * np.sinc(this_k_arr*dlambda/2/np.pi)**2
+            _kx = this_k_arr*dlambda
+            window = np.exp(-_kx**2)
+            if not self.args.no_tophat:
+                window *= np.sinc(_kx/2/np.pi)**2
             p1d_f /= window
             pcross /= window
 
@@ -149,35 +153,43 @@ class FFTEstimator(object):
         self.cross_power[z_bin_no] += pcross * weight
         self.counts[z_bin_no] += c[1:-1] * weight
 
-    def __call__(self, fnames):
-        if self.config_qmle.picca_input:
-            base, hdus = fnames
-            f = ospath_join(self.config_qmle.qso_dir, base)
-            pfile = qio.PiccaFile(f, 'r')
+    def _picca_file_call(self, fnames):
+        base, hdus = fnames
+        f = ospath_join(self.config_qmle.qso_dir, base)
+        pfile = qio.PiccaFile(f, 'r')
+
+        if args.indir2:
+            base_delta = base.split("/")[-1]
+            f2 = ospath_join(self.args.indir2, base_delta)
+            pfile_2 = qio.PiccaFile(f2, 'r')
+
+        for hdu in hdus:
+            qso = pfile.readSpectrum(hdu)
+            split_qsos = _splitQSO(qso, self.config_qmle.z_edges, args.min_nopix)
 
             if args.indir2:
-                base_delta = base.split("/")[-1]
-                f2 = ospath_join(self.args.indir2, base_delta)
-                pfile_2 = qio.PiccaFile(f2, 'r')
+                extname = pfile.fitsfile[hdu].get_extname()
 
-            for hdu in hdus:
-                qso = pfile.readSpectrum(hdu)
-                split_qsos = _splitQSO(qso, self.config_qmle.z_edges, args.min_nopix)
-
-                if args.indir2:
-                    extname = pfile.fitsfile[hdu].get_extname()
+                try:
                     qso_2 = pfile_2.readSpectrum(extname)
-                    split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, args.min_nopix)
-                else:
-                    split_qsos_2 = [None] * len(split_qsos)
+                except:
+                    logging.error(f"{extname} does not exist in indir2.")
+                    continue
 
-                for qso, qso_2 in zip(split_qsos, split_qsos_2):
-                    # try:
-                    self.getEstimates(qso, qso_2)
-                    # except Exception as e:
-                        # logging.error(f"{e} in {base}[{hdu}]")
+                split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, args.min_nopix)
+            else:
+                split_qsos_2 = [None] * len(split_qsos)
 
-            pfile.close()
+            for qso, qso_2 in zip(split_qsos, split_qsos_2):
+                self.getEstimates(qso, qso_2)
+
+        pfile.close()
+    def __call__(self, fnames):
+        if self.config_qmle.picca_input:
+            try:
+                self._picca_file_call(fnames)
+            except Exception as e:
+                logging.error(f"{e} in {base}[{hdu}]")
         else:
             for fl in fnames:
                 f = ospath_join(self.config_qmle.qso_dir, fl.rstrip())
@@ -196,8 +208,10 @@ if __name__ == '__main__':
     parser.add_argument("ConfigFile", help="Config file")
     parser.add_argument("--indir2",
         help="Cross correlate with the delta files in this directory")
-    parser.add_argument("--deconv-window", help="Deconvolve window function",
-        action="store_true")
+    parser.add_argument("--deconv-window", action="store_true",
+        help="Deconvolve window function. Assumes dlambda Gaussian and top-hat.")
+    parser.add_argument("--no-tophat", action="store_true",
+        help="No tophat correction.")
     # parser.add_argument("--correlation", help="Compute correlation fn instead.")
     parser.add_argument("--nproc", type=int, default=1)
     parser.add_argument("--min-nopix", type=int, default=30,
