@@ -156,7 +156,7 @@ class Xi1DEstimator(object):
 
 if __name__ == '__main__':
     # Arguments passed to run the script
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("ConfigFile", help="Config file")
 
     parser.add_argument("--nsubsamples", type=int, default=100, \

@@ -12,18 +12,7 @@ from astropy.table import Table
 import qsotools.io as qio
 import qsotools.fiducial as fid
 from qsotools.specops import getSpectographWindow_k
-
-def interpolate2Grid(v, f, padding = 100.):
-    v1 = v[0] - padding
-    v2 = v[-1] + padding
-    dv = np.min(np.diff(v))
-
-    Nv = int((v2-v1)/dv)
-    new_varr = np.arange(Nv+1)*dv + v1 - dv/2
-
-    interpF, _, _ = binned_statistic(v, f, statistic='sum', bins=new_varr)
-
-    return interpF, dv
+from qsotools.utils import Progress, SubsampleCov
 
 def binPowerSpectra(raw_k, raw_p, k_edges):
     binned_power,  _, binnumber = binned_statistic(raw_k, raw_p, statistic='sum', bins=k_edges)
@@ -31,11 +20,6 @@ def binPowerSpectra(raw_k, raw_p, k_edges):
 
     return binned_power, counts
 
-def binCorrelations(raw_v, raw_c, r_edges):
-    binned_corr,  _, binnumber = binned_statistic(raw_v, raw_c, statistic='sum', bins=r_edges)
-    counts = np.bincount(binnumber, minlength=len(r_edges)+1)
-
-    return binned_corr, counts
 
 def decomposePiccaFname(picca_fname):
     i1 = picca_fname.rfind('[')+1
@@ -46,166 +30,274 @@ def decomposePiccaFname(picca_fname):
 
     return (basefname, hdunum)
 
+def _splitQSO(qso, z_edges, min_nopix):
+    z = qso.wave/fid.LYA_WAVELENGTH-1
+    sp_indx = np.searchsorted(z, z_edges)
+
+    assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
+
+    # logging.debug(", ".join(np.hsplit(qso.wave, sp_indx)))
+    wave_chunks  = [x for x in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in x.shape]
+    flux_chunks  = [x for x in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in x.shape]
+    error_chunks = [x for x in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in x.shape]
+    reso_chunks  = [x for x in np.hsplit(qso.reso_kms, sp_indx)[1:-1] if 0 not in x.shape]
+    # logging.debug(", ".join(wave_chunks))
+
+    split_qsos =[]
+    for i in range(len(wave_chunks)):
+        wave = wave_chunks[i]
+        flux = flux_chunks[i]
+        error= error_chunks[i]
+        reso_kms = reso_chunks[i]
+
+        tmp_qso = qio.Spectrum(wave, flux, error, qso.z_qso, \
+            qso.specres, qso.dv, qso.coord, reso_kms)
+
+        if tmp_qso.s2n > 0 and wave.size > min_nopix:
+            split_qsos.append(tmp_qso)
+
+    return split_qsos
+
 class FFTEstimator(object):
     def __init__(self, args, config_qmle):
         self.args = args
         self.config_qmle = config_qmle
 
         self.power = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
+        self.cross_power = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
         self.counts = np.zeros_like(self.power)
         self.mean_resolution = np.zeros(self.config_qmle.z_n)
         self.counts_meanreso = np.zeros_like(self.mean_resolution)
 
-        self.r_edges = np.arange(args.nrbins+1) * args.dr
-        self.corr_fn = np.zeros((self.config_qmle.z_n, args.nrbins))
-        self.counts_corr = np.zeros_like(self.corr_fn)
-
-    def getEstimates(self, qso):
+    def getEstimates(self, qso, qso_2, pad_mult=4):
         z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
-        z_bin_no = int((z_med - self.config_qmle.z_0) / self.config_qmle.z_d)
+        z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
+        assert np.isclose(z_med, self.config_qmle.z_bins[z_bin_no], atol=self.config_qmle.z_d/2)
         if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
             return
 
-        v_arr = fid.LIGHT_SPEED * np.log(qso.wave)
-        delta_f, dv = interpolate2Grid(v_arr, qso.flux)
+        # assume wavelength is linear
+        dlambda = np.diff(qso.wave)
+        if not np.allclose(dlambda, dlambda[1]):
+            raise Exception("non-equal wavelength grid in qso.")
+
+        dlambda = dlambda[1]
+        
+        # padd arrays
+        qso.flux = np.pad(qso.flux, qso.size*pad_mult)
+        length_in_A = dlambda * qso.size
+        # length_in_kms = fid.LIGHT_SPEED*np.log(1+length_in_A/qso.wave[0])
 
         # Add to mean resolution
-        self.mean_resolution[z_bin_no] += qso.specres
-        self.counts_meanreso[z_bin_no] += 1
+        # Add to mean resolution
+        w = qso.reso_kms > 0
+        self.mean_resolution[z_bin_no] += np.sum(qso.reso_kms[w])
+        self.counts_meanreso[z_bin_no] += np.sum(w)
 
         # Compute & bin power
-        p1d_f = np.abs(np.fft.rfft(delta_f) * dv)**2 / (dv*delta_f.size)
+        delta_k = np.fft.rfft(qso.flux)
+        p1d_f = np.abs(delta_k)**2 * dlambda**2 / length_in_A
+        if qso_2 is not None:
+            qso_2.flux = np.pad(qso_2.flux, qso_2.size*pad_mult)
+            if qso.flux.size != qso_2.flux.size:
+                raise Exception("different sized cross delta file")
+            delta_k_2 = np.fft.rfft(qso_2.flux)
+            pcross = np.abs(delta_k.conj() * delta_k_2 + delta_k_2.conj() * delta_k)/2
+            pcross *= dlambda**2 / length_in_A
+        else:
+            pcross = np.zeros_like(p1d_f)
 
         if self.args.noise_realizations>0:
             pnoise = np.zeros_like(p1d_f)
             for _ in range(self.args.noise_realizations):
-                delta_noise = np.random.default_rng().normal(0, qso.error)
-                delta_noise, dv1 = interpolate2Grid(v_arr, delta_noise)
-                pnoise += np.abs(np.fft.rfft(delta_noise) * dv1)**2 / (dv1*delta_noise.size)
+                delta_noise = np.pad(np.random.default_rng().normal(0, qso.error), qso.size*pad_mult)
+                pnoise += np.abs(np.fft.rfft(delta_noise))**2 * dlambda**2 / length_in_A
 
             pnoise /= self.args.noise_realizations
             p1d_f -= pnoise
 
-        this_k_arr = 2*np.pi*np.fft.rfftfreq(delta_f.size, dv)
+        this_k_arr = 2*np.pi*np.fft.rfftfreq(qso.flux.size, dlambda)
+        conversion_A_kms = fid.LYA_WAVELENGTH*(1+z_med) / fid.LIGHT_SPEED # A/(km/s)
+        this_k_arr *= conversion_A_kms
+        p1d_f /= conversion_A_kms
         if self.args.deconv_window:
-            p1d_f /= getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
+            window = getSpectographWindow_k(this_k_arr, qso.specres, qso.dv)**2
+            p1d_f /= window
+            pcross /= window
 
         # ignore k=0 mode
-        p, c = binPowerSpectra(this_k_arr[1:], p1d_f[1:], config_qmle.k_edges)
-        
-        self.power[z_bin_no] += p
-        self.counts[z_bin_no] += c[1:-1]
+        jj = int(qso.flux.size/qso.size)
+        p, c = binPowerSpectra(this_k_arr[jj:], p1d_f[jj:], config_qmle.k_edges)
 
-        # Compute and bin correlations
-        corr1d_f = np.abs(np.fft.irfft(p1d_f)) / dv
-        new_varr = np.arange(corr1d_f.size)*dv
-        c, cc = binCorrelations(new_varr, corr1d_f, self.r_edges)
+        # if qso_2 is not None:
+        pcross /= conversion_A_kms
+        pcross, _ = binPowerSpectra(this_k_arr[jj:], pcross[jj:], config_qmle.k_edges)
 
-        self.corr_fn[z_bin_no] += c
-        self.counts_corr[z_bin_no] += cc[1:-1] 
+        # Recalculate error by adding lss to variance
+        if self.args.weighted_average:
+            var_lss = fid.getLyaFlucErrors(z_med, qso.dv, qso.dv, on_flux=False)
+            weight = qso.s2n**2 / (1+var_lss*qso.s2n**2)
+        else:
+            weight = 1
+
+        self.power[z_bin_no] += p * weight
+        self.cross_power[z_bin_no] += pcross * weight
+        self.counts[z_bin_no] += c[1:-1] * weight
 
     def __call__(self, fnames):
         if self.config_qmle.picca_input:
-            decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames]
-            decomp_list.sort(key=lambda x: x[0])
-            for base, hdus in groupby(decomp_list, lambda x: x[0]):
-                f = ospath_join(self.config_qmle.qso_dir, base)
-                pfile = qio.PiccaFile(f, 'r', clobber=False)
-                for hdu in hdus:
-                    qso = pfile.readSpectrum(hdu[1])
-                    self.getEstimates(qso)
-                pfile.close()
+            base, hdus = fnames
+            f = ospath_join(self.config_qmle.qso_dir, base)
+            pfile = qio.PiccaFile(f, 'r')
+
+            if args.indir2:
+                base_delta = base.split("/")[-1]
+                f2 = ospath_join(self.args.indir2, base_delta)
+                pfile_2 = qio.PiccaFile(f2, 'r')
+
+            for hdu in hdus:
+                qso = pfile.readSpectrum(hdu)
+                split_qsos = _splitQSO(qso, self.config_qmle.z_edges, args.min_nopix)
+
+                if args.indir2:
+                    extname = pfile.fitsfile[hdu].get_extname()
+                    qso_2 = pfile_2.readSpectrum(extname)
+                    split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, args.min_nopix)
+                else:
+                    split_qsos_2 = [None] * len(split_qsos)
+
+                for qso, qso_2 in zip(split_qsos, split_qsos_2):
+                    # try:
+                    self.getEstimates(qso, qso_2)
+                    # except Exception as e:
+                        # logging.error(f"{e} in {base}[{hdu}]")
+
+            pfile.close()
         else:
             for fl in fnames:
                 f = ospath_join(self.config_qmle.qso_dir, fl.rstrip())
                 bq = qio.BinaryQSO(f, 'r')
+                try:
+                    self.getEstimates(bq)
+                except Exception as e:
+                        logging.error(f"{e} in {fl}")
 
-                self.getEstimates(bq)
-
-        return self.power, self.counts, self.corr_fn, self.counts_corr, \
-            self.mean_resolution, self.counts_meanreso
+        return self.power, self.cross_power, self.counts, self.mean_resolution, self.counts_meanreso
 
 
 if __name__ == '__main__':
     # Arguments passed to run the script
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("ConfigFile", help="Config file")
-    parser.add_argument("--deconv-window", help="Deconvolve window function", \
+    parser.add_argument("--indir2",
+        help="Cross correlate with the delta files in this directory")
+    parser.add_argument("--deconv-window", help="Deconvolve window function",
         action="store_true")
     # parser.add_argument("--correlation", help="Compute correlation fn instead.")
-    parser.add_argument("--dr", type=float, default=30.0)
-    parser.add_argument("--nrbins", type=int, default=100)
     parser.add_argument("--nproc", type=int, default=1)
+    parser.add_argument("--min-nopix", type=int, default=30,
+        help="Number of minimum pixels in a chunk")
     parser.add_argument("--noise-realizations", type=int, default=100)
+    parser.add_argument("--weighted-average", action="store_true",
+        help="Averages power spectrum with mean snr^2")
+    parser.add_argument("--nsubsamples", type=int, default=100, \
+        help="Number of subsamples if input is not Picca.")
+    parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
+
+    # Set up logger
+    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+
+    logging.info("Starting")
 
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
     output_dir  = config_qmle.parameters['OutputDir']
     output_base = config_qmle.parameters['OutputFileBase']
 
-    file_list = open(config_qmle.qso_list, 'r')
-    header = file_list.readline()
-
     power = np.zeros((config_qmle.z_n, config_qmle.k_bins.size))
+    cross_power = np.zeros_like(power)
     counts = np.zeros_like(power)
 
     mean_resolution = np.zeros(config_qmle.z_n)
     counts_meanreso = np.zeros_like(mean_resolution)
 
-    r_edges = np.arange(args.nrbins+1) * args.dr
-    r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
-    corr_fn = np.zeros((config_qmle.z_n, args.nrbins))
-    counts_corr = np.zeros_like(corr_fn)
-
+    # Read file list file
+    file_list = open(config_qmle.qso_list, 'r')
+    header = file_list.readline() # First line: Number of spectra to read
     fnames_spectra = file_list.readlines()
-    nfchunk = int(len(fnames_spectra)/args.nproc)
-    indices = np.arange(args.nproc+1)*nfchunk
-    indices[-1] = len(fnames_spectra)
-    fnames_spectra = [fnames_spectra[indices[i]:indices[i+1]] for i in range(args.nproc)]
+    fnames_spectra = fnames_spectra[:int(header)] # Read only first N spectra
+
+    # If files are in Picca format, decompose filename list into
+    # Main file & hdus to read in that main file
+    if config_qmle.picca_input:
+        logging.info("Decomposing filenames to a list of (base, list(hdus)).")
+        decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
+        decomp_list.sort(key=lambda x: x[0])
+
+        new_fnames = []
+        for base, hdus in groupby(decomp_list, lambda x: x[0]):
+            new_fnames.append((base, list(map(lambda x: x[1], hdus))))
+
+        fnames_spectra = new_fnames
+
+    nfiles = len(fnames_spectra)
+    pcounter = Progress(nfiles) # Progress tracker
+    logging.info(f"There are {nfiles} files.")
+
+    nsubsamples = nfiles if config_qmle.picca_input else args.nsubsamples
+    reso_samples = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
+    p1d_samples = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    cross_samples = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(FFTEstimator(args, config_qmle), fnames_spectra)
 
-        for p1, c1, corfn, cnts_crr, mean_res, counts_mreso in imap_it:
-            power += p1
-            counts += c1
-            mean_resolution += mean_res
-            counts_meanreso += counts_mreso
-            corr_fn += corfn
-            counts_corr += cnts_crr
+        for p1, pc1, c1, mean_res, counts_mreso in imap_it:
+            reso_samples.addMeasurement(mean_res, counts_mreso)
+            p1d_samples.addMeasurement(p1.ravel(), c1.ravel())
+            cross_samples.addMeasurement(pc1.ravel(), c1.ravel())
+            
+            pcounter.increase()
 
     # Loop is done. Now average results
-    power /= counts
-    corr_fn /= counts_corr
+    mean_p1d, cov_p1d = p1d_samples.getMeanNCov()
+    mean_cross, cov_cross = cross_samples.getMeanNCov()
+    mean_reso, cov_reso = reso_samples.getMeanNCov()
 
     # Mean resolution
-    mean_resolution /= counts_meanreso
+    err_reso = np.sqrt(cov_reso.diagonal())
     meanres_filename = ospath_join(output_dir, output_base+"-mean-resolution.txt")
-    meanres_table = Table([config_qmle.z_bins, mean_resolution], names=('z', 'R'))
+    meanres_table = Table([config_qmle.z_bins, mean_reso, err_reso], names=('z', 'R', 'e_R'))
     meanres_table.write(meanres_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'R':'%d'}, overwrite=True)
-    print("Mean R saved as ", meanres_filename)
+        formats={'z':'%.1f', 'R':'%.1f', 'e_R':'%.1f'}, overwrite=True)
+    logging.info(f"Mean R saved as {meanres_filename}")
 
     # Save power spectrum
+    err_p1d = np.sqrt(cov_p1d.diagonal())
+    err_c1d = np.sqrt(cov_cross.diagonal())
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
-    corr_filename = ospath_join(output_dir, output_base+"-corr1d-fft-estimate.txt")
 
     zarr_repeated = np.repeat(config_qmle.z_bins, config_qmle.k_bins.size)
     karr_repeated = np.tile(config_qmle.k_bins, config_qmle.z_n)
 
-    power_table = Table([zarr_repeated, karr_repeated, power.ravel()], names=('z', 'k', 'P1D'))
+    power_table = Table(
+        [zarr_repeated, karr_repeated,
+        mean_p1d, err_p1d,
+        mean_cross, err_c1d],
+        names=('z', 'k', 'P1D', 'e_p1d', 'Cross', 'e_cross'))
     power_table.write(p1d_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e'}, overwrite=True)
+        formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e', 'Cross':'%.5e', 'e_p1d':'%.5e', 'e_cross':'%.5e'},
+        overwrite=True)
     print("P1D saved as ", p1d_filename)
 
-    # Save correlation fn
-    zarr_repeated = np.repeat(config_qmle.z_bins, r_bins.size)
-    rarr_repeated = np.tile(r_bins, config_qmle.z_n)
+    # Save covariance
+    cov_filename = ospath_join(output_dir, output_base+"-cov-p1d-fft-estimate.txt")
+    np.savetxt(cov_filename, cov_p1d)
 
-    corr_table = Table([zarr_repeated, rarr_repeated, corr_fn.ravel()], names=('z', 'r', 'Xi1D'))
-    corr_table.write(corr_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e'}, overwrite=True)
-    print("Corr fn saved as ", corr_filename)
+    if args.indir2:
+        cov_filename = ospath_join(output_dir, output_base+"-cov-cross-fft-estimate.txt")
+        np.savetxt(cov_filename, cov_cross)
+
 
 
 
