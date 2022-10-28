@@ -173,7 +173,7 @@ class FFTEstimator(object):
                 try:
                     qso_2 = pfile_2.readSpectrum(extname)
                 except:
-                    logging.error(f"{extname} does not exist in indir2.")
+                    logging.error(f"{extname} does not exist in indir2/{base}[{hdu}].")
                     continue
 
                 split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, args.min_nopix)
@@ -181,15 +181,15 @@ class FFTEstimator(object):
                 split_qsos_2 = [None] * len(split_qsos)
 
             for qso, qso_2 in zip(split_qsos, split_qsos_2):
-                self.getEstimates(qso, qso_2)
+                try:
+                    self.getEstimates(qso, qso_2)
+                except Exception as e:
+                    logging.error(f"{e} in {base}[{hdu}]")
 
         pfile.close()
     def __call__(self, fnames):
         if self.config_qmle.picca_input:
-            try:
-                self._picca_file_call(fnames)
-            except Exception as e:
-                logging.error(f"{e} in {base}[{hdu}]")
+            self._picca_file_call(fnames)
         else:
             for fl in fnames:
                 f = ospath_join(self.config_qmle.qso_dir, fl.rstrip())
