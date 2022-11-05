@@ -326,14 +326,14 @@ class MockGenerator(object):
 
         
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("OutputDir", help="Output directory")
     parser.add_argument("--master-file", help="Master file location. Generate mocks with "\
         "the exact RA, DEC & Z distribution. nmocks option is ignored when this passed.")
     parser.add_argument("--fixed-zforest", help="Generate forest at this redshift, " \
         "i.e. turns off redshift evolution.", type=float)
     parser.add_argument("--nmocks", help=("Number of mocks to generate. "\
-        "Redshift of qso picked at random given n(z). Default: %(default)s"), type=int, default=1)
+        "Redshift of qso picked at random given n(z)."), type=int, default=1)
 
     parser.add_argument("--save-qqfile", action="store_true", \
         help="Saves in quickquasar fileformat. Spectra are not chunked and all pixels are kept."\
@@ -344,24 +344,24 @@ if __name__ == '__main__':
     parser.add_argument("--oversample-rmat", help="Oversampling factor for resolution matrix. "\
         "Pass >1 to get finely space response function.", type=int, default=1)
 
-    parser.add_argument("--seed", help="Seed to generate random numbers. Default: %(default)s", \
+    parser.add_argument("--seed", help="Seed to generate random numbers.",
         type=int, default=332298)
 
-    parser.add_argument("--sigma-per-pixel", help=("Add Gaussian error to mocks with given sigma. "\
-        "Default: %(default)s"), type=float, default=0.7)
-    parser.add_argument("--specres", help="Spectral resolution. Default: %(default)s", type=int, \
+    parser.add_argument("--sigma-per-pixel", help="Add Gaussian error to mocks with given sigma.",
+        type=float, default=0.7)
+    parser.add_argument("--specres", help="Spectral resolution.", type=int,
         default=3200)
-    parser.add_argument("--pixel-dv", help=("Pixel size (km/s) of the log-spaced wave grid. "\
-        "Default: %(default)s"), type=float, default=30.)
-    parser.add_argument("--pixel-dlambda", help=("Pixel size (A) of the linearly-spaced wave grid. "\
-        "Default: %(default)s"), type=float, default=0.2)
-    parser.add_argument("--use-logspaced-wave", help=("Use log spaced array as final grid. "\
-        "Default: %(default)s"), action="store_true")
+    parser.add_argument("--pixel-dv", help="Pixel size (km/s) of the log-spaced wave grid.",
+        type=float, default=30.)
+    parser.add_argument("--pixel-dlambda", help="Pixel size (A) of the linearly-spaced wave grid.",
+        type=float, default=0.2)
+    parser.add_argument("--use-logspaced-wave", help="Use log spaced array as final grid.",
+        action="store_true")
 
-    parser.add_argument("--desi-w1", help=("Lower wavelength of DESI wave grid in A. "\
-        "Default: %(default)s A"), type=float, default=3600.)
-    parser.add_argument("--desi-w2", help=("Higher wavelength of DESI wave grid in A. "\
-        "Default: %(default)s A"), type=float, default=9800.)
+    parser.add_argument("--desi-w1", help="Lower wavelength of DESI wave grid in A.",
+        type=float, default=3600.)
+    parser.add_argument("--desi-w2", help="Higher wavelength of DESI wave grid in A.",
+        type=float, default=9800.)
     parser.add_argument("--desi-dec", help="Limit dec to (-25, 85).", action="store_true")
 
     parser.add_argument("--fixed-zqso", type=float, \
@@ -369,17 +369,17 @@ if __name__ == '__main__':
     parser.add_argument("--use-analytic-cdf", action="store_true", \
         help="Uses an analytic CDF for quasar redshifts.")
     parser.add_argument("--z-quasar-min", type=float, default=2.1, \
-        help="Lowest quasar redshift. Default: %(default)s")
+        help="Lowest quasar redshift.")
     parser.add_argument("--z-quasar-max", type=float, default=4.4, \
-        help="Maximum quasar redshift. Default: %(default)s")
-    parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
+        help="Maximum quasar redshift.")
+    parser.add_argument("--z-forest-min", help="Lower end of the forest.", \
         type=float, default=1.9)
-    parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
+    parser.add_argument("--z-forest-max", help="Upper end of the forest.", \
         type=float, default=4.3)
 
     parser.add_argument("--keep-nolya-pixels", action="store_true", \
         help="Instead of removing pixels, set flux=1 for lambda>L_lya")
-    parser.add_argument("--invcdf-nz", help="Table for inverse cdf of n(z). Default: %(default)s", \
+    parser.add_argument("--invcdf-nz", help="Table for inverse cdf of n(z).", \
         default=PKG_ICDF_Z_TABLE)
     
     parser.add_argument("--chunk-dyn",  action="store_true", \
@@ -396,13 +396,13 @@ if __name__ == '__main__':
     parser.add_argument("--save-full-flux", action="store_true", \
         help="When passed saves flux instead of fluctuations around truth.")
 
-    parser.add_argument("--log2ngrid", help="Number of grid points. Default: %(default)s", \
+    parser.add_argument("--log2ngrid", help="Number of grid points.", \
         type=int, default=18)
-    parser.add_argument("--griddv", help="Pixel size of the grid in km/s. Default: %(default)s", \
+    parser.add_argument("--griddv", help="Pixel size of the grid in km/s.", \
         type=float, default=2.)
 
     # healpix support
-    parser.add_argument("--hp-nside", type=int, default=16)
+    parser.add_argument("--hp-nside", help="NSIDE", type=int, default=16)
     parser.add_argument("--hp-ring", action="store_true", \
         help="Use RING pixel ordering. Default is NESTED.")
 
