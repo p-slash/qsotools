@@ -210,7 +210,7 @@ class FFTEstimator(object):
                 except Exception as e:
                         logging.error(f"{e} in {fl}")
 
-        return self.power, self.cross_power, self.counts, self.mean_resolution, self.counts_meanreso,
+        return self.power, self.cross_power, self.counts, self.mean_resolution, self.counts_meanreso,\
             self.mean_k_skm, self.mean_z
 
 
