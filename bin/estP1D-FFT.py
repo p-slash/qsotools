@@ -69,6 +69,8 @@ class FFTEstimator(object):
         self.mean_resolution = np.zeros(self.config_qmle.z_n)
         self.counts_meanreso = np.zeros_like(self.mean_resolution)
 
+        self.min_lengthA_zbin = self.args.skip_ratio *self.config_qmle.z_d * fid.LYA_WAVELENGTH
+
     def getEstimates(self, qso, qso_2, pad_mult=7):
         z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
@@ -165,7 +167,9 @@ class FFTEstimator(object):
 
         for hdu in hdus:
             qso = pfile.readSpectrum(hdu)
-            split_qsos = _splitQSO(qso, self.config_qmle.z_edges, args.min_nopix)
+            dlambda = qso.wave[1]-qso.wave[0]
+            min_nopix = self.min_lengthA_zbin/dlambda
+            split_qsos = _splitQSO(qso, self.config_qmle.z_edges, min_nopix)
 
             if args.indir2:
                 extname = pfile.fitsfile[hdu].get_extname()
@@ -176,7 +180,7 @@ class FFTEstimator(object):
                     logging.error(f"{extname} does not exist in indir2/{base}[{hdu}].")
                     continue
 
-                split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, args.min_nopix)
+                split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, min_nopix)
             else:
                 split_qsos_2 = [None] * len(split_qsos)
 
@@ -214,8 +218,8 @@ if __name__ == '__main__':
         help="No tophat correction.")
     # parser.add_argument("--correlation", help="Compute correlation fn instead.")
     parser.add_argument("--nproc", type=int, default=1)
-    parser.add_argument("--min-nopix", type=int, default=30,
-        help="Number of minimum pixels in a chunk")
+    parser.add_argument("--skip-ratio", type=int, default=0.2,
+        help="Skip ratio for a chunk")
     parser.add_argument("--noise-realizations", type=int, default=100)
     parser.add_argument("--weighted-average", action="store_true",
         help="Averages power spectrum with mean snr^2")
