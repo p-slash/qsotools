@@ -63,6 +63,8 @@ class FFTEstimator(object):
         self.args = args
         self.config_qmle = config_qmle
 
+        self.mean_k_skm = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
+        self.mean_z = np.zeros(self.config_qmle.z_n)
         self.power = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
         self.cross_power = np.zeros((self.config_qmle.z_n, self.config_qmle.k_bins.size))
         self.counts = np.zeros_like(self.power)
@@ -72,7 +74,8 @@ class FFTEstimator(object):
         self.min_lengthA_zbin = self.args.skip_ratio *self.config_qmle.z_d * fid.LYA_WAVELENGTH
 
     def getEstimates(self, qso, qso_2, pad_mult=7):
-        z_med = qso.wave[int(qso.size/2)] / fid.LYA_WAVELENGTH - 1
+        this_z_arr = qso.wave/fid.LYA_WAVELENGTH-1
+        z_med = this_z_arr[int(qso.size/2)]
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
         assert np.isclose(z_med, self.config_qmle.z_bins[z_bin_no], atol=self.config_qmle.z_d/2)
@@ -155,6 +158,10 @@ class FFTEstimator(object):
         self.cross_power[z_bin_no] += pcross * weight
         self.counts[z_bin_no] += c[1:-1] * weight
 
+        self.mean_k_skm[z_bin_no] += binPowerSpectra(this_k_arr[jj:], this_k_arr[jj:], config_qmle.k_edges)[0]* weight
+        z_pairs = np.sqrt(np.outer(1+this_z_arr, 1+this_z_arr).ravel())-1
+        self.mean_z[z_bin_no] += np.mean(z_pairs) * np.sum(self.counts[z_bin_no])
+
     def _picca_file_call(self, fnames):
         base, hdus = fnames
         f = ospath_join(self.config_qmle.qso_dir, base)
@@ -203,7 +210,8 @@ class FFTEstimator(object):
                 except Exception as e:
                         logging.error(f"{e} in {fl}")
 
-        return self.power, self.cross_power, self.counts, self.mean_resolution, self.counts_meanreso
+        return self.power, self.cross_power, self.counts, self.mean_resolution, self.counts_meanreso,
+            self.mean_k_skm, self.mean_z
 
 
 if __name__ == '__main__':
@@ -271,13 +279,19 @@ if __name__ == '__main__':
     reso_samples = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
     p1d_samples = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
     cross_samples = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    mean_k_skm = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    mean_z = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
+
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(FFTEstimator(args, config_qmle), fnames_spectra)
 
-        for p1, pc1, c1, mean_res, counts_mreso in imap_it:
+        for p1, pc1, c1, mean_res, counts_mreso, k1, z1 in imap_it:
             reso_samples.addMeasurement(mean_res, counts_mreso)
             p1d_samples.addMeasurement(p1.ravel(), c1.ravel())
             cross_samples.addMeasurement(pc1.ravel(), c1.ravel())
+
+            mean_k_skm.addMeasurement(k1.ravel(), c1.ravel())
+            mean_z.addMeasurement(z1, c1.sum(axis=1))
             
             pcounter.increase()
 
@@ -285,6 +299,9 @@ if __name__ == '__main__':
     mean_p1d, cov_p1d = p1d_samples.getMeanNCov()
     mean_cross, cov_cross = cross_samples.getMeanNCov()
     mean_reso, cov_reso = reso_samples.getMeanNCov()
+
+    mean_k_skm = mean_k_skm.getMean()
+    mean_z = mean_z.getMean()
 
     # Mean resolution
     err_reso = np.sqrt(cov_reso.diagonal())
@@ -299,8 +316,8 @@ if __name__ == '__main__':
     err_c1d = np.sqrt(cov_cross.diagonal())
     p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
 
-    zarr_repeated = np.repeat(config_qmle.z_bins, config_qmle.k_bins.size)
-    karr_repeated = np.tile(config_qmle.k_bins, config_qmle.z_n)
+    zarr_repeated = np.repeat(mean_z, config_qmle.k_bins.size)
+    karr_repeated = mean_k_skm # np.tile(config_qmle.k_bins, config_qmle.z_n)
 
     power_table = Table(
         [zarr_repeated, karr_repeated,
