@@ -218,8 +218,8 @@ if __name__ == '__main__':
         help="No tophat correction.")
     # parser.add_argument("--correlation", help="Compute correlation fn instead.")
     parser.add_argument("--nproc", type=int, default=1)
-    parser.add_argument("--skip-ratio", type=int, default=0.2,
-        help="Skip ratio for a chunk")
+    parser.add_argument("--skip-ratio", type=float, default=0.3,
+        help="Skip ratio for a chunk wrt zbin size")
     parser.add_argument("--noise-realizations", type=int, default=100)
     parser.add_argument("--weighted-average", action="store_true",
         help="Averages power spectrum with mean snr^2")
