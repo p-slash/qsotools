@@ -160,7 +160,7 @@ class FFTEstimator(object):
 
         self.mean_k_skm[z_bin_no] += binPowerSpectra(this_k_arr[jj:], this_k_arr[jj:], config_qmle.k_edges)[0]* weight
         z_pairs = np.sqrt(np.outer(1+this_z_arr, 1+this_z_arr).ravel())-1
-        self.mean_z[z_bin_no] += np.mean(z_pairs) * np.sum(self.counts[z_bin_no])
+        self.mean_z[z_bin_no] += np.mean(z_pairs) * np.sum(c[1:-1] * weight)
 
     def _picca_file_call(self, fnames):
         base, hdus = fnames
