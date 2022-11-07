@@ -293,7 +293,7 @@ if __name__ == '__main__':
             cross_samples.addMeasurement(pc1.ravel(), c1.ravel())
 
             mean_k_skm.addMeasurement(k1.ravel(), c1.ravel())
-            mean_z.addMeasurement(z1, c1.ravel())
+            mean_z.addMeasurement(z1.ravel(), c1.ravel())
             
             pcounter.increase()
 
