@@ -325,7 +325,7 @@ if __name__ == '__main__':
         mean_cross, err_c1d],
         names=('z', 'k', 'P1D', 'e_p1d', 'Cross', 'e_cross'))
     power_table.write(p1d_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'k':'%.5e', 'P1D':'%.5e', 'Cross':'%.5e', 'e_p1d':'%.5e', 'e_cross':'%.5e'},
+        formats={'z':'%.5e', 'k':'%.5e', 'P1D':'%.5e', 'Cross':'%.5e', 'e_p1d':'%.5e', 'e_cross':'%.5e'},
         overwrite=True)
     print("P1D saved as ", p1d_filename)
 
