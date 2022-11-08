@@ -141,11 +141,15 @@ class FFTEstimator(object):
 
         # ignore k=0 mode
         jj = 1 #int(qso.flux.size/qso.size)
-        p, c = binPowerSpectra(this_k_arr[jj:], p1d_f[jj:], config_qmle.k_edges)
+        this_k_arr = this_k_arr[jj:]
+        p1d_f = p1d_f[jj:]
+        pcross = pcross[jj:]
+
+        p, c = binPowerSpectra(this_k_arr, p1d_f, config_qmle.k_edges)
 
         # if qso_2 is not None:
         pcross /= conversion_A_kms
-        pcross, _ = binPowerSpectra(this_k_arr[jj:], pcross[jj:], config_qmle.k_edges)
+        pcross, _ = binPowerSpectra(this_k_arr, pcross, config_qmle.k_edges)
 
         # Recalculate error by adding lss to variance
         if self.args.weighted_average:
@@ -159,7 +163,10 @@ class FFTEstimator(object):
         _cc = c[1:-1] * weight
         self.counts[z_bin_no] += _cc
 
-        self.mean_k_skm[z_bin_no] += binPowerSpectra(this_k_arr[jj:], this_k_arr[jj:], config_qmle.k_edges)[0]* weight
+        self.mean_k_skm[z_bin_no] += binPowerSpectra(this_k_arr, this_k_arr, config_qmle.k_edges)[0]* weight
+
+        # l_A_modes = 2*np.pi/this_k_arr/conversion_A_kms
+        # nzmodes = length_in_A/l_A_modes
         # z_pairs = np.sqrt(np.outer(1+this_z_arr, 1+this_z_arr).ravel())-1
 
         self.mean_z[z_bin_no] += np.mean(this_z_arr) * _cc
