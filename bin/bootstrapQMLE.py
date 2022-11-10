@@ -87,14 +87,33 @@ def getCounts(booted_indices):
         counts[b] = np.bincount(booted_indices[b], minlength=no_spectra)
 
     return counts
-        
+
+
+def getOneSliceBoot(RND, nspec, elems_count, spectra, remove_last_nz_bins, nboot_per_it):
+    booted_indices = RND.integers(low=0, high=nspec, size=(nboot_per_it, nspec))
+    boot_counts = getCounts(booted_indices)
+    logging.info(f"Generated boot indices.")
+
+    # Allocate memory for matrices
+    total_data = np.empty((nboot_per_it, elems_count))
+    total_data = boot_counts @ spectra
+
+    logging.info("Calculating bootstrapped inverse Fisher and power...")
+    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, remove_last_nz_bins)
+    total_power = 0.5 * np.linalg.solve(F, total_power_b4)
+
+    return total_power
+
+
 if __name__ == '__main__':
     # Arguments passed to run the script
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("Bootfile", help="File as described in QMLE.")
-    parser.add_argument("--bootnum", default=1000, type=int, \
-        help="Number of bootstrap resamples. Default: %(default)s")
-    parser.add_argument("--remove-last-nz-bins", default=0, type=int, \
+    parser.add_argument("--bootnum", default=10000, type=int,
+        help="Number of bootstrap resamples.")
+    parser.add_argument("--nboot-per-it", default=10000, type=int,
+        help="Number of bootstraps to generate per iteration.")
+    parser.add_argument("--remove-last-nz-bins", default=0, type=int,
         help="Remove last nz bins to obtain invertable Fisher.")
     parser.add_argument("--seed", help="Seed", default=3422, type=int)
     parser.add_argument("--save-cov", action="store_true")
@@ -103,31 +122,34 @@ if __name__ == '__main__':
 
     outdir = ospath_dir(args.Bootfile)
     # Set up log
-    logging.basicConfig(filename=ospath_join(outdir, 'bootstrapping.log'), \
-        level=logging.INFO)
+    logging.basicConfig()
     logging.info(" ".join(sys.argv))
 
     Nk, Nz, Nd, total_nkz, elems_count, nspec = getNumbersfromBootfile(args.Bootfile)
     logging.info("There are %d subsamples.", nspec)
+    logging.info("Reading bootstrap dat file.")
+    spectra = readBootFile(args.Bootfile, elems_count)
+
+    newpowersize = total_nkz-args.remove_last_nz_bins*Nk
+    # Save original estimate to first array
+    total_power = np.empty((args.bootnum+1, newpowersize))
+
+    # Calculate original
+    logging.info("Calculating original power.")
+    total_data = np.sum(spectra, axis=0)
+    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, remove_last_nz_bins)
+    total_power[0] = 0.5 * np.linalg.solve(F, total_power_b4)
 
     # Generate bootstrap realizations through indexes
-    RND            = np.random.default_rng(args.seed)
-    booted_indices = RND.integers(low=0, high=nspec, size=(args.bootnum, nspec))
-    # Save original estimate to first array
-    boot_counts    = np.empty((args.bootnum+1, nspec))
-    boot_counts[0] = 1
-    boot_counts[1:]= getCounts(booted_indices)
-    logging.info(f"Generated boot indices.")
+    RND = np.random.default_rng(args.seed)
+    n_iter = int(args.bootnum/args.nboot_per_it)
 
-    # Allocate memory for matrices
-    total_data = np.empty((args.bootnum+1, elems_count))
-    spectra    = readBootFile(args.Bootfile, elems_count)
-
-    total_data = boot_counts @ spectra
-
-    logging.info("Calculating bootstrapped inverse Fisher and power...")
-    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
-    total_power = 0.5 * np.linalg.solve(F, total_power_b4)
+    for jj in range(n_iter):
+        logging.info(f"Iteration {jj+1}/{n_iter}.")
+        i1 = jj*args.nboot_per_it+1
+        i2 += args.nboot_per_it
+        total_power[i1:i2] = getOneSliceBoot(RND, nspec, elems_count, spectra,
+            args.remove_last_nz_bins, args.nboot_per_it)
 
     # Save power to a file
     # Set up output file
