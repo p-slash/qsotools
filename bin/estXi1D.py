@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 import argparse
-from os.path import join as ospath_join
 import logging
 from multiprocessing import Pool
-from itertools import groupby
 
 import numpy as np
 from numba import jit
@@ -11,16 +9,7 @@ from astropy.table import Table
 
 import qsotools.io as qio
 import qsotools.fiducial as fid
-from qsotools.utils import Progress, SubsampleCov
-
-def decomposePiccaFname(picca_fname):
-    i1 = picca_fname.rfind('[')+1
-    i2 = picca_fname.rfind(']')
-
-    basefname = picca_fname[:i1-1]
-    hdunum = int(picca_fname[i1:i2])
-
-    return (basefname, hdunum)
+import qsotools.utils as qutil
 
 def _splitQSO(qso, z_edges):
     z = qso.wave/fid.LYA_WAVELENGTH-1
@@ -134,7 +123,7 @@ class Xi1DEstimator(object):
     def __call__(self, fname):
         if self.config_qmle.picca_input:
             base, hdus = fname
-            f = ospath_join(self.config_qmle.qso_dir, base)
+            f = f"{self.config_qmle.qso_dir}/{base}"
             pfile = qio.PiccaFile(f, 'r', clobber=False)
 
             for hdu in hdus:
@@ -146,7 +135,7 @@ class Xi1DEstimator(object):
 
             pfile.close()
         else:
-            f = ospath_join(self.config_qmle.qso_dir, fname.rstrip())
+            f = f"{self.config_qmle.qso_dir}/{fname.rstrip()}"
             bq = qio.BinaryQSO(f, 'r')
 
             self.getEstimates(bq)
@@ -177,7 +166,7 @@ if __name__ == '__main__':
     output_base = config_qmle.parameters['OutputFileBase']
 
     # Set up logger
-    logging.basicConfig(filename=ospath_join(output_dir, f'est-xi1d.log'), \
+    logging.basicConfig(filename=f"{output_dir}/est-xi1d.log", \
         level=logging.DEBUG if args.debug else logging.INFO)
 
     # Set up velocity bin edges
@@ -185,32 +174,22 @@ if __name__ == '__main__':
     r_bins  = (r_edges[1:] + r_edges[:-1]) / 2
 
     # Read file list file
-    file_list = open(config_qmle.qso_list, 'r')
-    header = file_list.readline() # First line: Number of spectra to read
-    fnames_spectra = file_list.readlines()
-    fnames_spectra = fnames_spectra[:int(header)] # Read only first N spectra
+    fnames_spectra = config_qmle.readFnameSpectra()
 
     # If files are in Picca format, decompose filename list into
     # Main file & hdus to read in that main file
     if config_qmle.picca_input:
         logging.info("Decomposing filenames to a list of (base, list(hdus)).")
-        decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
-        decomp_list.sort(key=lambda x: x[0])
-
-        new_fnames = []
-        for base, hdus in groupby(decomp_list, lambda x: x[0]):
-            new_fnames.append((base, list(map(lambda x: x[1], hdus))))
-
-        fnames_spectra = new_fnames
+        fnames_spectra = qutil.getPiccaFList(fnames_spectra)
 
     nfiles = len(fnames_spectra)
     # Use subsampling to estimate covariance
     nsubsamples = nfiles if config_qmle.picca_input else args.nsubsamples
     # Set up subsampling class to store results
-    reso_samples = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
-    xi1d_samples = SubsampleCov(config_qmle.z_n*args.nrbins, nsubsamples, is_weighted=True)
+    reso_samples = qutil.SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
+    xi1d_samples = qutil.SubsampleCov(config_qmle.z_n*args.nrbins, nsubsamples, is_weighted=True)
 
-    pcounter = Progress(nfiles) # Progress tracker
+    pcounter = qutil.Progress(nfiles) # Progress tracker
     logging.info(f"There are {nfiles} files.")
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(Xi1DEstimator(args, config_qmle), fnames_spectra)
@@ -228,14 +207,14 @@ if __name__ == '__main__':
 
     # Mean resolution
     err_reso = np.sqrt(cov_reso.diagonal())
-    meanres_filename = ospath_join(output_dir, output_base+"-mean-resolution.txt")
+    meanres_filename = f"{output_dir}/{output_base}-mean-resolution.txt"
     meanres_table = Table([config_qmle.z_bins, mean_reso, err_reso], names=('z', 'R', 'e_R'))
     meanres_table.write(meanres_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'R':'%.1f', 'e_R':'%.1f'}, overwrite=True)
     logging.info(f"Mean R saved as {meanres_filename}")
 
     # Save correlation fn
-    corr_filename = ospath_join(output_dir, output_base+"-corr1d-weighted-estimate.txt")
+    corr_filename = f"{output_dir}/{output_base}-corr1d-weighted-estimate.txt"
     zarr_repeated = np.repeat(config_qmle.z_bins, r_bins.size)
     rarr_repeated = np.tile(r_bins, config_qmle.z_n)
 
@@ -247,7 +226,7 @@ if __name__ == '__main__':
     logging.info(f"Corr fn saved as {corr_filename}")
 
     # Save covariance
-    cov_filename = ospath_join(output_dir, output_base+"-covariance-xi1d-weighted-estimate.txt")
+    cov_filename = f"{output_dir}/{output_base}-covariance-xi1d-weighted-estimate.txt"
     np.savetxt(cov_filename, cov_xi1d)
 
     logging.info("DONE!")
