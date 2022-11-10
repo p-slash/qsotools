@@ -1,7 +1,27 @@
 import logging
 import time
+from itertools import groupby
 
 import numpy as np
+
+def decomposePiccaFname(picca_fname):
+    i1 = picca_fname.rfind('[')+1
+    i2 = picca_fname.rfind(']')
+
+    basefname = picca_fname[:i1-1]
+    hdunum = int(picca_fname[i1:i2])
+
+    return (basefname, hdunum)
+
+def getPiccaFList(fnames_spectra):
+    decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
+    decomp_list.sort(key=lambda x: x[0])
+
+    new_fnames = []
+    for base, hdus in groupby(decomp_list, lambda x: x[0]):
+        new_fnames.append((base, list(map(lambda x: x[1], hdus))))
+
+    fnames_spectra = new_fnames
 
 class Progress(object):
     """Utility class to log progress. Initialize with total number of operations."""
