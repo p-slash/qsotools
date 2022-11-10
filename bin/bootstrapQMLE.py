@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     outdir = ospath_dir(args.Bootfile)
     # Set up log
-    logging.basicConfig(filename=f"{output_dir}/bootstrapping.log")
+    logging.basicConfig(filename=f"{outdir}/bootstrapping.log")
     logging.info(" ".join(sys.argv))
 
     Nk, Nz, Nd, total_nkz, elems_count, nspec = getNumbersfromBootfile(args.Bootfile)
