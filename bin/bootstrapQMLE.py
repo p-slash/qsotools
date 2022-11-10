@@ -88,14 +88,13 @@ def getCounts(booted_indices):
 
     return counts
 
-
-def getOneSliceBoot(RND, nspec, elems_count, spectra, remove_last_nz_bins, nboot_per_it):
-    booted_indices = RND.integers(low=0, high=nspec, size=(nboot_per_it, nspec))
+@njit("(f8[:, :](i8[:, :], i8, i8, f8[:, :], i8, i8)")
+def getOneSliceBoot(booted_indices, nspec, elems_count, spectra, remove_last_nz_bins, nboot_per_it):
     boot_counts = getCounts(booted_indices)
     logging.info(f"Generated boot indices.")
 
     # Allocate memory for matrices
-    total_data = np.empty((nboot_per_it, elems_count))
+    # total_data = np.empty((nboot_per_it, elems_count))
     total_data = boot_counts @ spectra
 
     logging.info("Calculating bootstrapped inverse Fisher and power...")
@@ -103,7 +102,6 @@ def getOneSliceBoot(RND, nspec, elems_count, spectra, remove_last_nz_bins, nboot
     total_power = 0.5 * np.linalg.solve(F, total_power_b4)
 
     return total_power
-
 
 if __name__ == '__main__':
     # Arguments passed to run the script
@@ -124,7 +122,8 @@ if __name__ == '__main__':
     if outdir == "":
         outdir = "."
     # Set up log
-    logging.basicConfig(filename=f"{outdir}/bootstrapping.log")
+    logging.basicConfig(filename=f"{outdir}/bootstrapping.log",
+        level=logging.DEBUG)
     logging.info(" ".join(sys.argv))
 
     Nk, Nz, Nd, total_nkz, elems_count, nspec = getNumbersfromBootfile(args.Bootfile)
@@ -138,7 +137,7 @@ if __name__ == '__main__':
 
     # Calculate original
     logging.info("Calculating original power.")
-    total_data = np.reshape(np.ones(nspec) @ spectra, (1, elems_count))
+    total_data = np.ones((1, nspec)) @ spectra
     total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
     total_power[0] = 0.5 * np.linalg.solve(F, total_power_b4)
 
@@ -150,7 +149,8 @@ if __name__ == '__main__':
         logging.info(f"Iteration {jj+1}/{n_iter}.")
         i1 = jj*args.nboot_per_it+1
         i2 = i1+args.nboot_per_it
-        total_power[i1:i2] = getOneSliceBoot(RND, nspec, elems_count, spectra,
+        booted_indices = RND.integers(low=0, high=nspec, size=(nboot_per_it, nspec))
+        total_power[i1:i2] = getOneSliceBoot(booted_indices, nspec, elems_count, spectra,
             args.remove_last_nz_bins, args.nboot_per_it)
 
     # Save power to a file
