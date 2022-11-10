@@ -88,7 +88,7 @@ def getCounts(booted_indices):
 
     return counts
 
-@njit("(f8[:, :](i8[:, :], i8, i8, f8[:, :], i8, i8)")
+@njit("f8[:, :](i8[:, :], i8, i8, f8[:, :], i8, i8)")
 def getOneSliceBoot(booted_indices, nspec, elems_count, spectra, remove_last_nz_bins, nboot_per_it):
     boot_counts = getCounts(booted_indices)
     logging.info(f"Generated boot indices.")
