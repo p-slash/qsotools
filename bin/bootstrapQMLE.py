@@ -151,7 +151,8 @@ if __name__ == '__main__':
         i1 = jj*args.nboot_per_it+1
         i2 = i1+args.nboot_per_it
         booted_indices = RND.integers(low=0, high=nspec, size=(args.nboot_per_it, nspec))
-        total_power[i1:i2] = getOneSliceBoot(booted_indices, nspec, elems_count, spectra,
+        total_power[i1:i2] = getOneSliceBoot(spectra, booted_indices, nspec,
+            Nk, Nd, total_nkz, elems_count,
             args.remove_last_nz_bins, args.nboot_per_it)
 
     # Save power to a file
