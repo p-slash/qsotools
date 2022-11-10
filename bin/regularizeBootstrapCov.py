@@ -70,9 +70,15 @@ if __name__ == '__main__':
 
     for _ in range(args.iterations):
         boostrap_fisher, _ = safe_inverse(bootstrap_covariance)
-        bootstrap_covariance, _ = safe_inverse(boostrap_fisher*qmle_fisher_sparcity)
+        newcov, _ = safe_inverse(boostrap_fisher*qmle_fisher_sparcity)
 
-        bootstrap_covariance = mcdonald_eval_fix(bootstrap_covariance, qmle_covariance, not args.use_qmle_evecs)
+        newcov = mcdonald_eval_fix(newcov, qmle_covariance, not args.use_qmle_evecs)
+        diff = np.abs(newcov-bootstrap_covariance)
+        bootstrap_covariance=newcov
+
+        if np.all(diff<1e-8):
+            print("Converged.")
+            break
 
     for idx in qmle_zero_idx:
         bootstrap_covariance[idx, idx] = 0
