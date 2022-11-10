@@ -150,7 +150,7 @@ if __name__ == '__main__':
         logging.info(f"Iteration {jj+1}/{n_iter}.")
         i1 = jj*args.nboot_per_it+1
         i2 = i1+args.nboot_per_it
-        booted_indices = RND.integers(low=0, high=nspec, size=(nboot_per_it, nspec))
+        booted_indices = RND.integers(low=0, high=nspec, size=(args.nboot_per_it, nspec))
         total_power[i1:i2] = getOneSliceBoot(booted_indices, nspec, elems_count, spectra,
             args.remove_last_nz_bins, args.nboot_per_it)
 
