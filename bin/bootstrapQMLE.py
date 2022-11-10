@@ -88,15 +88,17 @@ def getCounts(booted_indices):
 
     return counts
 
-@njit("f8[:, :](f8[:, :], i8[:, :], i8, i8, i8, i8, i8, i8, i8)")
 def getOneSliceBoot(spectra, booted_indices, nspec,
     Nk, Nd, total_nkz, elems_count,
     remove_last_nz_bins, nboot_per_it):
     boot_counts = getCounts(booted_indices)
+    logging.info("    > Generated boot indices.")
+
     # Allocate memory for matrices
     # total_data = np.empty((nboot_per_it, elems_count))
     total_data = boot_counts @ spectra
 
+    logging.info("    > Calculating bootstrapped inverse Fisher and power...")
     total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, remove_last_nz_bins)
     total_power = 0.5 * np.linalg.solve(F, total_power_b4)
 
@@ -148,9 +150,7 @@ if __name__ == '__main__':
         logging.info(f"Iteration {jj+1}/{n_iter}.")
         i1 = jj*args.nboot_per_it+1
         i2 = i1+args.nboot_per_it
-        logging.info("    > Generating boot indices.")
         booted_indices = RND.integers(low=0, high=nspec, size=(nboot_per_it, nspec))
-        logging.info("    > Calculating bootstrapped inverse Fisher and power...")
         total_power[i1:i2] = getOneSliceBoot(booted_indices, nspec, elems_count, spectra,
             args.remove_last_nz_bins, args.nboot_per_it)
 
