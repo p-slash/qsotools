@@ -115,7 +115,9 @@ if __name__ == '__main__':
     parser.add_argument("--remove-last-nz-bins", default=0, type=int,
         help="Remove last nz bins to obtain invertable Fisher.")
     parser.add_argument("--seed", help="Seed", default=3422, type=int)
-    parser.add_argument("--save-cov", action="store_true")
+    # parser.add_argument("--save-cov", action="store_true")
+    parser.add_argument("--save-powers", action="store_true")
+    parser.add_argument("--calculate-originals", action="store_true")
     parser.add_argument("--fbase", default="")
     args = parser.parse_args()
 
@@ -132,23 +134,23 @@ if __name__ == '__main__':
     logging.info("Reading bootstrap dat file.")
     spectra = readBootFile(args.Bootfile, elems_count)
 
-
     # Calculate original
-    logging.info("Calculating original power.")
-    total_data = np.ones((1, nspec)) @ spectra
-    total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
-    orig_power = 0.5 * np.linalg.solve(F, total_power_b4)
-    # Save power to a file
-    # Set up output file
-    output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-power.txt")
-    np.savetxt(output_fname, orig_power)
-    logging.info(f"Original power saved as {output_fname}.")
-    output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-fisher.txt")
-    np.savetxt(output_fname, F[0])
-    logging.info(f"Original fisher saved as {output_fname}.")
+    if args.calculate_originals:
+        logging.info("Calculating original power.")
+        total_data = np.ones((1, nspec)) @ spectra
+        total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
+        orig_power = 0.5 * np.linalg.solve(F, total_power_b4)
+        # Save power to a file
+        # Set up output file
+        output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-power.txt")
+        np.savetxt(output_fname, orig_power)
+        logging.info(f"Original power saved as {output_fname}.")
+        output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-fisher.txt")
+        np.savetxt(output_fname, F[0])
+        logging.info(f"Original fisher saved as {output_fname}.")
 
-    if args.bootnum == 0:
-        logging.info(f"Exiting. Only calculated the original power.")
+    if args.bootnum <= 0:
+        logging.info(f"No bootstraps were asked.")
         exit()
 
     # Generate bootstrap realizations through indexes
@@ -166,17 +168,17 @@ if __name__ == '__main__':
             Nk, Nd, total_nkz, elems_count,
             args.remove_last_nz_bins, args.nboot_per_it)
 
+    bootstrap_cov = np.cov(total_power, rowvar=False)
     output_fname = ospath_join(outdir, 
-        f"{args.fbase}bootstrap-power-n{args.bootnum}-s{args.seed}.txt")
-    np.savetxt(output_fname, total_power)
-    logging.info(f"Power saved as {output_fname}.")
+        f"{args.fbase}bootstrap-cov-n{args.bootnum}-s{args.seed}.txt")
+    np.savetxt(output_fname, bootstrap_cov)
+    logging.info(f"Covariance saved as {output_fname}.")
 
-    # If time allows, run many bootstraps and save its covariance
-    # when save-cov passed
-    if args.save_cov:
-        bootstrap_cov = np.cov(total_power, rowvar=False)
+    if args.save_powers:
         output_fname = ospath_join(outdir, 
-            f"{args.fbase}bootstrap-cov-n{args.bootnum}-s{args.seed}.txt")
-        np.savetxt(output_fname, bootstrap_cov)
-        logging.info(f"Covariance saved as {output_fname}.")
+            f"{args.fbase}bootstrap-power-n{args.bootnum}-s{args.seed}.txt")
+        np.savetxt(output_fname, total_power)
+        logging.info(f"Power saved as {output_fname}.")
+
+    
 
