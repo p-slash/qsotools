@@ -121,6 +121,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     outdir = ospath_dir(args.Bootfile)
+    if outdir == "":
+        outdir = "."
     # Set up log
     logging.basicConfig(filename=f"{outdir}/bootstrapping.log")
     logging.info(" ".join(sys.argv))
