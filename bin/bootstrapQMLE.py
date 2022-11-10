@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
     # Calculate original
     logging.info("Calculating original power.")
-    total_data = np.sum(spectra, axis=0)
+    total_data = np.ones(nspec) @ spectra
     total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
     total_power[0] = 0.5 * np.linalg.solve(F, total_power_b4)
 
