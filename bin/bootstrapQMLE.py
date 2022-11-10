@@ -132,51 +132,49 @@ if __name__ == '__main__':
     logging.info("Reading bootstrap dat file.")
     spectra = readBootFile(args.Bootfile, elems_count)
 
-    newpowersize = total_nkz-args.remove_last_nz_bins*Nk
-    # Save original estimate to first array
-    total_power = np.empty((args.bootnum+1, newpowersize))
 
     # Calculate original
     logging.info("Calculating original power.")
     total_data = np.ones((1, nspec)) @ spectra
     total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
-    total_power[0] = 0.5 * np.linalg.solve(F, total_power_b4)
-
-    # Generate bootstrap realizations through indexes
-    RND = np.random.default_rng(args.seed)
-    n_iter = int(args.bootnum/args.nboot_per_it)
-
-    for jj in range(n_iter):
-        logging.info(f"Iteration {jj+1}/{n_iter}.")
-        i1 = jj*args.nboot_per_it+1
-        i2 = i1+args.nboot_per_it
-        booted_indices = RND.integers(low=0, high=nspec, size=(args.nboot_per_it, nspec))
-        total_power[i1:i2] = getOneSliceBoot(spectra, booted_indices, nspec,
-            Nk, Nd, total_nkz, elems_count,
-            args.remove_last_nz_bins, args.nboot_per_it)
-
+    orig_power = 0.5 * np.linalg.solve(F, total_power_b4)
     # Save power to a file
     # Set up output file
     output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-power.txt")
-    np.savetxt(output_fname, total_power[0])
+    np.savetxt(output_fname, orig_power)
     logging.info(f"Original power saved as {output_fname}.")
     output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-fisher.txt")
-    np.savetxt(output_fname, F)
+    np.savetxt(output_fname, F[0])
     logging.info(f"Original fisher saved as {output_fname}.")
 
     if args.bootnum == 0:
         logging.info(f"Exiting. Only calculated the original power.")
         exit()
 
+    # Generate bootstrap realizations through indexes
+    RND = np.random.default_rng(args.seed)
+    newpowersize = total_nkz-args.remove_last_nz_bins*Nk
+    total_power = np.empty((args.bootnum, newpowersize))
+    n_iter = int(args.bootnum/args.nboot_per_it)
+
+    for jj in range(n_iter):
+        logging.info(f"Iteration {jj+1}/{n_iter}.")
+        i1 = jj*args.nboot_per_it
+        i2 = i1+args.nboot_per_it
+        booted_indices = RND.integers(low=0, high=nspec, size=(args.nboot_per_it, nspec))
+        total_power[i1:i2] = getOneSliceBoot(spectra, booted_indices, nspec,
+            Nk, Nd, total_nkz, elems_count,
+            args.remove_last_nz_bins, args.nboot_per_it)
+
     output_fname = ospath_join(outdir, 
         f"{args.fbase}bootstrap-power-n{args.bootnum}-s{args.seed}.txt")
-    np.savetxt(output_fname, total_power[1:])
+    np.savetxt(output_fname, total_power)
     logging.info(f"Power saved as {output_fname}.")
 
     # If time allows, run many bootstraps and save its covariance
     # when save-cov passed
     if args.save_cov:
-        bootstrap_cov = np.cov(total_power[1:], rowvar=False)
+        bootstrap_cov = np.cov(total_power, rowvar=False)
         output_fname = ospath_join(outdir, 
             f"{args.fbase}bootstrap-cov-n{args.bootnum}-s{args.seed}.txt")
         np.savetxt(output_fname, bootstrap_cov)
