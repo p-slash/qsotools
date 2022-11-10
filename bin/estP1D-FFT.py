@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 import argparse
-from os.path import join as ospath_join
 import logging
 from multiprocessing import Pool
-from itertools import groupby
 
 import numpy as np
 from scipy.stats import binned_statistic
@@ -12,23 +10,13 @@ from astropy.table import Table
 import qsotools.io as qio
 import qsotools.fiducial as fid
 from qsotools.specops import getSpectographWindow_k
-from qsotools.utils import Progress, SubsampleCov
+import qsotools.utils as qutil
 
 def binPowerSpectra(raw_k, raw_p, k_edges):
     binned_power,  _, binnumber = binned_statistic(raw_k, raw_p, statistic='sum', bins=k_edges)
     counts = np.bincount(binnumber, minlength=len(k_edges)+1)
 
     return binned_power, counts
-
-
-def decomposePiccaFname(picca_fname):
-    i1 = picca_fname.rfind('[')+1
-    i2 = picca_fname.rfind(']')
-
-    basefname = picca_fname[:i1-1]
-    hdunum = int(picca_fname[i1:i2])
-
-    return (basefname, hdunum)
 
 def _splitQSO(qso, z_edges, min_nopix):
     z = qso.wave/fid.LYA_WAVELENGTH-1
@@ -173,12 +161,12 @@ class FFTEstimator(object):
 
     def _picca_file_call(self, fnames):
         base, hdus = fnames
-        f = ospath_join(self.config_qmle.qso_dir, base)
+        f = f"{self.config_qmle.qso_dir}/{base}"
         pfile = qio.PiccaFile(f, 'r')
 
         if args.indir2:
             base_delta = base.split("/")[-1]
-            f2 = ospath_join(self.args.indir2, base_delta)
+            f2 = f"{self.args.indir2}/{base_delta}"
             pfile_2 = qio.PiccaFile(f2, 'r')
 
         for hdu in hdus:
@@ -212,7 +200,7 @@ class FFTEstimator(object):
             self._picca_file_call(fnames)
         else:
             for fl in fnames:
-                f = ospath_join(self.config_qmle.qso_dir, fl.rstrip())
+                f = f"{self.config_qmle.qso_dir}/{fl.rstrip()}"
                 bq = qio.BinaryQSO(f, 'r')
                 try:
                     self.getEstimates(bq)
@@ -262,34 +250,24 @@ if __name__ == '__main__':
     counts_meanreso = np.zeros_like(mean_resolution)
 
     # Read file list file
-    file_list = open(config_qmle.qso_list, 'r')
-    header = file_list.readline() # First line: Number of spectra to read
-    fnames_spectra = file_list.readlines()
-    fnames_spectra = fnames_spectra[:int(header)] # Read only first N spectra
+    fnames_spectra = config_qmle.readFnameSpectra()
 
     # If files are in Picca format, decompose filename list into
     # Main file & hdus to read in that main file
     if config_qmle.picca_input:
         logging.info("Decomposing filenames to a list of (base, list(hdus)).")
-        decomp_list = [decomposePiccaFname(fl.rstrip()) for fl in fnames_spectra]
-        decomp_list.sort(key=lambda x: x[0])
-
-        new_fnames = []
-        for base, hdus in groupby(decomp_list, lambda x: x[0]):
-            new_fnames.append((base, list(map(lambda x: x[1], hdus))))
-
-        fnames_spectra = new_fnames
+        fnames_spectra = qutil.getPiccaFList(fnames_spectra)
 
     nfiles = len(fnames_spectra)
-    pcounter = Progress(nfiles) # Progress tracker
+    pcounter = qutil.Progress(nfiles) # Progress tracker
     logging.info(f"There are {nfiles} files.")
 
     nsubsamples = nfiles if config_qmle.picca_input else args.nsubsamples
-    reso_samples = SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
-    p1d_samples = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
-    cross_samples = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
-    mean_k_skm = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
-    mean_z = SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    reso_samples = qutil.SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
+    p1d_samples = qutil.SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    cross_samples = qutil.SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    mean_k_skm = qutil.SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
+    mean_z = qutil.SubsampleCov(config_qmle.z_n*config_qmle.k_bins.size, nsubsamples, is_weighted=True)
 
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(FFTEstimator(args, config_qmle), fnames_spectra)
@@ -314,7 +292,7 @@ if __name__ == '__main__':
 
     # Mean resolution
     err_reso = np.sqrt(cov_reso.diagonal())
-    meanres_filename = ospath_join(output_dir, output_base+"-mean-resolution.txt")
+    meanres_filename = f"{output_dir}/{output_base}-mean-resolution.txt"
     meanres_table = Table([config_qmle.z_bins, mean_reso, err_reso], names=('z', 'R', 'e_R'))
     meanres_table.write(meanres_filename, format='ascii.fixed_width', \
         formats={'z':'%.1f', 'R':'%.1f', 'e_R':'%.1f'}, overwrite=True)
@@ -323,7 +301,7 @@ if __name__ == '__main__':
     # Save power spectrum
     err_p1d = np.sqrt(cov_p1d.diagonal())
     err_c1d = np.sqrt(cov_cross.diagonal())
-    p1d_filename = ospath_join(output_dir, output_base+"-p1d-fft-estimate.txt")
+    p1d_filename = f"{output_dir}/{output_base}-p1d-fft-estimate.txt"
 
     zarr_repeated = mean_z #np.repeat(mean_z, config_qmle.k_bins.size)
     karr_repeated = mean_k_skm # np.tile(config_qmle.k_bins, config_qmle.z_n)
@@ -339,11 +317,11 @@ if __name__ == '__main__':
     print("P1D saved as ", p1d_filename)
 
     # Save covariance
-    cov_filename = ospath_join(output_dir, output_base+"-cov-p1d-fft-estimate.txt")
+    cov_filename = f"{output_dir}/{output_base}-cov-p1d-fft-estimate.txt"
     np.savetxt(cov_filename, cov_p1d)
 
     if args.indir2:
-        cov_filename = ospath_join(output_dir, output_base+"-cov-cross-fft-estimate.txt")
+        cov_filename = f"{output_dir}/{output_base}-cov-cross-fft-estimate.txt"
         np.savetxt(cov_filename, cov_cross)
 
 
