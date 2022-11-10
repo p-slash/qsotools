@@ -68,7 +68,8 @@ if __name__ == '__main__':
     else:
         qmle_fisher_sparcity = np.ones(qmle_fisher.shape, dtype=bool)
 
-    for _ in range(args.iterations):
+    for it in range(args.iterations):
+        print(f"Iteration {it}.")
         boostrap_fisher, _ = safe_inverse(bootstrap_covariance)
         newcov, _ = safe_inverse(boostrap_fisher*qmle_fisher_sparcity)
 
