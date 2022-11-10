@@ -21,7 +21,7 @@ def getPiccaFList(fnames_spectra):
     for base, hdus in groupby(decomp_list, lambda x: x[0]):
         new_fnames.append((base, list(map(lambda x: x[1], hdus))))
 
-    fnames_spectra = new_fnames
+    return new_fnames
 
 class Progress(object):
     """Utility class to log progress. Initialize with total number of operations."""
