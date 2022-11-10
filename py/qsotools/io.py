@@ -605,7 +605,7 @@ class ConfigQMLE:
     def readFnameSpectra(self):
         """Returns list of first N filenames, where N is the first line in file.
         """
-        file_list = open(config_qmle.qso_list, 'r')
+        file_list = open(self.qso_list, 'r')
         header = file_list.readline() # First line: Number of spectra to read
         fnames_spectra = file_list.readlines()
         fnames_spectra = fnames_spectra[:int(header)] # Read only first N spectra
