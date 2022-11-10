@@ -122,7 +122,7 @@ if __name__ == '__main__':
 
     outdir = ospath_dir(args.Bootfile)
     # Set up log
-    logging.basicConfig()
+    logging.basicConfig(filename=f"{output_dir}/bootstrapping.log")
     logging.info(" ".join(sys.argv))
 
     Nk, Nz, Nd, total_nkz, elems_count, nspec = getNumbersfromBootfile(args.Bootfile)
@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
     # Calculate original
     logging.info("Calculating original power.")
-    total_data = np.ones(nspec) @ spectra
+    total_data = np.reshape(np.ones(nspec) @ spectra, (1, elems_count))
     total_power_b4, F = getPSandFisher(total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
     total_power[0] = 0.5 * np.linalg.solve(F, total_power_b4)
 
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     for jj in range(n_iter):
         logging.info(f"Iteration {jj+1}/{n_iter}.")
         i1 = jj*args.nboot_per_it+1
-        i2 += args.nboot_per_it
+        i2 = i1+args.nboot_per_it
         total_power[i1:i2] = getOneSliceBoot(RND, nspec, elems_count, spectra,
             args.remove_last_nz_bins, args.nboot_per_it)
 
@@ -157,7 +157,7 @@ if __name__ == '__main__':
     np.savetxt(output_fname, total_power[0])
     logging.info(f"Original power saved as {output_fname}.")
     output_fname = ospath_join(outdir, f"{args.fbase}bootstrap-original-fisher.txt")
-    np.savetxt(output_fname, F[0])
+    np.savetxt(output_fname, F)
     logging.info(f"Original fisher saved as {output_fname}.")
 
     if args.bootnum == 0:
