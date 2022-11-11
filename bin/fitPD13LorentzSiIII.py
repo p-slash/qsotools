@@ -1,7 +1,7 @@
 import argparse
 
 import numpy as np
-from scipy.optimize import minimize
+import iminuit
 from astropy.io import ascii
 
 import qsotools.fiducial as fid
@@ -56,16 +56,25 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     model = LyaP1DModel(args.final_qmle, args.final_cov, args.ions)
+    mini = iminuit.Minuit(model.chi2, name=model.names, **model.initial)
+    mini.errordef = 1
+    mini.print_level = 1
+    print(mini.migrad())
 
-    result = minimize(model.chi2, model.initial)
-    chi2 = model.chi2(result.x)
-    print(f"Chi2: {chi2} / {len(model.names)}")
+    if not mini.valid:
+        print("Error: function minimum is not valid.")
+
+    result = mini.values.to_dict()
+    errors = mini.errors.to_dict()
+
+    chi2 = model.chi2(*result.values())
+    print(f"Chi2: {chi2:.2f} / {model.power_table.size-len(model.names)}")
 
     for i, name in enumerate(model.names):
-        print(f"{name}: {results.x[i]} pm {result.hess_inv[i, i]}")
+        print(f"{name}: {result[name]:.3e} pm {errors[name]:.3e}")
 
-    print("Full inv hess")
-    print(result.hess_inv)
+    # print("Full inv hess")
+    # print(result.hess_inv)
 
 
 
