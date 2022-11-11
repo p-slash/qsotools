@@ -17,12 +17,12 @@ class LyaP1DModel(object):
 
         self.names = ['A', 'n', 'alpha', 'B', 'beta', 'k1']
         self.initial = {
-            'A':PDW_FIT_AMP,
-            'n':PDW_FIT_N,
-            'alpha':PDW_FIT_APH,
-            'B':PDW_FIT_B,
-            'beta':PDW_FIT_BETA,
-            'k1':1/np.sqrt(PDW_FIT_LMD)
+            'A':fid.PDW_FIT_AMP,
+            'n':fid.PDW_FIT_N,
+            'alpha':fid.PDW_FIT_APH,
+            'B':fid.PDW_FIT_B,
+            'beta':fid.PDW_FIT_BETA,
+            'k1':1/np.sqrt(fid.PDW_FIT_LMD)
         }
 
         for ion in self.fit_ions:
