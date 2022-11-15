@@ -1,5 +1,6 @@
 import argparse
 import numpy as np
+from os.path import dirname as ospath_dir
 
 def normalize(matrix):
     fk_v = matrix.diagonal()
@@ -57,6 +58,7 @@ if __name__ == '__main__':
     parser.add_argument("--fbase", default="")
     args = parser.parse_args()
 
+    outdir = ospath_dir(args.boot_cov)
     bootstrap_covariance = np.loadtxt(args.boot_cov)
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
@@ -85,7 +87,7 @@ if __name__ == '__main__':
         bootstrap_covariance[idx, idx] = 0
 
     basis_txt = "qmle" if args.use_qmle_evecs else "boot"
-    np.savetxt(f"{args.fbase}regularized-bootstrap-cov-{basis_txt}-evecs.txt", bootstrap_covariance)
+    np.savetxt(f"{outdir}/{args.fbase}regularized-bootstrap-cov-{basis_txt}-evecs.txt", bootstrap_covariance)
 
 
 
