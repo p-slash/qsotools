@@ -50,11 +50,12 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--boot-cov", help="Covariance from bootstrap file.", required=True)
     parser.add_argument("--qmle-fisher",help="Fisher matrix from QMLE.", required=True)
-    parser.add_argument("--qmle-sparcity-cut", default=0.01, type=float, \
+    parser.add_argument("--qmle-sparcity-cut", default=0.001, type=float, \
         help="Sparsity pattern to cut using QMLE Fisher matrix.")
     parser.add_argument("--use-qmle-evecs", action="store_true")
     parser.add_argument("--iterations", type=int, default=1,
         help="Number of iterations")
+    parser.add_argument("--reg-in-cov", action="store_true")
     parser.add_argument("--fbase", default="")
     args = parser.parse_args()
 
@@ -63,17 +64,22 @@ if __name__ == '__main__':
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
     qmle_covariance, qmle_zero_idx = safe_inverse(qmle_fisher)
+    normalized_qmle_cov = normalize(qmle_covariance)
     normalized_qmle_fisher = normalize(qmle_fisher)
 
+    matrix_to_use_for_sparsity = normalized_qmle_cov if args.reg_in_cov else normalized_qmle_fisher
     if args.qmle_sparcity_cut > 0:
-        qmle_fisher_sparcity = np.abs(normalized_qmle_fisher) > args.qmle_sparcity_cut
+        qmle_sparcity = np.abs(matrix_to_use_for_sparsity) > args.qmle_sparcity_cut
     else:
-        qmle_fisher_sparcity = np.ones(qmle_fisher.shape, dtype=bool)
+        qmle_sparcity = np.ones(qmle_fisher.shape, dtype=bool)
 
     for it in range(args.iterations):
         print(f"Iteration {it}.")
-        boostrap_fisher, _ = safe_inverse(bootstrap_covariance)
-        newcov, _ = safe_inverse(boostrap_fisher*qmle_fisher_sparcity)
+        if args.reg_in_cov:
+            newcov = bootstrap_covariance * qmle_sparcity
+        else:
+            boostrap_fisher, _ = safe_inverse(bootstrap_covariance)
+            newcov, _ = safe_inverse(boostrap_fisher*qmle_sparcity)
 
         newcov = mcdonald_eval_fix(newcov, qmle_covariance, not args.use_qmle_evecs)
         diff = np.abs(newcov-bootstrap_covariance)
