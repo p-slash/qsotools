@@ -26,8 +26,8 @@ class LyaP1DModel(object):
         }
 
         for ion in self.fit_ions:
-            self.names.append(f'f_{ion}')
-            self.initial[f'f_{ion}']=0.
+            self.names.append(f'a_{ion}')
+            self.initial[f'a_{ion}']=0.
 
 
     def getModelPower(self, **kwargs):
@@ -37,8 +37,8 @@ class LyaP1DModel(object):
             kwargs['alpha'], kwargs['B'], kwargs['beta'],
             lmd)
         for ion in self.fit_ions:
-            f = kwargs[f'f_{ion}']
-            plya *= (1+f**2+2*f*np.cos(self.power_table['kc']*velocity_seps[ion]))
+            a = kwargs[f'a_{ion}'] # /(1-fid.meanFluxFG08(self.power_table['z']))
+            plya *= (1+a**2+2*a*np.cos(self.power_table['kc']*velocity_seps[ion]))
 
         return plya
 
