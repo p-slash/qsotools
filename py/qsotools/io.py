@@ -398,6 +398,32 @@ class Spectrum:
             self.specres, self.dv)
         tbq.close()
 
+    def split(self, z_edges, min_nopix=0):
+        z = self.wave/fid.LYA_WAVELENGTH-1
+        sp_indx = np.searchsorted(z, z_edges)
+
+        # assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
+
+        wave_chunks  = [x for x in np.hsplit(self.wave, sp_indx)[1:-1]  if 0 not in x.shape]
+        flux_chunks  = [x for x in np.hsplit(self.flux, sp_indx)[1:-1]  if 0 not in x.shape]
+        error_chunks = [x for x in np.hsplit(self.error, sp_indx)[1:-1] if 0 not in x.shape]
+        reso_chunks  = [x for x in np.hsplit(self.reso_kms, sp_indx)[1:-1] if 0 not in x.shape]
+
+        split_qsos =[]
+        for i in range(len(wave_chunks)):
+            wave = wave_chunks[i]
+            flux = flux_chunks[i]
+            error= error_chunks[i]
+            reso_kms = reso_chunks[i]
+
+            tmp_qso = Spectrum(wave, flux, error, self.z_qso, \
+                self.specres, self.dv, self.coord, reso_kms)
+
+            if tmp_qso.s2n > 0 and wave.size > min_nopix:
+                split_qsos.append(tmp_qso)
+
+        return split_qsos
+
 class BinaryQSO(Spectrum):
     """
     Read and write in binary format for quadratic estimator.
