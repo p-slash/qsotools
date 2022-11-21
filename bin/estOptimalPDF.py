@@ -74,7 +74,7 @@ class PDFEstimator(object):
 
             for hdu in hdus:
                 qso = pfile.readSpectrum(hdu)
-                split_qsos = qso.split(self.config_qmle.z_edges)
+                split_qsos = qso.split(self.config_qmle.z_edges, self.args.min_nopix)
 
                 for qso in split_qsos:
                     self.getEstimates(qso)
@@ -102,9 +102,11 @@ if __name__ == '__main__':
 
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates.")
-    parser.add_argument("--dlambda", help="Wavelength dispersion", default=0.8)
+    parser.add_argument("--dlambda", help="Wavelength dispersion", type=float, default=0.8)
     parser.add_argument("--convert2flux", help="Converts delta values to flux using FG08.",
         action="store_true")
+    parser.add_argument("--min-nopix", help="Minimum number of pixels in chunk", type=int,
+        default=20)
 
     parser.add_argument("--nproc", type=int, default=1)
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
