@@ -2,6 +2,7 @@ import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.special import erf
+from scipy.interpolate import RectBivariateSpline
 from numba import jit
 
 warnings.simplefilter("error", OptimizeWarning)
@@ -253,6 +254,51 @@ def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-0.5*np.log(10), dln
         err2_lya *= meanFluxFG08(z)**2
 
     return err2_lya
+
+def getLyaCorrFn(z, dlambda, log2ngrid=17, kms_grid=1., on_flux=True):
+    """ Obtain RectBivariateSpline that you can call as xi1d(z, v).
+    Args
+    ------
+    z: array_like
+    Redshift values to evaluate
+    dlambda: float
+    Wavelength bin size
+
+    Returns
+    ------
+    RectBivariateSpline
+    """
+    if isinstance(z, np.ndarray):
+        pass
+    elif isinstance(z, float):
+        z = np.array([z])
+    elif isinstance(z, list):
+        z = np.array(z)
+    else:
+        raise RuntimeError("z should be numpy array.")
+    
+    if not isinstance(dlambda, float):
+        raise RuntimeError("dlambda should be float.")
+
+    ngrid = 2**log2ngrid
+    v_values = kms_grid * (np.arange(ngrid) - ngrid/2)
+    xi1d = np.empty((z.size, ngrid))
+
+    k = 2*np.pi * np.fft.rfftfreq(ngrid, d=kms_grid)
+    for zi, zr in enumerate(z):
+        dv = fid.LIGHT_SPEED*0.8/((1+zr)*fid.LYA_WAVELENGTH)
+        R_kms = dv
+        window_fn_2 = np.sinc(k*dv/2/np.pi)**2 * np.exp(-k**2 * R_kms**2)
+        tp2 = fid.evaluatePD13W17Fit(k, zr) * window_fn_2
+    
+        if on_flux:
+            tp2 *= fid.meanFluxFG08(zr)**2
+
+        xi1d[zi] = np.fft.fftshift(
+            np.fft.irfft(tp2, n=ngrid)
+            )/kms_grid
+
+    return RectBivariateSpline(z, v_values, xi1d, kx=1, ky=1)
 
 # -----------------------------------------------------
 # DLA begins
