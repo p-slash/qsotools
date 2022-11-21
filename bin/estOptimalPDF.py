@@ -32,8 +32,8 @@ class PDFEstimator(object):
         # ivar = 1./qso.error**2
         # ivar[~qso.mask] = 0
 
-        v_gpu = cupy.asarray(qso.wave)
-        v_gpu = fid.LIGHT_SPEED * cupy.log(qso.wave/qso.wave[0])
+        v_gpu = cupy.asarray(qso.wave/qso.wave[0])
+        v_gpu = fid.LIGHT_SPEED * cupy.log(v_gpu)
         # v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
         dv_matrix = v_gpu[:, cupy.newaxis] - v_gpu[cupy.newaxis, :]
         dv_matrix = cupy.asnumpy(dv_matrix)
@@ -61,7 +61,9 @@ class PDFEstimator(object):
             return
 
         if self.args.convert2flux:
-            qso.flux = (1+qso.flux) * fid.meanFluxFG08(z_arr)
+            mf = fid.meanFluxFG08(z_arr)
+            qso.flux = (1+qso.flux) * mf
+            qso.error *= mf
 
         cinv_gpu = self.getInvCovariance(qso, z_arr)
         flux_gpu = cupy.asarray(qso.flux)
