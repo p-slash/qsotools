@@ -55,19 +55,16 @@ class PDFEstimator(object):
 
         cinv = self.getInvCovariance(qso, z_arr)
         flux_idx = np.searchsorted(self.flux_edges, qso.flux)
+
         y = cinv@qso.flux
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
-        self.flux_pdf[i1:i2] += np.bincount(flux_idx, weights=y, minlength=self.nfbins+1)[1:-1]
+        self.flux_pdf[i1:i2] += np.bincount(flux_idx, weights=y, minlength=self.nfbins+2)[1:-1]
+
         _2d_bin_idx = np.ravel(flux_idx[:, np.newaxis] + (self.nfbins+2) * flux_idx[np.newaxis, :])
         temp_cinv = np.bincount(_2d_bin_idx, weights=cinv.ravel(), minlength=(self.nfbins+2)**2)
         temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
         self.fisher[i1:i2, i1:i2] += temp_cinv
-        # temp_cinv = np.empty((qso.size, self.nfbins))
-        # for row in range(qso.size):
-        #     temp_cinv[row] = np.bincount(flux_idx, weights=cinv[row, :], minlength=self.nfbins+1)[1:-1]
-        # for col in range(qso.size):
-        #     self.fisher[i1+col, i1:i2] += np.bincount(flux_idx, weights=temp_cinv[:, col], minlength=self.nfbins+1)[1:-1]
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
