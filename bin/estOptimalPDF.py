@@ -155,6 +155,10 @@ if __name__ == '__main__':
 
             pcounter.increase()
 
+    for ii in range(fisher.size):
+        if fisher[ii, ii] == 0:
+            fisher[ii, ii]=1
+
     cov = np.linalg.inv(fisher)
     flux_pdf = cov@flux_pdf
 
