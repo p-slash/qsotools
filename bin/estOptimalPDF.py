@@ -107,6 +107,8 @@ class PDFEstimator(object):
 
 
 if __name__ == '__main__':
+    multiprocessing.set_start_method('spawn')
+
     # Arguments passed to run the script
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("ConfigFile", help="Config file")
