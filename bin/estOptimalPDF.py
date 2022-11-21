@@ -45,7 +45,8 @@ class PDFEstimator(object):
         fiducial_signal = self.fiducial_corr_fn(zij_matrix, dv_matrix, grid=False)
 
         sfid_gpu = cupy.asarray(fiducial_signal)
-        cinv_gpu = cupy.linalg.inv(cupy.diag(qso.error**2)+sfid_gpu)
+        noise_gpu = cupy.diag(cupy.asarray(qso.error**2))
+        cinv_gpu = cupy.linalg.inv(noise_gpu+sfid_gpu)
         # cinv = np.eye(qso.size)+np.diag(ivar)@fiducial_signal
         # cinv = np.linalg.inv(cinv)*ivar
 
@@ -74,8 +75,11 @@ class PDFEstimator(object):
         i2 = i1 + self.nfbins
         self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y, minlength=self.nfbins+2)[1:-1]
 
-        _2d_bin_idx = cupy.ravel(flux_idx_gpu[:, cupy.newaxis] + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :])
-        temp_cinv = np.bincount(_2d_bin_idx, weights=cinv.ravel(), minlength=(self.nfbins+2)**2)
+        _2d_bin_idx = cupy.ravel(
+            flux_idx_gpu[:, cupy.newaxis]
+            + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
+        )
+        temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
         temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
         self.fisher[i1:i2, i1:i2] += temp_cinv
 
