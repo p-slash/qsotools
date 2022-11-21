@@ -32,7 +32,7 @@ class PDFEstimator(object):
         ivar[~qso.mask] = 0
 
         v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
-        
+
         dv_matrix = v_arr[:, np.newaxis] - v_arr[np.newaxis, :]
         zij_matrix = np.sqrt(np.outer(1+z_arr, 1+z_arr))-1
         fiducial_signal = self.fiducial_corr_fn(zij_matrix, dv_matrix, grid=False)
@@ -47,6 +47,7 @@ class PDFEstimator(object):
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
         if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
+            logging.debug(f"Skipping z_med={z_med:.2f}")
             return
 
         if self.args.convert2flux:
@@ -59,7 +60,7 @@ class PDFEstimator(object):
         i2 = i1 + self.nfbins
         self.flux_pdf[i1:i2] += np.bincount(flux_idx, weights=y, minlength=self.nfbins+1)[1:-1]
         _2d_bin_idx = np.ravel(flux_idx[:, np.newaxis] + (self.nfbins+2) * flux_idx[np.newaxis, :])
-        temp_cinv = np.bincount(_2d_bin_idx, minlength=(self.nfbins+2)**2)
+        temp_cinv = np.bincount(_2d_bin_idx, weights=cinv.ravel(), minlength=(self.nfbins+2)**2)
         temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
         self.fisher[i1:i2, i1:i2] += temp_cinv
         # temp_cinv = np.empty((qso.size, self.nfbins))
