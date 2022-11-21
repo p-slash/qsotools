@@ -11,34 +11,6 @@ import qsotools.io as qio
 import qsotools.fiducial as fid
 import qsotools.utils as qutil
 
-def _splitQSO(qso, z_edges):
-    z = qso.wave/fid.LYA_WAVELENGTH-1
-    sp_indx = np.searchsorted(z, z_edges)
-
-    assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
-
-    # logging.debug(", ".join(np.hsplit(qso.wave, sp_indx)))
-    wave_chunks  = [x for x in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in x.shape]
-    flux_chunks  = [x for x in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in x.shape]
-    error_chunks = [x for x in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in x.shape]
-    reso_chunks  = [x for x in np.hsplit(qso.reso_kms, sp_indx)[1:-1] if 0 not in x.shape]
-    # logging.debug(", ".join(wave_chunks))
-
-    split_qsos =[]
-    for i in range(len(wave_chunks)):
-        wave = wave_chunks[i]
-        flux = flux_chunks[i]
-        error= error_chunks[i]
-        reso_kms = reso_chunks[i]
-
-        tmp_qso = qio.Spectrum(wave, flux, error, qso.z_qso, \
-            qso.specres, qso.dv, qso.coord, reso_kms)
-
-        if tmp_qso.s2n > 0 and wave.size > 10:
-            split_qsos.append(tmp_qso)
-
-    return split_qsos
-
 @jit("i8(f8[:], i8, f8)", nopython=True)
 def _findVMaxj(arr, j1, rmax):
     for j in range(j1, arr.size):
@@ -128,7 +100,7 @@ class Xi1DEstimator(object):
 
             for hdu in hdus:
                 qso = pfile.readSpectrum(hdu)
-                split_qsos = _splitQSO(qso, self.config_qmle.z_edges)
+                split_qsos = qso.split(self.config_qmle.z_edges)
 
                 for qso in split_qsos:
                     self.getEstimates(qso)

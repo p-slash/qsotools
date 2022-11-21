@@ -18,34 +18,6 @@ def binPowerSpectra(raw_k, raw_p, k_edges):
 
     return binned_power, counts
 
-def _splitQSO(qso, z_edges, min_nopix):
-    z = qso.wave/fid.LYA_WAVELENGTH-1
-    sp_indx = np.searchsorted(z, z_edges)
-
-    assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
-
-    # logging.debug(", ".join(np.hsplit(qso.wave, sp_indx)))
-    wave_chunks  = [x for x in np.hsplit(qso.wave, sp_indx)[1:-1]  if 0 not in x.shape]
-    flux_chunks  = [x for x in np.hsplit(qso.flux, sp_indx)[1:-1]  if 0 not in x.shape]
-    error_chunks = [x for x in np.hsplit(qso.error, sp_indx)[1:-1] if 0 not in x.shape]
-    reso_chunks  = [x for x in np.hsplit(qso.reso_kms, sp_indx)[1:-1] if 0 not in x.shape]
-    # logging.debug(", ".join(wave_chunks))
-
-    split_qsos =[]
-    for i in range(len(wave_chunks)):
-        wave = wave_chunks[i]
-        flux = flux_chunks[i]
-        error= error_chunks[i]
-        reso_kms = reso_chunks[i]
-
-        tmp_qso = qio.Spectrum(wave, flux, error, qso.z_qso, \
-            qso.specres, qso.dv, qso.coord, reso_kms)
-
-        if tmp_qso.s2n > 0 and wave.size > min_nopix:
-            split_qsos.append(tmp_qso)
-
-    return split_qsos
-
 class FFTEstimator(object):
     def __init__(self, args, config_qmle):
         self.args = args
@@ -173,7 +145,7 @@ class FFTEstimator(object):
             qso = pfile.readSpectrum(hdu)
             dlambda = qso.wave[1]-qso.wave[0]
             min_nopix = self.min_lengthA_zbin/dlambda
-            split_qsos = _splitQSO(qso, self.config_qmle.z_edges, min_nopix)
+            split_qsos = qso.split(self.config_qmle.z_edges, min_nopix)
 
             if args.indir2:
                 extname = pfile.fitsfile[hdu].get_extname()
@@ -184,7 +156,7 @@ class FFTEstimator(object):
                     logging.error(f"{extname} does not exist in indir2/{base}[{hdu}].")
                     continue
 
-                split_qsos_2 = _splitQSO(qso_2, self.config_qmle.z_edges, min_nopix)
+                split_qsos_2 = qso_2.split(self.config_qmle.z_edges, min_nopix)
             else:
                 split_qsos_2 = [None] * len(split_qsos)
 
