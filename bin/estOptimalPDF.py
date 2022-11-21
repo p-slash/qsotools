@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
     corr_table = Table([zarr_repeated, farr_repeated, flux_pdf, egauss], \
         names=('z', 'F', 'FPDF', 'e_FPDF'))
-    corr_table.write(fname2save, overwrite=True, \
+    corr_table.write(fname2save, format="ascii", overwrite=True, \
         formats={'z':'%.5e', 'F':'%.5e', 'FPDF':'%.5e', 'e_FPDF':'%.5e'})
     logging.info(f"Flux PDF saved as {fname2save}")
 
