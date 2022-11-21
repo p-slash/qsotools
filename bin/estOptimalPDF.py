@@ -106,7 +106,7 @@ if __name__ == '__main__':
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates.")
     parser.add_argument("--dlambda", help="Wavelength dispersion", default=0.8)
-    parser.add_argument("--covert2flux", help="Converts delta values to flux using FG08.",
+    parser.add_argument("--convert2flux", help="Converts delta values to flux using FG08.",
         action="store_true")
 
     parser.add_argument("--nproc", type=int, default=1)
