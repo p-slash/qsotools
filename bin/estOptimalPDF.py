@@ -42,7 +42,7 @@ class PDFEstimator(object):
         return cinv
 
     def getEstimates(self, qso):
-        z_arr = qso.wave/fid.LIGHT_SPEED-1
+        z_arr = qso.wave/fid.LYA_WAVELENGTH-1
         z_med = z_arr[int(qso.size/2)]
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
