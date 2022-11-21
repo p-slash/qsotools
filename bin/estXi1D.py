@@ -59,8 +59,8 @@ class Xi1DEstimator(object):
 
     def getIVAR(self, qso):
         # Smooth qso.error
-        if args.smooth_noise_sigmaA > 0:
-            qso.smoothNoise(sigma_A=args.smooth_noise_sigmaA)
+        if self.args.smooth_noise_sigmaA > 0:
+            qso.smoothNoise(sigma_A=self.args.smooth_noise_sigmaA)
 
         # Add LSS to qso.error**2
         qso.addLyaFlucErrors(on_flux=False)
