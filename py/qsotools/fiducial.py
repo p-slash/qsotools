@@ -286,13 +286,13 @@ def getLyaCorrFn(z, dlambda, log2ngrid=17, kms_grid=1., on_flux=True):
 
     k = 2*np.pi * np.fft.rfftfreq(ngrid, d=kms_grid)
     for zi, zr in enumerate(z):
-        dv = fid.LIGHT_SPEED*0.8/((1+zr)*fid.LYA_WAVELENGTH)
+        dv = LIGHT_SPEED*0.8/((1+zr)*LYA_WAVELENGTH)
         R_kms = dv
         window_fn_2 = np.sinc(k*dv/2/np.pi)**2 * np.exp(-k**2 * R_kms**2)
-        tp2 = fid.evaluatePD13W17Fit(k, zr) * window_fn_2
+        tp2 = evaluatePD13W17Fit(k, zr) * window_fn_2
     
         if on_flux:
-            tp2 *= fid.meanFluxFG08(zr)**2
+            tp2 *= meanFluxFG08(zr)**2
 
         xi1d[zi] = np.fft.fftshift(
             np.fft.irfft(tp2, n=ngrid)
