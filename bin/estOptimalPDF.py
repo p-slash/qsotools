@@ -4,6 +4,7 @@ import logging
 from multiprocessing import Pool
 
 import numpy as np
+import cupy
 from astropy.table import Table
 
 import qsotools.io as qio
@@ -14,7 +15,7 @@ class PDFEstimator(object):
     def __init__(self, args, config_qmle, flux_edges, fiducial_corr_fn):
         self.args = args
         self.config_qmle = config_qmle
-        self.flux_edges = flux_edges
+        self.flux_edges_gpu = cupy.asarray(flux_edges)
         self.fiducial_corr_fn = fiducial_corr_fn
 
         self.nfbins = flux_edges.size-1
@@ -22,24 +23,33 @@ class PDFEstimator(object):
 
         # self.minlength = (self.flux_edges.size+1) * (self.z_edges.size+1)
 
-        self.flux_pdf = np.zeros(self.nfbins*self.config_qmle.z_n)
-        self.fisher = np.zeros((self.flux_pdf.size, self.flux_pdf.size))
+        self.flux_pdf = cupy.zeros(self.nfbins*self.config_qmle.z_n)
+        self.fisher = cupy.zeros((self.flux_pdf.size, self.flux_pdf.size))
 
     def getInvCovariance(self, qso, z_arr):
         if self.args.smooth_noise_sigmaA > 0:
             qso.smoothNoise(sigma_A=self.args.smooth_noise_sigmaA)
-        ivar = 1./qso.error**2
-        ivar[~qso.mask] = 0
+        # ivar = 1./qso.error**2
+        # ivar[~qso.mask] = 0
 
-        v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
+        v_gpu = cupy.asarray(qso.wave)
+        v_gpu = fid.LIGHT_SPEED * cupy.log(qso.wave/qso.wave[0])
+        # v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
+        dv_matrix = v_gpu[:, cupy.newaxis] - v_gpu[cupy.newaxis, :]
+        dv_matrix = cupy.asnumpy(dv_matrix)
 
-        dv_matrix = v_arr[:, np.newaxis] - v_arr[np.newaxis, :]
-        zij_matrix = np.sqrt(np.outer(1+z_arr, 1+z_arr))-1
+        z_gpu = cupy.asarray(z_arr)
+        zij_matrix = cupy.sqrt(cupy.outer(1+z_gpu, 1+z_gpu))-1
+        zij_matrix = cupy.asnumpy(zij_matrix)
+
         fiducial_signal = self.fiducial_corr_fn(zij_matrix, dv_matrix, grid=False)
-        cinv = np.eye(qso.size)+np.diag(ivar)@fiducial_signal
-        cinv = np.linalg.inv(cinv)*ivar
 
-        return cinv
+        sfid_gpu = cupy.asarray(fiducial_signal)
+        cinv_gpu = cupy.linalg.inv(cupy.diag(qso.error**2)+sfid_gpu)
+        # cinv = np.eye(qso.size)+np.diag(ivar)@fiducial_signal
+        # cinv = np.linalg.inv(cinv)*ivar
+
+        return cinv_gpu
 
     def getEstimates(self, qso):
         z_arr = qso.wave/fid.LYA_WAVELENGTH-1
@@ -53,15 +63,16 @@ class PDFEstimator(object):
         if self.args.convert2flux:
             qso.flux = (1+qso.flux) * fid.meanFluxFG08(z_arr)
 
-        cinv = self.getInvCovariance(qso, z_arr)
-        flux_idx = np.searchsorted(self.flux_edges, qso.flux)
+        cinv_gpu = self.getInvCovariance(qso, z_arr)
+        flux_gpu = cupy.asarray(qso.flux)
+        flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, flux_gpu)
 
-        y = cinv@qso.flux
+        y = cinv_gpu.dot(flux_gpu)
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
-        self.flux_pdf[i1:i2] += np.bincount(flux_idx, weights=y, minlength=self.nfbins+2)[1:-1]
+        self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y, minlength=self.nfbins+2)[1:-1]
 
-        _2d_bin_idx = np.ravel(flux_idx[:, np.newaxis] + (self.nfbins+2) * flux_idx[np.newaxis, :])
+        _2d_bin_idx = cupy.ravel(flux_idx_gpu[:, cupy.newaxis] + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :])
         temp_cinv = np.bincount(_2d_bin_idx, weights=cinv.ravel(), minlength=(self.nfbins+2)**2)
         temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
         self.fisher[i1:i2, i1:i2] += temp_cinv
@@ -86,7 +97,7 @@ class PDFEstimator(object):
 
             self.getEstimates(bq)
 
-        return self.flux_pdf, self.fisher
+        return cupy.asnumpy(self.flux_pdf), cupy.asnumpy(self.fisher)
 
 
 if __name__ == '__main__':
@@ -137,7 +148,9 @@ if __name__ == '__main__':
     nfiles = len(fnames_spectra)
 
     # Calculate fiducial correlation function
+    logging.info("Calculating fiducial correlation function.")
     fiducial_corr_fn = fid.getLyaCorrFn(config_qmle.z_edges, args.dlambda)
+
     flux_pdf = np.zeros(nfbins*config_qmle.z_n)
     fisher = np.zeros((flux_pdf.size, flux_pdf.size))
 
