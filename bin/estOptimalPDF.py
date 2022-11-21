@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
             pcounter.increase()
 
-    for ii in range(fisher.size):
+    for ii in range(flux_pdf.size):
         if fisher[ii, ii] == 0:
             fisher[ii, ii]=1
 
