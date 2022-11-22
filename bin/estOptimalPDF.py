@@ -28,16 +28,17 @@ class PDFEstimator(object):
     def getInvCovariance(self, qso, z_arr):
         if self.args.smooth_noise_sigmaA > 0:
             qso.smoothNoise(sigma_A=self.args.smooth_noise_sigmaA)
-        ivar = 1./qso.error**2
-        ivar[~qso.mask] = 0
 
         v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
 
         dv_matrix = v_arr[:, np.newaxis] - v_arr[np.newaxis, :]
         zij_matrix = np.sqrt(np.outer(1+z_arr, 1+z_arr))-1
         fiducial_signal = self.fiducial_corr_fn(zij_matrix, dv_matrix, grid=False)
-        cinv = np.eye(qso.size)+np.diag(ivar)@fiducial_signal
-        cinv = np.linalg.inv(cinv)*ivar
+
+        cinv = fiducial_signal
+        _di_idx = np.diag_indices(v_arr.size)
+        cinv[_di_idx] += qso.error**2
+        cinv = np.linalg.inv(cinv)
 
         return cinv
 
@@ -51,7 +52,9 @@ class PDFEstimator(object):
             return
 
         if self.args.convert2flux:
-            qso.flux = (1+qso.flux) * fid.meanFluxFG08(z_arr)
+            mf = fid.meanFluxFG08(z_arr)
+            qso.flux = (1+qso.flux) * mf
+            qso.error *= mf
 
         cinv = self.getInvCovariance(qso, z_arr)
         flux_idx = np.searchsorted(self.flux_edges, qso.flux)
@@ -155,9 +158,10 @@ if __name__ == '__main__':
 
             pcounter.increase()
 
-    for ii in range(flux_pdf.size):
-        if fisher[ii, ii] == 0:
-            fisher[ii, ii]=1
+    # Fix empty diagonals
+    _di_idx = np.diag_indices(flux_pdf.size)
+    w = fisher[_di_idx] == 0
+    fisher[_di_idx][w] = 1
 
     cov = np.linalg.inv(fisher)
     flux_pdf = cov@flux_pdf
