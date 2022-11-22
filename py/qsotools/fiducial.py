@@ -255,7 +255,7 @@ def getLyaFlucErrors(z, dv, R_kms, lnk1=-4*np.log(10), lnk2=-0.5*np.log(10), dln
     return err2_lya
 
 def getLyaCorrFn(z, dlambda, log2ngrid=17, kms_grid=1., on_flux=True):
-    """ Obtain RectBivariateSpline that you can call as xi1d(z, v).
+    """ Obtain z, v_values and xi1d.
     Args
     ------
     z: array_like
@@ -265,7 +265,7 @@ def getLyaCorrFn(z, dlambda, log2ngrid=17, kms_grid=1., on_flux=True):
 
     Returns
     ------
-    RectBivariateSpline
+    z, v_values, xi1d
     """
     if isinstance(z, np.ndarray):
         pass
