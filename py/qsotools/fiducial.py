@@ -2,7 +2,6 @@ import numpy as np
 import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.special import erf
-from scipy.interpolate import RectBivariateSpline
 from numba import jit
 
 warnings.simplefilter("error", OptimizeWarning)
@@ -298,7 +297,9 @@ def getLyaCorrFn(z, dlambda, log2ngrid=17, kms_grid=1., on_flux=True):
             np.fft.irfft(tp2, n=ngrid)
             )/kms_grid
 
-    return RectBivariateSpline(z, v_values, xi1d, kx=1, ky=1)
+
+
+    return (z, v_values, xi1d)
 
 # -----------------------------------------------------
 # DLA begins
