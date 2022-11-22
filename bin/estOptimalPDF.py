@@ -176,7 +176,7 @@ if __name__ == '__main__':
 
     nfiles = len(fnames_spectra)
     logging.info(f"There are {nfiles} files.")
-    local_queue = balance_load(fnames_spectra)
+    local_queue = balance_load(fnames_spectra, mpi_size, mpi_rank)
 
     # Calculate fiducial correlation function
     logging.info("Calculating fiducial correlation function.")
