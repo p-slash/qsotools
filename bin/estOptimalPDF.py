@@ -15,7 +15,7 @@ class cpInterp2d(object):
     def __init__(self, x_cpu, y_cpu, f_cpu):
         assert np.allclose(np.diff(x_cpu), x_cpu[1]-x_cpu[0])
         assert np.allclose(np.diff(y_cpu), y_cpu[1]-y_cpu[0])
-        assert f_cpu.shape = (x_cpu.size, y_cpu.size)
+        assert f_cpu.shape == (x_cpu.size, y_cpu.size)
 
         self.x_gpu = cupy.asarray(x_cpu)
         self.y_gpu = cupy.asarray(y_cpu)
@@ -24,12 +24,18 @@ class cpInterp2d(object):
         self.dy = self.y_gpu[1]-self.y_gpu[0]
 
     def __call__(self, x_g, y_g):
+        # Limit
+        x_g[x_g<self.x_gpu[0]] = self.x_gpu[0]
+        x_g[x_g>=self.x_gpu[-1]] = self.x_gpu[-1]-1e-6
+        y_g[y_g<self.y_gpu[0]] = self.y_gpu[0]
+        y_g[y_g>=self.y_gpu[-1]] = self.y_gpu[-1]-1e-6
+
         xx = (x_g-self.x_gpu[0])/self.dx
-        xi = int(xx)
+        xi = (xx).astype(np.int64)
         dxi = xx - xi
 
         yy = (y_g-self.y_gpu[0])/self.dy
-        yi = int(yy)
+        yi = (yy).astype(np.int64)
         dyi = yy - yi
 
         result = self.f_gpu[xi, yi] * (1-dxi) * (1-dyi)\
@@ -75,15 +81,12 @@ class PDFEstimator(object):
         self.fisher = cupy.zeros((self.flux_pdf.size, self.flux_pdf.size))
 
     def getInvCovariance(self, w_gpu, z_gpu, e_gpu):
-        # ivar = 1./qso.error**2
-        # ivar[~qso.mask] = 0
-
         v_gpu = w_gpu/w_gpu[0]
         v_gpu = fid.LIGHT_SPEED * cupy.log(v_gpu)
         dv_matrix = v_gpu[:, cupy.newaxis] - v_gpu[cupy.newaxis, :]
         zij_matrix = cupy.sqrt(cupy.outer(1+z_gpu, 1+z_gpu))-1
 
-        cinv_gpu = self.fiducial_corr_fn(zij_matrix, dv_matrix, grid=False)
+        cinv_gpu = self.fiducial_corr_fn(zij_matrix, dv_matrix)
 
         _di_idx = cupy.diag_indices(v_gpu.size)
         cinv_gpu[_di_idx] += e_gpu**2
@@ -188,7 +191,7 @@ if __name__ == '__main__':
     nfbins = int((args.f2 - args.f1) / args.df)
     flux_edges_gpu = (cupy.arange(nfbins+1)-0.5) * args.df + args.f1
     _cdev = flux_edges_gpu.device
-    logging.info(f"mpi: {mpi_rank} -- gpu: {_cdev.id} - bus {_cdev.pci_bus_id}")
+    logging.debug(f"mpi: {mpi_rank} -- gpu: {_cdev.id} - bus {_cdev.pci_bus_id}")
 
     # Read file list file
     fnames_spectra = config_qmle.readFnameSpectra()
@@ -196,18 +199,19 @@ if __name__ == '__main__':
     # If files are in Picca format, decompose filename list into
     # Main file & hdus to read in that main file
     if config_qmle.picca_input:
-        logging_mpi("Decomposing filenames to a list of (base, list(hdus)).")
+        logging_mpi("Decomposing filenames to a list of (base, list(hdus)).", mpi_rank)
         fnames_spectra = qutil.getPiccaFList(fnames_spectra)
 
     nfiles = len(fnames_spectra)
-    logging_mpi(f"There are {nfiles} files.")
+    logging_mpi(f"There are {nfiles} files.", mpi_rank)
     local_queue = balance_load(fnames_spectra, mpi_size, mpi_rank)
 
     # Calculate fiducial correlation function
-    logging_mpi("Calculating fiducial correlation function.")
+    logging_mpi("Calculating fiducial correlation function.", mpi_rank)
     z, v, xi1d = fid.getLyaCorrFn(config_qmle.z_edges, args.dlambda)
     fiducial_corr_fn = cpInterp2d(z, v, xi1d)
 
+    logging_mpi("Running PDF estimator.", mpi_rank)
     pdf_estimator = PDFEstimator(args, config_qmle, flux_edges_gpu, fiducial_corr_fn)
     for fname in local_queue:
         pdf_estimator(fname)
@@ -218,18 +222,22 @@ if __name__ == '__main__':
     flux_centers = (flux_edges_cpu[1:] + flux_edges_cpu[:-1])/2
     flux_pdf_cpu = cupy.asnumpy(pdf_estimator.flux_pdf)
     fisher_cpu = cupy.asnumpy(pdf_estimator.fisher)
-    MPI.Reduce(flux_pdf_cpu, root=0)
-    MPI.Reduce(fisher_cpu, root=0)
+
+    logging_mpi("Reducing to root.", mpi_rank)
+    comm.reduce(flux_pdf_cpu, root=0)
+    comm.reduce(fisher_cpu, root=0)
 
     if mpi_rank == 0:
-        for ii in range(flux_pdf.size):
-            if fisher[ii, ii] == 0:
-                fisher[ii, ii]=1
+        logging.info("Getting final results")
+        _di_idx = np.diag_indices(flux_pdf_cpu.size)
+        w = fisher_cpu[_di_idx] == 0
+        fisher_cpu[_di_idx][w] = 1
 
         cov = np.linalg.inv(fisher_cpu)
         flux_pdf = cov@flux_pdf_cpu
 
         # Save flux pdf fn
+        logging.info("Saving to files.")
         fname2save = f"{output_dir}/{output_base}-flux-pdf-estimate.txt"
         zarr_repeated = np.repeat(config_qmle.z_bins, nfbins)
         farr_repeated = np.tile(flux_centers, config_qmle.z_n)
