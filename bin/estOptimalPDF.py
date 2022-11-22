@@ -188,7 +188,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
     # Set up flux bin edges
-    nfbins = int((args.f2 - args.f1) / args.df)
+    nfbins = int((args.f2 - args.f1) / args.df)+1
     flux_edges_gpu = (cupy.arange(nfbins+1)-0.5) * args.df + args.f1
     _cdev = flux_edges_gpu.device
     logging.debug(f"mpi: {mpi_rank} -- gpu: {_cdev.id} - bus {_cdev.pci_bus_id}")
