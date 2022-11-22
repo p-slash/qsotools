@@ -1,21 +1,39 @@
 #!/usr/bin/env python
 import argparse
 import logging
-from multiprocessing import Pool
 
 import numpy as np
 import cupy
 from astropy.table import Table
+from mpi4py import MPI
 
 import qsotools.io as qio
 import qsotools.fiducial as fid
 import qsotools.utils as qutil
 
+def cp_meanFluxFG08(z):
+    tau = 0.001845 * cupy.power(1. + z, 3.924)
+
+    return cupy.exp(-tau)
+
+def balance_load(pc_flist, mpi_size, mpi_rank):
+    pc_flist.sort(key=lambda x: len(x[1])) # Ascending order
+    number_of_spectra = np.zeros(mpi_size, dtype=int)
+    local_queue = []
+    for x in reversed(pc_flist):
+        min_idx = np.argmin(number_of_spectra)
+        number_of_spectra[min_idx] += len(x[1])
+
+        if min_idx == mpi_rank:
+            local_queue.append(x)
+
+    return local_queue
+
 class PDFEstimator(object):       
-    def __init__(self, args, config_qmle, flux_edges, fiducial_corr_fn):
+    def __init__(self, args, config_qmle, flux_edges_gpu, fiducial_corr_fn):
         self.args = args
         self.config_qmle = config_qmle
-        self.flux_edges_gpu = cupy.asarray(flux_edges)
+        self.flux_edges_gpu = flux_edges_gpu
         self.fiducial_corr_fn = fiducial_corr_fn
 
         self.nfbins = flux_edges.size-1
@@ -26,26 +44,23 @@ class PDFEstimator(object):
         self.flux_pdf = cupy.zeros(self.nfbins*self.config_qmle.z_n)
         self.fisher = cupy.zeros((self.flux_pdf.size, self.flux_pdf.size))
 
-    def getInvCovariance(self, qso, z_arr):
-        if self.args.smooth_noise_sigmaA > 0:
-            qso.smoothNoise(sigma_A=self.args.smooth_noise_sigmaA)
+    def getInvCovariance(self, w_gpu, z_gpu, e_gpu):
         # ivar = 1./qso.error**2
         # ivar[~qso.mask] = 0
 
-        v_gpu = cupy.asarray(qso.wave/qso.wave[0])
+        v_gpu = w_gpu/w_gpu[0]
         v_gpu = fid.LIGHT_SPEED * cupy.log(v_gpu)
         # v_arr = fid.LIGHT_SPEED * np.log(qso.wave/qso.wave[0])
         dv_matrix = v_gpu[:, cupy.newaxis] - v_gpu[cupy.newaxis, :]
         dv_matrix = cupy.asnumpy(dv_matrix)
 
-        z_gpu = cupy.asarray(z_arr)
         zij_matrix = cupy.sqrt(cupy.outer(1+z_gpu, 1+z_gpu))-1
         zij_matrix = cupy.asnumpy(zij_matrix)
 
         fiducial_signal = self.fiducial_corr_fn(zij_matrix, dv_matrix, grid=False)
 
         sfid_gpu = cupy.asarray(fiducial_signal)
-        noise_gpu = cupy.diag(cupy.asarray(qso.error**2))
+        noise_gpu = cupy.diag(e_gpu**2)
         cinv_gpu = cupy.linalg.inv(noise_gpu+sfid_gpu)
         # cinv = np.eye(qso.size)+np.diag(ivar)@fiducial_signal
         # cinv = np.linalg.inv(cinv)*ivar
@@ -53,8 +68,16 @@ class PDFEstimator(object):
         return cinv_gpu
 
     def getEstimates(self, qso):
-        z_arr = qso.wave/fid.LYA_WAVELENGTH-1
-        z_med = z_arr[int(qso.size/2)]
+        if self.args.smooth_noise_sigmaA > 0:
+            qso.smoothNoise(sigma_A=self.args.smooth_noise_sigmaA)
+
+        w_gpu = cupy.asarray(qso.wave)
+        z_gpu = w_gpu/fid.LYA_WAVELENGTH-1
+        f_gpu = cupy.asarray(qso.flux)
+        e_gpu = cupy.asarray(qso.error)
+
+        # z_arr = qso.wave/fid.LYA_WAVELENGTH-1
+        z_med = z_gpu[int(qso.size/2)]
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
         if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
@@ -62,15 +85,14 @@ class PDFEstimator(object):
             return
 
         if self.args.convert2flux:
-            mf = fid.meanFluxFG08(z_arr)
-            qso.flux = (1+qso.flux) * mf
-            qso.error *= mf
+            mf = cp_meanFluxFG08(z_gpu)
+            f_gpu = (1+f_gpu) * mf
+            e_gpu *= mf
 
-        cinv_gpu = self.getInvCovariance(qso, z_arr)
-        flux_gpu = cupy.asarray(qso.flux)
-        flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, flux_gpu)
+        cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
+        flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
 
-        y = cinv_gpu.dot(flux_gpu)
+        y = cinv_gpu.dot(f_gpu)
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
         self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y, minlength=self.nfbins+2)[1:-1]
@@ -103,11 +125,11 @@ class PDFEstimator(object):
 
             self.getEstimates(bq)
 
-        return cupy.asnumpy(self.flux_pdf), cupy.asnumpy(self.fisher)
-
 
 if __name__ == '__main__':
-    multiprocessing.set_start_method('spawn')
+    comm = MPI.COMM_WORLD
+    mpi_rank = comm.Get_rank()
+    mpi_size = comm.Get_size()
 
     # Arguments passed to run the script
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -141,8 +163,7 @@ if __name__ == '__main__':
 
     # Set up flux bin edges
     nfbins = int((args.f2 - args.f1) / args.df)
-    flux_edges = (np.arange(nfbins+1)-0.5) * args.df + args.f1
-    flux_centers = (flux_edges[1:] + flux_edges[:-1])/2
+    flux_edges_gpu = (cupy.arange(nfbins+1)-0.5) * args.df + args.f1
 
     # Read file list file
     fnames_spectra = config_qmle.readFnameSpectra()
@@ -154,101 +175,49 @@ if __name__ == '__main__':
         fnames_spectra = qutil.getPiccaFList(fnames_spectra)
 
     nfiles = len(fnames_spectra)
+    logging.info(f"There are {nfiles} files.")
+    local_queue = balance_load(fnames_spectra)
 
     # Calculate fiducial correlation function
     logging.info("Calculating fiducial correlation function.")
     fiducial_corr_fn = fid.getLyaCorrFn(config_qmle.z_edges, args.dlambda)
 
-    flux_pdf = np.zeros(nfbins*config_qmle.z_n)
-    fisher = np.zeros((flux_pdf.size, flux_pdf.size))
+    pdf_estimator = PDFEstimator(args, config_qmle, flux_edges_gpu, fiducial_corr_fn)
+    for fname in local_queue:
+        pdf_estimator(fname)
 
-    pcounter = qutil.Progress(nfiles) # Progress tracker
-    logging.info(f"There are {nfiles} files.")
-    with Pool(processes=args.nproc) as pool:
-        imap_it = pool.imap(
-            PDFEstimator(args, config_qmle, flux_edges, fiducial_corr_fn),
-            fnames_spectra
-            )
+    flux_edges_cpu = cupy.asnumpy(flux_edges_gpu)
+    flux_centers = (flux_edges_cpu[1:] + flux_edges_cpu[:-1])/2
+    flux_pdf_cpu = cupy.asnumpy(pdf_estimator.flux_pdf)
+    fisher_cpu = cupy.asnumpy(pdf_estimator.fisher)
+    MPI.Reduce(flux_pdf_cpu, root=0)
+    MPI.Reduce(fisher_cpu, root=0)
 
-        for _fpdf, _cinv in imap_it:
-            flux_pdf += _fpdf
-            fisher += _cinv
+    if mpi_rank == 0:
+        for ii in range(flux_pdf.size):
+            if fisher[ii, ii] == 0:
+                fisher[ii, ii]=1
 
-            pcounter.increase()
+        cov = np.linalg.inv(fisher_cpu)
+        flux_pdf = cov@flux_pdf_cpu
 
-    for ii in range(flux_pdf.size):
-        if fisher[ii, ii] == 0:
-            fisher[ii, ii]=1
+        # Save flux pdf fn
+        fname2save = f"{output_dir}/{output_base}-flux-pdf-estimate.txt"
+        zarr_repeated = np.repeat(config_qmle.z_bins, nfbins)
+        farr_repeated = np.tile(flux_centers, config_qmle.z_n)
+        egauss = np.sqrt(cov.diagonal())
 
-    cov = np.linalg.inv(fisher)
-    flux_pdf = cov@flux_pdf
+        corr_table = Table([zarr_repeated, farr_repeated, flux_pdf, egauss], \
+            names=('z', 'F', 'FPDF', 'e_FPDF'))
+        corr_table.write(fname2save, format="ascii", overwrite=True, \
+            formats={'z':'%.5e', 'F':'%.5e', 'FPDF':'%.5e', 'e_FPDF':'%.5e'})
+        logging.info(f"Flux PDF saved as {fname2save}")
 
-    # Save flux pdf fn
-    fname2save = f"{output_dir}/{output_base}-flux-pdf-estimate.txt"
-    zarr_repeated = np.repeat(config_qmle.z_bins, nfbins)
-    farr_repeated = np.tile(flux_centers, config_qmle.z_n)
-    egauss = np.sqrt(cov.diagonal())
+        # Save Fisher
+        fname2save = f"{output_dir}/{output_base}-fisher-flux-pdf-estimate.txt"
+        np.savetxt(fname2save, fisher_cpu)
 
-    corr_table = Table([zarr_repeated, farr_repeated, flux_pdf, egauss], \
-        names=('z', 'F', 'FPDF', 'e_FPDF'))
-    corr_table.write(fname2save, format="ascii", overwrite=True, \
-        formats={'z':'%.5e', 'F':'%.5e', 'FPDF':'%.5e', 'e_FPDF':'%.5e'})
-    logging.info(f"Flux PDF saved as {fname2save}")
-
-    # Save Fisher
-    fname2save = f"{output_dir}/{output_base}-fisher-flux-pdf-estimate.txt"
-    np.savetxt(fname2save, fisher)
-
-    logging.info("DONE!")
-"""
-    # Use subsampling to estimate covariance
-    nsubsamples = nfiles if config_qmle.picca_input else args.nsubsamples
-    # Set up subsampling class to store results
-    reso_samples = qutil.SubsampleCov(config_qmle.z_n, nsubsamples, is_weighted=True)
-    xi1d_samples = qutil.SubsampleCov(config_qmle.z_n*args.nrbins, nsubsamples, is_weighted=True)
-
-    pcounter = qutil.Progress(nfiles) # Progress tracker
-    logging.info(f"There are {nfiles} files.")
-    with Pool(processes=args.nproc) as pool:
-        imap_it = pool.imap(Xi1DEstimator(args, config_qmle), fnames_spectra)
-
-        for corfn, cnts_crr, mean_res, counts_mreso in imap_it:
-            reso_samples.addMeasurement(mean_res, counts_mreso)
-            xi1d_samples.addMeasurement(corfn.ravel(), cnts_crr.ravel())
-
-            pcounter.increase()
-
-    # Loop is done. Now average results
-    mean_xi1d, cov_xi1d = xi1d_samples.getMeanNCov()
-    mean_xi1d_biascorr, _ = xi1d_samples.getMeanNCov(bias_correct=True)
-    mean_reso, cov_reso = reso_samples.getMeanNCov()
-
-    # Mean resolution
-    err_reso = np.sqrt(cov_reso.diagonal())
-    meanres_filename = f"{output_dir}/{output_base}-mean-resolution.txt"
-    meanres_table = Table([config_qmle.z_bins, mean_reso, err_reso], names=('z', 'R', 'e_R'))
-    meanres_table.write(meanres_filename, format='ascii.fixed_width', \
-        formats={'z':'%.1f', 'R':'%.1f', 'e_R':'%.1f'}, overwrite=True)
-    logging.info(f"Mean R saved as {meanres_filename}")
-
-    # Save correlation fn
-    corr_filename = f"{output_dir}/{output_base}-corr1d-weighted-estimate.txt"
-    zarr_repeated = np.repeat(config_qmle.z_bins, r_bins.size)
-    rarr_repeated = np.tile(r_bins, config_qmle.z_n)
-
-    err_xi1d = np.sqrt(cov_xi1d.diagonal())
-    corr_table = Table([zarr_repeated, rarr_repeated, mean_xi1d, mean_xi1d_biascorr, err_xi1d], \
-        names=('z', 'r', 'Xi1D', 'Xi1D-bcor', 'e_xi1d'))
-    corr_table.write(corr_filename, format='ascii.fixed_width', overwrite=True, \
-        formats={'z':'%.1f', 'r':'%.1f', 'Xi1D':'%.5e', 'Xi1D-bcor':'%.5e', 'e_xi1d':'%.5e'})
-    logging.info(f"Corr fn saved as {corr_filename}")
-
-    # Save covariance
-    cov_filename = f"{output_dir}/{output_base}-covariance-xi1d-weighted-estimate.txt"
-    np.savetxt(cov_filename, cov_xi1d)
-
-    logging.info("DONE!")
-"""
+        logging.info("DONE!")
 
 
 
