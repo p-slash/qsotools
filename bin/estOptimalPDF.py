@@ -120,9 +120,11 @@ class PDFEstimator(object):
         return Bmat
 
     def constructBinMat(self, flux_idx_gpu):
-        Bmat_interp = 0.5*self._oneBmat(flux_idx_gpu)\
-            + 0.25*self._oneBmat(flux_idx_gpu-1)\
-            + 0.25*self._oneBmat(flux_idx_gpu+1)
+        Bmat_interp = self._oneBmat(flux_idx_gpu)
+        if self.args.alpha>0 and self.args.alpha<1:
+            Bmat_interp = (1 - self.args.alpha) * Bmat_interp\
+                    + self.args.alpha * self._oneBmat(flux_idx_gpu-1)\
+                    + self.args.alpha * self._oneBmat(flux_idx_gpu+1)
         return Bmat_interp
 
     def getEstimates(self, qso):
@@ -156,8 +158,9 @@ class PDFEstimator(object):
 
         Bmat = self.constructBinMat(flux_idx_gpu)
         BmatT = Bmat.transpose()
-        self.flux_pdf[i1:i2] += BmatT.dot(y)*f_gpu.size
-        self.fisher[i1:i2, i1:i2] += (BmatT @ cinv_gpu @ Bmat)*f_gpu.size**2
+        factor = f_gpu.size if self.args.method3 else 1
+        self.flux_pdf[i1:i2] += BmatT.dot(y) * factor
+        self.fisher[i1:i2, i1:i2] += (BmatT @ cinv_gpu @ Bmat) * factor**2
 
         # _2d_bin_idx = cupy.ravel(
         #     flux_idx_gpu[:, cupy.newaxis]
@@ -204,6 +207,7 @@ if __name__ == '__main__':
     parser.add_argument("--f1", help="First flux bin", type=float, default=-0.25)
     parser.add_argument("--f2", help="Last flux bin", type=float, default=1.55)
     parser.add_argument("--df", help="Flux bin size", type=float, default=0.05)
+    parser.add_argument("--alpha", help="Mixing ratio for neighboring flux bins", default=0, type=float)
 
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates.")
@@ -213,6 +217,7 @@ if __name__ == '__main__':
     parser.add_argument("--min-nopix", help="Minimum number of pixels in chunk", type=int,
         default=20)
     parser.add_argument("--no-sfid", help="Turn off fiducial signal matrix", action="store_true")
+    parser.add_argument("--method3", action="store_true")
 
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
@@ -277,27 +282,29 @@ if __name__ == '__main__':
         # norm = np.repeat(fdiag_sum, nfbins)
         # -----------------------------
 
-        # Norm PDF directly
-        fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
-        sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
-        norm = np.repeat(sum_fpdf_z, nfbins)
-        cov = fisher_cpu/np.outer(norm, norm)
-        fisher_cpu = np.linalg.inv(cov)
-        flux_pdf = flux_pdf_cpu/norm
-        # -----------------------------
+        if args.method3:
+            # Third norm - does not work due to 0 probably
+            # norm = np.tile(args.df * flux_centers, config_qmle.z_n)
+            norm = args.df
+            fisher_cpu *= norm**2 # np.outer(norm, norm)
+            flux_pdf_cpu *= norm
 
-        # Third norm - does not work due to 0 probably
-        # norm = np.tile(args.df * flux_centers, config_qmle.z_n)
-        # # norm = args.df
-        # fisher_cpu *= np.outer(norm, norm) # norm**2
-        # flux_pdf_cpu *= norm
-
-        # _di_idx = np.diag_indices(flux_pdf_cpu.size)
-        # w = fisher_cpu[_di_idx] == 0
-        # fisher_cpu[_di_idx][w] = 1
-        # cov = np.linalg.inv(fisher_cpu)
-        # cov[w] = 0
-        # flux_pdf = cov@flux_pdf_cpu
+            _di_idx = np.diag_indices(flux_pdf_cpu.size)
+            w = fisher_cpu[_di_idx] == 0
+            fisher_cpu[_di_idx][w] = 1
+            cov = np.linalg.inv(fisher_cpu)
+            cov[w] = 0
+            flux_pdf = cov@flux_pdf_cpu
+            # -----------------------------
+        else:
+            # Norm PDF directly
+            fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
+            sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
+            norm = np.repeat(sum_fpdf_z, nfbins)
+            cov = fisher_cpu/np.outer(norm, norm)
+            fisher_cpu = np.linalg.inv(cov)
+            flux_pdf = flux_pdf_cpu/norm
+            # -----------------------------
 
         # Save flux pdf fn
         logging.info("Saving to files.")
