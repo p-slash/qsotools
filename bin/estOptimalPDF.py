@@ -73,7 +73,8 @@ class PDFEstimator(object):
         self.args = args
         self.config_qmle = config_qmle
         self.flux_edges_gpu = flux_edges_gpu
-        self.df = flux_edges_gpu[1]-flux_edges_gpu[0]
+        if args.method3:
+            self.flux_centers_gpu = flux_edges_gpu[:-1]+args.df/2
         self.fiducial_corr_fn = fiducial_corr_fn
 
         self.nfbins = flux_edges_gpu.size-1
@@ -150,13 +151,17 @@ class PDFEstimator(object):
 
         cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
         flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
+        Bmat = self.constructBinMat(flux_idx_gpu) 
 
-        y = cinv_gpu.dot(cupy.ones_like(f_gpu))
+        if self.args.method3:
+            y = cinv_gpu.dot(f_gpu)
+            Bmat = Bmat @ cupy.diag(self.flux_centers_gpu)
+        else:
+            y = cinv_gpu.dot(cupy.ones_like(f_gpu))
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
 
-        Bmat = self.constructBinMat(flux_idx_gpu)
         BmatT = Bmat.transpose()
         factor = f_gpu.size if self.args.method3 else 1
         self.flux_pdf[i1:i2] += BmatT.dot(y) * factor
@@ -290,8 +295,11 @@ if __name__ == '__main__':
             flux_pdf_cpu *= norm
 
             _di_idx = np.diag_indices(flux_pdf_cpu.size)
-            w = fisher_cpu[_di_idx] == 0
+            w = fisher_cpu[_di_idx] < 1e-6
+            fisher_cpu[w, :] = 0
+            fisher_cpu[:, w] = 0
             fisher_cpu[_di_idx][w] = 1
+            flux_pdf_cpu[w] = 0
             cov = np.linalg.inv(fisher_cpu)
             cov[w] = 0
             flux_pdf = cov@flux_pdf_cpu
