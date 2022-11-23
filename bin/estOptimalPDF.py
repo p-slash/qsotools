@@ -96,19 +96,19 @@ class PDFEstimator(object):
 
         return cinv_gpu
 
-    def _oneBmat(iidx):
+    def _oneBmat(self, iidx):
         # Move overflows into range
         iidx[iidx<1] = 1
         iidx[iidx>self.nfbins] = self.nfbins
 
-        ndata = idx.size
+        ndata = iidx.size
         sparsedata = cupy.ones(ndata, dtype=float)
         indices = cupy.empty(ndata, dtype=int)
         indptr = cupy.zeros(self.nfbins+1, dtype=int)
 
-        bcts = cupy.bincount(iidx, minlength=self.nfbins+2)
+        bcts = cupy.bincount(iidx, minlength=self.nfbins+1)
 
-        indptr = cupy.cumsum(bcts[:-1])
+        indptr = cupy.cumsum(bcts)
         jj = cupy.arange(self.nfbins)+1
         indices = cupy.nonzero(iidx==jj[:, cupy.newaxis])[1]
 
@@ -118,11 +118,19 @@ class PDFEstimator(object):
 
     def constructBinMat(self, flux_idx_gpu):
         Bmat_interp = 0.5*self._oneBmat(flux_idx_gpu)\
-            + 0.25 *self._oneBmat(flux_idx_gpu-1)\
+            + 0.25*self._oneBmat(flux_idx_gpu-1)\
             + 0.25*self._oneBmat(flux_idx_gpu+1)
         return Bmat_interp
 
     def getEstimates(self, qso):
+        # z_arr = qso.wave/fid.LYA_WAVELENGTH-1
+        z_med = qso.wave[int(qso.size/2)]/fid.LYA_WAVELENGTH-1
+        z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
+
+        if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
+            logging.debug(f"Skipping z_med={z_med:.2f}")
+            return
+
         if self.args.smooth_noise_sigmaA > 0:
             qso.smoothNoise(sigma_A=self.args.smooth_noise_sigmaA)
 
@@ -131,14 +139,6 @@ class PDFEstimator(object):
         f_gpu = cupy.asarray(qso.flux)
         e_gpu = cupy.asarray(qso.error)
 
-        # z_arr = qso.wave/fid.LYA_WAVELENGTH-1
-        z_med = z_gpu[int(qso.size/2)]
-        z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
-
-        if z_bin_no < 0 or z_bin_no > self.config_qmle.z_n-1:
-            logging.debug(f"Skipping z_med={z_med:.2f}")
-            return
-
         if self.args.convert2flux:
             mf = cp_meanFluxFG08(z_gpu)
             f_gpu = (1+f_gpu) * mf
@@ -146,12 +146,12 @@ class PDFEstimator(object):
 
         cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
         flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
-        _2d_bin_idx = cupy.ravel(
-            flux_idx_gpu[:, cupy.newaxis]
-            + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
-        )
+        # _2d_bin_idx = cupy.ravel(
+        #     flux_idx_gpu[:, cupy.newaxis]
+        #     + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
+        # )
 
-        y = cinv_gpu.dot(f_gpu)
+        y = cinv_gpu.dot(cupy.ones_like(f_gpu))
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
@@ -163,8 +163,8 @@ class PDFEstimator(object):
 
         Bmat = self.constructBinMat(flux_idx_gpu)
         BmatT = Bmat.transpose()
-        self.flux_pdf[i1:i2] += BmatT.dot(y)
-        self.fisher[i1:i2, i1:i2] += BmatT.dot(cinv_gpu) @ Bmat
+        self.flux_pdf[i1:i2] += BmatT.dot(y)*f_gpu.size
+        self.fisher[i1:i2, i1:i2] += (BmatT.dot(cinv_gpu) @ Bmat)*f_gpu.size**2
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
@@ -279,10 +279,11 @@ if __name__ == '__main__':
         # flux_pdf = flux_pdf_cpu/norm
         # -----------------------------
 
-        # Third norm
-        norm = np.repeat(args.df * flux_centers, config_qmle.z_n)
-        fisher_cpu *= np.outer(norm, norm)
-        flux_pdf *= norm
+        # Third norm - does not work due to 0 probably
+        # norm = np.tile(args.df * flux_centers, config_qmle.z_n)
+        norm = args.df
+        fisher_cpu *= norm**2 # np.outer(norm, norm)
+        flux_pdf_cpu *= norm
 
         _di_idx = np.diag_indices(flux_pdf_cpu.size)
         w = fisher_cpu[_di_idx] == 0
