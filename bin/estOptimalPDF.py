@@ -265,7 +265,7 @@ if __name__ == '__main__':
         # norm = np.repeat(fdiag_sum, nfbins)
 
         # Norm PDF directly
-        fpdf_per_z = np.split(flux_pdf_cpu)
+        fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
         sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
         norm = np.repeat(sum_fpdf_z, nfbins)
 
