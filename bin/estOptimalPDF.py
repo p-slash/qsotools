@@ -253,12 +253,21 @@ if __name__ == '__main__':
 
     if mpi_rank == 0:
         logging.info("Getting final results")
-        fdiag = np.split(fisher_cpu.diagonal(), config_qmle.z_n)
-        fdiag_sum = np.sum(fdiag, axis=1)
-        norm = np.repeat(fdiag_sum, nfbins)
+        
+        # Wrong
         # _di_idx = np.diag_indices(flux_pdf_cpu.size)
         # w = fisher_cpu[_di_idx] == 0
         # fisher_cpu[_di_idx][w] = 1
+
+        # Norm with Fisher diagonals
+        # fdiag = np.split(fisher_cpu.diagonal(), config_qmle.z_n)
+        # fdiag_sum = np.sum(fdiag, axis=1)
+        # norm = np.repeat(fdiag_sum, nfbins)
+
+        # Norm PDF directly
+        fpdf_per_z = np.split(flux_pdf_cpu)
+        sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
+        norm = np.repeat(sum_fpdf_z, nfbins)
 
         cov = fisher_cpu/np.outer(norm, norm)
         fisher_cpu = np.linalg.inv(cov)
