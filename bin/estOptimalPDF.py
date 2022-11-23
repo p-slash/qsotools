@@ -83,6 +83,9 @@ class PDFEstimator(object):
         self.fisher = cupy.zeros((self.flux_pdf.size, self.flux_pdf.size))
 
     def getInvCovariance(self, w_gpu, z_gpu, e_gpu):
+        if self.args.no_sfid:
+            return cupy.diag(e_gpu**-2)
+
         v_gpu = w_gpu/w_gpu[0]
         v_gpu = fid.LIGHT_SPEED * cupy.log(v_gpu)
         dv_matrix = v_gpu[:, cupy.newaxis] - v_gpu[cupy.newaxis, :]
@@ -146,25 +149,26 @@ class PDFEstimator(object):
 
         cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
         flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
-        # _2d_bin_idx = cupy.ravel(
-        #     flux_idx_gpu[:, cupy.newaxis]
-        #     + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
-        # )
 
         y = cinv_gpu.dot(cupy.ones_like(f_gpu))
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
-        # self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y*Sb, minlength=self.nfbins+2)[1:-1]
-
-        # temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
-        # temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
-        # self.fisher[i1:i2, i1:i2] += temp_cinv
 
         Bmat = self.constructBinMat(flux_idx_gpu)
         BmatT = Bmat.transpose()
         self.flux_pdf[i1:i2] += BmatT.dot(y)*f_gpu.size
         self.fisher[i1:i2, i1:i2] += (BmatT.dot(cinv_gpu) @ Bmat)*f_gpu.size**2
+
+        # _2d_bin_idx = cupy.ravel(
+        #     flux_idx_gpu[:, cupy.newaxis]
+        #     + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
+        # )
+        # self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y*Sb, minlength=self.nfbins+2)[1:-1]
+
+        # temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
+        # temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
+        # self.fisher[i1:i2, i1:i2] += temp_cinv
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
@@ -209,6 +213,7 @@ if __name__ == '__main__':
         action="store_true")
     parser.add_argument("--min-nopix", help="Minimum number of pixels in chunk", type=int,
         default=20)
+    parser.add_argument("--no-sfid", help="Turn off fiducial signal matrix", action="store_true")
 
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
     args = parser.parse_args()
@@ -241,9 +246,12 @@ if __name__ == '__main__':
     local_queue = balance_load(fnames_spectra, mpi_size, mpi_rank)
 
     # Calculate fiducial correlation function
-    logging_mpi("Calculating fiducial correlation function.", mpi_rank)
-    z, v, xi1d = fid.getLyaCorrFn(config_qmle.z_edges, args.dlambda)
-    fiducial_corr_fn = cpInterp2d(z, v, xi1d)
+    if not args.no_sfid:
+        logging_mpi("Calculating fiducial correlation function.", mpi_rank)
+        z, v, xi1d = fid.getLyaCorrFn(config_qmle.z_edges, args.dlambda)
+        fiducial_corr_fn = cpInterp2d(z, v, xi1d)
+    else:
+        fiducial_corr_fn = None
 
     logging_mpi("Running PDF estimator.", mpi_rank)
     pdf_estimator = PDFEstimator(args, config_qmle, flux_edges_gpu, fiducial_corr_fn)
