@@ -95,27 +95,22 @@ class PDFEstimator(object):
 
         return cinv_gpu
 
-    def constructBinMat(self, flux_idx_gpu):
-        w = (flux_idx_gpu>0) & (flux_idx_gpu<self.nfbins+1)
-        ndata = cupy.sum(w)
-        data = cupy.ones(ndata, dtype=float)
-        indices = cupy.empty(ndata, dtype=int)
+    # def constructBinMat(self, flux_idx_gpu):
+    #     w = cupy.logical_and(flux_idx_gpu>0, flux_idx_gpu<self.nfbins+1)
+    #     ndata = cupy.sum(w).get()
+    #     data = cupy.ones(ndata, dtype=float)
+    #     indices = cupy.empty(ndata, dtype=int)
+    #     indptr = cupy.zeros(self.nfbins+1, dtype=int)
 
-        ubins, bidx, bcts = cupy.unique(flux_idx_gpu, return_inverse=True, return_counts=True)
-        lastcol = min(ubins[-1], nfbins)
-        indptr = cupy.zeros(lastcol+1, dtype=int)
-        jj=0
-        for ii in range(1, lastcol+1):
-            if (ubins[jj] != ii):
-                indptr[ii]=indptr[ii-1]
-            else:
-                indptr[ii]=indptr[ii-1]+bcts[jj]
-                indices[indptr[ii-1]:indptr[ii]] = cupy.nonzero(bidx==jj)
-                jj += 1
+    #     bcts = cupy.bincount(flux_idx_gpu, minlength=self.nfbins+2)
+    #     bcts[0]=0
+    #     indptr = cupy.cumsum(bcts[:-1])
+    #     ii = cupy.arange(self.nfbins)+1
+    #     indices = cupy.nonzero(flux_idx_gpu==ii[:, cupy.newaxis])[1]
 
-        Bmat = cupyx.scipy.sparse.csc_matrix((data, indices, indptr),
-            shape=(flux_idx_gpu, nfbins))
-        return Bmat
+    #     Bmat = cupyx.scipy.sparse.csc_matrix((data, indices, indptr),
+    #         shape=(flux_idx_gpu.size, self.nfbins))
+    #     return Bmat
 
     def getEstimates(self, qso):
         if self.args.smooth_noise_sigmaA > 0:
@@ -141,22 +136,25 @@ class PDFEstimator(object):
 
         cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
         flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
-        Bmat = self.constructBinMat(flux_idx_gpu)
-        BmatT = Bmat.transpose()
+        _2d_bin_idx = cupy.ravel(
+            flux_idx_gpu[:, cupy.newaxis]
+            + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
+        )
 
-        y = cinv_gpu.dot(f_gpu)
+        y = cinv_gpu.dot(cupy.ones_like(f_gpu))
+
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
-        # self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y, minlength=self.nfbins+2)[1:-1]
-        self.flux_pdf[i1:i2] += BmatT.dot(y)
+        self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y, minlength=self.nfbins+2)[1:-1]
 
-        # _2d_bin_idx = cupy.ravel(
-        #     flux_idx_gpu[:, cupy.newaxis]
-        #     + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
-        # )
-        # temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
-        # temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
-        self.fisher[i1:i2, i1:i2] += BmatT @ cinv @ Bmat
+        temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
+        temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
+        self.fisher[i1:i2, i1:i2] += temp_cinv
+
+        # Bmat = self.constructBinMat(flux_idx_gpu)
+        # BmatT = Bmat.transpose()
+        # self.flux_pdf[i1:i2] += BmatT.dot(y)
+        # self.fisher[i1:i2, i1:i2] += BmatT @ cinv @ Bmat
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
@@ -255,12 +253,16 @@ if __name__ == '__main__':
 
     if mpi_rank == 0:
         logging.info("Getting final results")
-        _di_idx = np.diag_indices(flux_pdf_cpu.size)
-        w = fisher_cpu[_di_idx] == 0
-        fisher_cpu[_di_idx][w] = 1
+        fdiag = np.split(fisher_cpu.diagonal(), config_qmle.z_n)
+        fdiag_sum = np.sum(fdiag, axis=1)
+        norm = np.repeat(fdiag_sum, nfbins)
+        # _di_idx = np.diag_indices(flux_pdf_cpu.size)
+        # w = fisher_cpu[_di_idx] == 0
+        # fisher_cpu[_di_idx][w] = 1
 
-        cov = np.linalg.inv(fisher_cpu)
-        flux_pdf = cov@flux_pdf_cpu
+        cov = fisher_cpu/np.outer(norm, norm)
+        fisher_cpu = np.linalg.inv(cov)
+        flux_pdf = flux_pdf_cpu/norm
 
         # Save flux pdf fn
         logging.info("Saving to files.")
