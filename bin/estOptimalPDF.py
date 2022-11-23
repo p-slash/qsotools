@@ -126,7 +126,6 @@ class PDFEstimator(object):
         return Bmat_interp
 
     def getEstimates(self, qso):
-        # z_arr = qso.wave/fid.LYA_WAVELENGTH-1
         z_med = qso.wave[int(qso.size/2)]/fid.LYA_WAVELENGTH-1
         z_bin_no = int((z_med - self.config_qmle.z_edges[0]) / self.config_qmle.z_d)
 
@@ -150,7 +149,7 @@ class PDFEstimator(object):
         cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
         flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
 
-        y = cinv_gpu.dot(cupy.ones_like(f_gpu))
+        y = cinv_gpu.dot(f_gpu)
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
@@ -158,7 +157,7 @@ class PDFEstimator(object):
         Bmat = self.constructBinMat(flux_idx_gpu)
         BmatT = Bmat.transpose()
         self.flux_pdf[i1:i2] += BmatT.dot(y)*f_gpu.size
-        self.fisher[i1:i2, i1:i2] += (BmatT.dot(cinv_gpu) @ Bmat)*f_gpu.size**2
+        self.fisher[i1:i2, i1:i2] += (BmatT @ cinv_gpu @ Bmat)*f_gpu.size**2
 
         # _2d_bin_idx = cupy.ravel(
         #     flux_idx_gpu[:, cupy.newaxis]
@@ -202,8 +201,8 @@ if __name__ == '__main__':
 
     parser.add_argument("--nsubsamples", type=int, default=100, \
         help="Number of subsamples if input is not Picca.")
-    parser.add_argument("--f1", help="First flux bin", type=float, default=-0.2)
-    parser.add_argument("--f2", help="Last flux bin", type=float, default=1.2)
+    parser.add_argument("--f1", help="First flux bin", type=float, default=-0.25)
+    parser.add_argument("--f2", help="Last flux bin", type=float, default=1.55)
     parser.add_argument("--df", help="Flux bin size", type=float, default=0.1)
 
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
@@ -288,9 +287,9 @@ if __name__ == '__main__':
         # -----------------------------
 
         # Third norm - does not work due to 0 probably
-        # norm = np.tile(args.df * flux_centers, config_qmle.z_n)
-        norm = args.df
-        fisher_cpu *= norm**2 # np.outer(norm, norm)
+        norm = np.tile(args.df * flux_centers, config_qmle.z_n)
+        # norm = args.df
+        fisher_cpu *= np.outer(norm, norm) # norm**2
         flux_pdf_cpu *= norm
 
         _di_idx = np.diag_indices(flux_pdf_cpu.size)
