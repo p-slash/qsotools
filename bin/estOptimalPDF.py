@@ -149,7 +149,7 @@ class PDFEstimator(object):
         cinv_gpu = self.getInvCovariance(w_gpu, z_gpu, e_gpu)
         flux_idx_gpu = cupy.searchsorted(self.flux_edges_gpu, f_gpu)
 
-        y = cinv_gpu.dot(f_gpu)
+        y = cinv_gpu.dot(cupy.ones_like(f_gpu))
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
