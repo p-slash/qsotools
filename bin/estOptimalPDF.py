@@ -4,7 +4,7 @@ import logging
 
 import numpy as np
 import cupy
-import cupyx
+from cupyx.scipy.sparse import csc_matrix
 from astropy.table import Table
 from mpi4py import MPI
 
@@ -73,6 +73,7 @@ class PDFEstimator(object):
         self.args = args
         self.config_qmle = config_qmle
         self.flux_edges_gpu = flux_edges_gpu
+        self.df = flux_edges_gpu[1]-flux_edges_gpu[0]
         self.fiducial_corr_fn = fiducial_corr_fn
 
         self.nfbins = flux_edges_gpu.size-1
@@ -95,22 +96,31 @@ class PDFEstimator(object):
 
         return cinv_gpu
 
-    # def constructBinMat(self, flux_idx_gpu):
-    #     w = cupy.logical_and(flux_idx_gpu>0, flux_idx_gpu<self.nfbins+1)
-    #     ndata = cupy.sum(w).get()
-    #     data = cupy.ones(ndata, dtype=float)
-    #     indices = cupy.empty(ndata, dtype=int)
-    #     indptr = cupy.zeros(self.nfbins+1, dtype=int)
+    def _oneBmat(iidx):
+        # Move overflows into range
+        iidx[iidx<1] = 1
+        iidx[iidx>self.nfbins] = self.nfbins
 
-    #     bcts = cupy.bincount(flux_idx_gpu, minlength=self.nfbins+2)
-    #     bcts[0]=0
-    #     indptr = cupy.cumsum(bcts[:-1])
-    #     ii = cupy.arange(self.nfbins)+1
-    #     indices = cupy.nonzero(flux_idx_gpu==ii[:, cupy.newaxis])[1]
+        ndata = idx.size
+        sparsedata = cupy.ones(ndata, dtype=float)
+        indices = cupy.empty(ndata, dtype=int)
+        indptr = cupy.zeros(self.nfbins+1, dtype=int)
 
-    #     Bmat = cupyx.scipy.sparse.csc_matrix((data, indices, indptr),
-    #         shape=(flux_idx_gpu.size, self.nfbins))
-    #     return Bmat
+        bcts = cupy.bincount(iidx, minlength=self.nfbins+2)
+
+        indptr = cupy.cumsum(bcts[:-1])
+        jj = cupy.arange(self.nfbins)+1
+        indices = cupy.nonzero(iidx==jj[:, cupy.newaxis])[1]
+
+        Bmat = csc_matrix((sparsedata, indices, indptr),
+            shape=(iidx.size, self.nfbins))
+        return Bmat
+
+    def constructBinMat(self, flux_idx_gpu):
+        Bmat_interp = 0.5*self._oneBmat(flux_idx_gpu)\
+            + 0.25 *self._oneBmat(flux_idx_gpu-1)\
+            + 0.25*self._oneBmat(flux_idx_gpu+1)
+        return Bmat_interp
 
     def getEstimates(self, qso):
         if self.args.smooth_noise_sigmaA > 0:
@@ -141,20 +151,20 @@ class PDFEstimator(object):
             + (self.nfbins+2) * flux_idx_gpu[cupy.newaxis, :]
         )
 
-        y = cinv_gpu.dot(cupy.ones_like(f_gpu))
+        y = cinv_gpu.dot(f_gpu)
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
-        self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y, minlength=self.nfbins+2)[1:-1]
+        # self.flux_pdf[i1:i2] += cupy.bincount(flux_idx_gpu, weights=y*Sb, minlength=self.nfbins+2)[1:-1]
 
-        temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
-        temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
-        self.fisher[i1:i2, i1:i2] += temp_cinv
+        # temp_cinv = cupy.bincount(_2d_bin_idx, weights=cinv_gpu.ravel(), minlength=(self.nfbins+2)**2)
+        # temp_cinv = temp_cinv.reshape(self.nfbins+2, self.nfbins+2)[1:-1, 1:-1]
+        # self.fisher[i1:i2, i1:i2] += temp_cinv
 
-        # Bmat = self.constructBinMat(flux_idx_gpu)
-        # BmatT = Bmat.transpose()
-        # self.flux_pdf[i1:i2] += BmatT.dot(y)
-        # self.fisher[i1:i2, i1:i2] += BmatT @ cinv @ Bmat
+        Bmat = self.constructBinMat(flux_idx_gpu)
+        BmatT = Bmat.transpose()
+        self.flux_pdf[i1:i2] += BmatT.dot(y)
+        self.fisher[i1:i2, i1:i2] += BmatT.dot(cinv_gpu) @ Bmat
 
     def __call__(self, fname):
         if self.config_qmle.picca_input:
@@ -253,25 +263,34 @@ if __name__ == '__main__':
 
     if mpi_rank == 0:
         logging.info("Getting final results")
-        
-        # Wrong
-        # _di_idx = np.diag_indices(flux_pdf_cpu.size)
-        # w = fisher_cpu[_di_idx] == 0
-        # fisher_cpu[_di_idx][w] = 1
 
         # Norm with Fisher diagonals
         # fdiag = np.split(fisher_cpu.diagonal(), config_qmle.z_n)
         # fdiag_sum = np.sum(fdiag, axis=1)
         # norm = np.repeat(fdiag_sum, nfbins)
+        # -----------------------------
 
         # Norm PDF directly
-        fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
-        sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
-        norm = np.repeat(sum_fpdf_z, nfbins)
+        # fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
+        # sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
+        # norm = np.repeat(sum_fpdf_z, nfbins)
+        # cov = fisher_cpu/np.outer(norm, norm)
+        # fisher_cpu = np.linalg.inv(cov)
+        # flux_pdf = flux_pdf_cpu/norm
+        # -----------------------------
 
-        cov = fisher_cpu/np.outer(norm, norm)
-        fisher_cpu = np.linalg.inv(cov)
-        flux_pdf = flux_pdf_cpu/norm
+        # Third norm
+        norm = np.repeat(args.df * flux_centers, config_qmle.z_n)
+        fisher_cpu *= np.outer(norm, norm)
+        flux_pdf *= norm
+
+        _di_idx = np.diag_indices(flux_pdf_cpu.size)
+        w = fisher_cpu[_di_idx] == 0
+        fisher_cpu[_di_idx][w] = 1
+        cov = np.linalg.inv(fisher_cpu)
+        cov[w] = 0
+
+        flux_pdf = cov@flux_pdf_cpu
 
         # Save flux pdf fn
         logging.info("Saving to files.")
