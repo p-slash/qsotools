@@ -203,7 +203,7 @@ if __name__ == '__main__':
         help="Number of subsamples if input is not Picca.")
     parser.add_argument("--f1", help="First flux bin", type=float, default=-0.25)
     parser.add_argument("--f2", help="Last flux bin", type=float, default=1.55)
-    parser.add_argument("--df", help="Flux bin size", type=float, default=0.1)
+    parser.add_argument("--df", help="Flux bin size", type=float, default=0.05)
 
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates.")
@@ -278,27 +278,26 @@ if __name__ == '__main__':
         # -----------------------------
 
         # Norm PDF directly
-        # fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
-        # sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
-        # norm = np.repeat(sum_fpdf_z, nfbins)
-        # cov = fisher_cpu/np.outer(norm, norm)
-        # fisher_cpu = np.linalg.inv(cov)
-        # flux_pdf = flux_pdf_cpu/norm
+        fpdf_per_z = np.split(flux_pdf_cpu, config_qmle.z_n)
+        sum_fpdf_z = np.sum(fpdf_per_z, axis=1) * args.df
+        norm = np.repeat(sum_fpdf_z, nfbins)
+        cov = fisher_cpu/np.outer(norm, norm)
+        fisher_cpu = np.linalg.inv(cov)
+        flux_pdf = flux_pdf_cpu/norm
         # -----------------------------
 
         # Third norm - does not work due to 0 probably
-        norm = np.tile(args.df * flux_centers, config_qmle.z_n)
-        # norm = args.df
-        fisher_cpu *= np.outer(norm, norm) # norm**2
-        flux_pdf_cpu *= norm
+        # norm = np.tile(args.df * flux_centers, config_qmle.z_n)
+        # # norm = args.df
+        # fisher_cpu *= np.outer(norm, norm) # norm**2
+        # flux_pdf_cpu *= norm
 
-        _di_idx = np.diag_indices(flux_pdf_cpu.size)
-        w = fisher_cpu[_di_idx] == 0
-        fisher_cpu[_di_idx][w] = 1
-        cov = np.linalg.inv(fisher_cpu)
-        cov[w] = 0
-
-        flux_pdf = cov@flux_pdf_cpu
+        # _di_idx = np.diag_indices(flux_pdf_cpu.size)
+        # w = fisher_cpu[_di_idx] == 0
+        # fisher_cpu[_di_idx][w] = 1
+        # cov = np.linalg.inv(fisher_cpu)
+        # cov[w] = 0
+        # flux_pdf = cov@flux_pdf_cpu
 
         # Save flux pdf fn
         logging.info("Saving to files.")
