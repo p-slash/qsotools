@@ -275,8 +275,8 @@ if __name__ == '__main__':
     fisher_cpu = cupy.asnumpy(pdf_estimator.fisher)
 
     logging_mpi("Reducing to root.", mpi_rank)
-    comm.reduce(flux_pdf_cpu, root=0)
-    comm.reduce(fisher_cpu, root=0)
+    flux_pdf_cpu = comm.reduce(flux_pdf_cpu, root=0)
+    fisher_cpu = comm.reduce(fisher_cpu, root=0)
 
     if mpi_rank == 0:
         logging.info("Getting final results")
