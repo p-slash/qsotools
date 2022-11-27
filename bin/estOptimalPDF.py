@@ -84,8 +84,9 @@ class PDFEstimator(object):
         self.fisher = cupy.zeros((self.flux_pdf.size, self.flux_pdf.size))
 
     def getInvCovariance(self, w_gpu, z_gpu, e_gpu):
-        if self.args.no_sfid:
-            return cupy.diag(e_gpu**-2)
+        if not self.args.full_sfid:
+            var_lss = self.fiducial_corr_fn(z_gpu, cupy.zeros_like(z_gpu))
+            return 1/cupy.diag(e_gpu**2+var_lss)
 
         v_gpu = w_gpu/w_gpu[0]
         v_gpu = fid.LIGHT_SPEED * cupy.log(v_gpu)
@@ -122,10 +123,14 @@ class PDFEstimator(object):
 
     def constructBinMat(self, flux_idx_gpu):
         Bmat_interp = self._oneBmat(flux_idx_gpu)
-        if self.args.alpha>0 and self.args.alpha<1:
-            Bmat_interp = (1 - self.args.alpha) * Bmat_interp\
-                    + self.args.alpha * self._oneBmat(flux_idx_gpu-1)\
-                    + self.args.alpha * self._oneBmat(flux_idx_gpu+1)
+        if self.args.nmix>0:
+            norm = 1 + 2 * (1 - np.exp(-self.args.nmix))/(np.e - 1)
+            Bmat_interp /= norm
+            for ni in range(1, self.args.nmix+1):
+                Bmat_interp += ( self._oneBmat(flux_idx_gpu-ni)
+                               + self._oneBmat(flux_idx_gpu+ni)
+                               ) * (np.exp(-ni)/norm)
+
         return Bmat_interp
 
     def getEstimates(self, qso):
@@ -212,7 +217,8 @@ if __name__ == '__main__':
     parser.add_argument("--f1", help="First flux bin", type=float, default=-0.25)
     parser.add_argument("--f2", help="Last flux bin", type=float, default=1.55)
     parser.add_argument("--df", help="Flux bin size", type=float, default=0.05)
-    parser.add_argument("--alpha", help="Mixing ratio for neighboring flux bins", default=0, type=float)
+    parser.add_argument("--nmix", help="Mixing number of neighboring flux bins",
+        default=0, type=int)
 
     parser.add_argument("--smooth-noise-sigmaA", type=float, default=20.,
         help="Gaussian sigma in A to smooth pipeline noise estimates.")
@@ -221,7 +227,7 @@ if __name__ == '__main__':
         action="store_true")
     parser.add_argument("--min-nopix", help="Minimum number of pixels in chunk", type=int,
         default=20)
-    parser.add_argument("--no-sfid", help="Turn off fiducial signal matrix", action="store_true")
+    parser.add_argument("--full-sfid", help="Use full fiducial signal matrix", action="store_true")
     parser.add_argument("--method3", action="store_true")
 
     parser.add_argument("--debug", help="Set logger to DEBUG level.", action="store_true")
