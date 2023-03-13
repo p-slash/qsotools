@@ -1517,6 +1517,11 @@ class QQFile():
     3  TRANSMISSION ImageHDU         8   (1864, 571)   float32
     4  DLA          BinTableHDU      17 1864R x 4C [long, double, double, double]
     """
+    meta_dt = np.dtype([
+        ('RA', 'f8'), ('DEC', 'f8'), ('Z', 'f8'), ('MOCKID', 'i8'),
+        ('COADD_EXPTIME', 'f8'), ('FLUX_R', 'f8'), ('TSNR2_LRG', 'f8')
+    ])
+
     def __init__(self, fname, rw='r', clobber=True):
         self.fname = fname
         self.rw = rw
@@ -1549,7 +1554,8 @@ class QQFile():
 
     def getColList(colnames):
         l1 = []
-        def add_colname(radec):
+
+        def add_colname(radec, l1):
             if f'TARGET_{radec}' in colnames:
                 l1.append(f'TARGET_{radec}')
             elif radec in colnames:
@@ -1557,8 +1563,10 @@ class QQFile():
             else:
                 raise Exception(f"Missing metadata info: {radec}")
 
-        add_colname('RA')
-        add_colname('DEC')
+            return l1
+
+        l1 = add_colname('RA', l1)
+        l1 = add_colname('DEC', l1)
         l1.append('Z')
 
         # Check must-have columns are present
@@ -1581,26 +1589,28 @@ class QQFile():
             metadata_str = 'QSO_CAT'
         else:
             metadata_str = 1
-            logging.warning("Metadata not found by hduname. Using extension 1.")
+            logging.warning(
+                "Metadata not found by hduname. Using extension 1.")
 
         metahdu = self.fitsfile[metadata_str]
         colnames = metahdu.get_colnames()
 
-        meta_dt = np.dtype([('RA','f8'), ('DEC','f8'), ('Z','f8'),('MOCKID','i8'), \
-            ('COADD_EXPTIME','f8'), ('FLUX_R','f8')])
+        self.metadata = np.zeros(metahdu.get_nrows(), dtype=QQFile.meta_dt)
 
-        self.metadata = np.zeros(metahdu.get_nrows(), dtype=meta_dt)
-
-        for mcol, fcol in zip(['RA', 'DEC', 'Z', 'MOCKID'], QQFile.getColList(colnames)):
+        for mcol, fcol in zip(
+            ['RA', 'DEC', 'Z', 'MOCKID'], QQFile.getColList(colnames)
+        ):
             self.metadata[mcol] = metahdu[fcol].read()
 
+        def read_xcols(xcol, l1):
+            if xcol in colnames:
+                xres = metahdu[xcol].read()
+                l1.append(xcol)
+            return xres, l1
+
         l1 = ['RA', 'DEC', 'Z', 'MOCKID']
-        if 'COADD_EXPTIME' in colnames:
-            self.metadata['COADD_EXPTIME'] = metahdu['COADD_EXPTIME'].read()
-            l1.append('COADD_EXPTIME')
-        if 'FLUX_R' in colnames:
-            self.metadata['FLUX_R'] = metahdu['FLUX_R'].read()
-            l1.append('FLUX_R')
+        for xcol in ['COADD_EXPTIME', 'FLUX_R', 'TSNR2_LRG']:
+            self.metadata[xcol], l1 = read_xcols(xcol, l1)
 
         self.nqso = self.metadata.size
 
