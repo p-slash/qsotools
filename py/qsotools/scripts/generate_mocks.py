@@ -344,6 +344,9 @@ def saveQQFile(ipix, meta1, wave, fluxes, args):
     fname = ospath_join(
         dir2, f"lya-transmission-{args.hp_nside}-{ipix}.fits.gz")
 
+    if args.nosave:
+        return fname
+
     qqfile = QQFile(fname, 'rw')
     header = {'HPXNSIDE': args.hp_nside, 'HPXNEST': not args.hp_ring}
     qqfile.writeAll(meta1, header, wave, fluxes)
@@ -405,6 +408,7 @@ class MockGenerator(object):
                 break
 
             nthis_mock = min(n_one_iter, rem_mocks)
+            _slice = np.s_[n_gen_mocks:n_gen_mocks + nthis_mock]
             n_gen_mocks += nthis_mock
 
             _, _f, _e = lya_m.resampledMocks(
@@ -415,10 +419,8 @@ class MockGenerator(object):
                 keep_empty_bins=self.args.keep_nolya_pixels
             )
 
-            _slice = np.s_[n_gen_mocks:n_gen_mocks + nthis_mock]
-
-            fluxes[_slice, :] = _f.astype(np.float32)
-            errors[_slice, :] = _e.astype(np.float32)
+            fluxes[_slice] = _f.astype(np.float32)
+            errors[_slice] = _e.astype(np.float32)
 
         return wave, fluxes, errors
 
@@ -429,8 +431,8 @@ class MockGenerator(object):
         if self.TURNOFF_ZEVO:
             spectrum_z = self.args.fixed_zforest
         else:
-            spectrum_z = np.array(
-                wave, dtype=np.double) / fid.LYA_WAVELENGTH - 1
+            spectrum_z = wave / fid.LYA_WAVELENGTH - 1
+
         true_mean_flux = self.mean_flux_function(spectrum_z)
 
         fluxes = fluxes / true_mean_flux - 1
@@ -458,13 +460,14 @@ class MockGenerator(object):
         return waves, fluxes, errors
 
     def save_nonqq_files(
-            self, imock, waves, fluxes, errors, z_qso, meta1, pcfile):
+            self, imock, waves, fluxes, errors, z_qso, meta1, pcfile
+    ):
         wave_c, flux_c, err_c = chunkHelper(
             imock, waves, fluxes, errors, z_qso, self.args)
 
         nchunks = len(wave_c)
         nid = meta1['MOCKID'][imock]
-        z_qso_i = z_qso[imock]
+        z_qso_i = z_qso[imock, 0]
         dec, ra = meta1['DEC'][imock], meta1['RA'][imock]
         mockid = meta1['MOCKID'][imock]
 
@@ -504,7 +507,7 @@ class MockGenerator(object):
 
         # If save-qqfile option is passed, do not save as BinaryQSO files
         # This also means no chunking or removing pixels
-        if not self.args.nosave and self.args.save_qqfile:
+        if self.args.save_qqfile:
             fname = saveQQFile(ipix, meta1, wave, fluxes, self.args)
 
             return [fname]
