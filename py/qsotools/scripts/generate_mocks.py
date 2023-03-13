@@ -378,7 +378,7 @@ class MockGenerator(object):
         else:
             self.mean_flux_function = lm.lognMeanFluxGH
 
-    def generate_wfe_hpx(self, ipix, nmocks, n_one_iter=5000):
+    def generate_wfe_hpx(self, ipix, nmocks, n_one_iter=100):
         """New seed is seed + healpix no"""
         lya_m = lm.LyaMocks(
             self.args.seed + ipix,
@@ -399,7 +399,10 @@ class MockGenerator(object):
 
         wave = np.array(self.DESI_WAVEGRID, dtype=np.float32)
         fluxes = np.empty((nmocks, nwave), dtype=np.float32)
-        errors = np.empty_like(fluxes)
+        if self.args.save_qqfile:
+            errors = None
+        else:
+            errors = np.empty_like(fluxes)
 
         for _ in range(n_iter):
             rem_mocks = nmocks - n_gen_mocks
@@ -420,6 +423,10 @@ class MockGenerator(object):
             )
 
             fluxes[_slice] = _f.astype(np.float32)
+
+            if self.args.save_qqfile:
+                continue
+
             errors[_slice] = _e.astype(np.float32)
 
         return wave, fluxes, errors
