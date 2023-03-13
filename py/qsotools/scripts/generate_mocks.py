@@ -502,7 +502,7 @@ class MockGenerator(object):
         z_qso = meta1['Z'][:, None]
 
         if nmocks == 0:
-            return []
+            return [], nmocks
 
         wave, fluxes, errors = self.generate_wfe_hpx(ipix, nmocks)
 
@@ -517,7 +517,7 @@ class MockGenerator(object):
         if self.args.save_qqfile:
             fname = saveQQFile(ipix, meta1, wave, fluxes, self.args)
 
-            return [fname]
+            return [fname], nmocks
 
         # Cut Lyman-alpha forest region and convert wave to waves = [wave]
         waves, fluxes, errors = self.cut_lya_forest_region(
@@ -538,7 +538,7 @@ class MockGenerator(object):
             if fname:
                 all_fnames.extend(fname)
 
-        return all_fnames
+        return all_fnames, nmocks
 
 
 def main():
@@ -574,14 +574,14 @@ def main():
     split_meta = np.split(metadata, s[1:])
     logging.info(
         f"Length of split metadata {len(split_meta)} vs npixels {npixels}.")
-    pcounter = Progress(len(split_meta))
+    pcounter = Progress(metadata.size)
 
     filename_list = []
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(MockGenerator(args), zip(u_pix, split_meta))
-        for fname in imap_it:
+        for fname, nmocks in imap_it:
             filename_list.extend(fname)
-            pcounter.increase()
+            pcounter.increase(nmocks)
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt")
