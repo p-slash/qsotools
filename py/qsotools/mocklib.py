@@ -424,10 +424,12 @@ class LyaMocks():
 
         return qso
 
-    def resampledMocks(self, howmany, err_per_final_pixel=0, spectrograph_resolution=None, \
-        resample_dv=None, obs_wave_edges=None, delta_z=None, \
-        keep_empty_bins=False):
-        wave   = fid.LYA_WAVELENGTH * (1. + self.z_values)
+    def resampledMocks(
+            self, howmany, err_per_final_pixel=0, spectrograph_resolution=None,
+            resample_dv=None, obs_wave_edges=None, delta_z=None,
+            keep_empty_bins=False
+    ):
+        wave = fid.LYA_WAVELENGTH * (1. + self.z_values)
 
         self.generateMocks(howmany, spectrograph_resolution)
         fluxes = self.delta_F
