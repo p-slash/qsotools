@@ -352,10 +352,10 @@ def saveQQFile(ipix, meta1, wave, fluxes, args):
 
 
 @njit
-def remove_above_lya_absoprtion(wave, fluxes, z_qso):
+def remove_above_lya_absorption(wave, fluxes, z_qso):
     nmocks = fluxes.shape[0]
     # Remove absorption above Lya
-    nonlya_ind = wave > fid.LYA_WAVELENGTH * (1 + z_qso)
+    nonlya_ind = wave > (fid.LYA_WAVELENGTH * (1 + z_qso))
     for i in range(nmocks):
         fluxes[i][nonlya_ind[i]] = 1
 
@@ -390,15 +390,15 @@ class MockGenerator(object):
         else:
             lya_m.setCentralRedshift(3.0)
 
-        nwave = self.DESI_WAVEEDGES.size - 1
-        n_iter = int(nmocks / n_one_iter)
+        nwave = self.DESI_WAVEGRID.size
+        n_iter = int(nmocks / n_one_iter) + 1
         n_gen_mocks = 0
 
         wave = np.array(self.DESI_WAVEGRID, dtype=np.float32)
         fluxes = np.empty((nmocks, nwave), dtype=np.float32)
         errors = np.empty_like(fluxes)
 
-        for it in range(n_iter + 1):
+        for _ in range(n_iter):
             rem_mocks = nmocks - n_gen_mocks
 
             if rem_mocks <= 0:
@@ -417,8 +417,8 @@ class MockGenerator(object):
 
             _slice = np.s_[n_gen_mocks:n_gen_mocks + nthis_mock]
 
-            fluxes[_slice] = _f.astype(np.float32)
-            errors[_slice] = _e.astype(np.float32)
+            fluxes[_slice, :] = _f.astype(np.float32)
+            errors[_slice, :] = _e.astype(np.float32)
 
         return wave, fluxes, errors
 
@@ -497,7 +497,7 @@ class MockGenerator(object):
         wave, fluxes, errors = self.generate_wfe_hpx(ipix, nmocks)
 
         # Remove absorption above Lya
-        fluxes = remove_above_lya_absoprtion(wave, fluxes, z_qso)
+        fluxes = remove_above_lya_absorption(wave, fluxes, z_qso)
 
         # Divide by mean flux if required
         fluxes, errors = self.divide_by_mean_flux(wave, fluxes, errors)
