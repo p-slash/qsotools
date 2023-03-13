@@ -202,12 +202,9 @@ def _genRNDDec(RNST, N, dec1_deg, dec2_deg):
 def getMetadata(args):
     # The METADATA HDU contains a binary table
     # with (at least) RA, DEC, Z, TARGETID
-    meta_dt = np.dtype([
-        ('RA', 'f8'), ('DEC', 'f8'), ('Z', 'f8'), ('MOCKID', 'i8'),
-        ('PIXNUM', 'i4'), ('COADD_EXPTIME', 'f8'), ('FLUX_R', 'f8')
-    ])
-    dt_list = list(meta_dt.names)
-    dt_list.remove('PIXNUM')
+    meta_dt = np.dtype(QQFile.meta_dt.descr + [('PIXNUM', 'i4')])
+
+    dt_list = list(QQFile.meta_dt.names)
     if args.master_file:
         logging.info(f"Reading master file: {args.master_file}")
         master_file = QQFile(args.master_file)
