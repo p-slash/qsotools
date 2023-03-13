@@ -375,7 +375,7 @@ class MockGenerator(object):
         else:
             self.mean_flux_function = lm.lognMeanFluxGH
 
-    def generate_wfe_hpx(self, ipix, nmocks):
+    def generate_wfe_hpx(self, ipix, nmocks, n_one_iter=5000):
         """New seed is seed + healpix no"""
         lya_m = lm.LyaMocks(
             self.args.seed + ipix,
@@ -390,13 +390,35 @@ class MockGenerator(object):
         else:
             lya_m.setCentralRedshift(3.0)
 
-        wave, fluxes, errors = lya_m.resampledMocks(
-            nmocks,
-            err_per_final_pixel=self.args.sigma_per_pixel,
-            spectrograph_resolution=self.args.specres,
-            obs_wave_edges=self.DESI_WAVEEDGES,
-            keep_empty_bins=self.args.keep_nolya_pixels
-        )
+        nwave = self.DESI_WAVEEDGES.size - 1
+        n_iter = int(nmocks / n_one_iter)
+        n_gen_mocks = 0
+
+        wave = np.array(self.DESI_WAVEGRID, dtype=np.float32)
+        fluxes = np.empty((nmocks, nwave), dtype=np.float32)
+        errors = np.empty_like(fluxes)
+
+        for it in range(n_iter + 1):
+            rem_mocks = nmocks - n_gen_mocks
+
+            if rem_mocks <= 0:
+                break
+
+            nthis_mock = min(n_one_iter, rem_mocks)
+            n_gen_mocks += nthis_mock
+
+            _, _f, _e = lya_m.resampledMocks(
+                nthis_mock,
+                err_per_final_pixel=self.args.sigma_per_pixel,
+                spectrograph_resolution=self.args.specres,
+                obs_wave_edges=self.DESI_WAVEEDGES,
+                keep_empty_bins=self.args.keep_nolya_pixels
+            )
+
+            _slice = np.s_[n_gen_mocks:n_gen_mocks + nthis_mock]
+
+            fluxes[_slice] = _f.astype(np.float32)
+            errors[_slice] = _e.astype(np.float32)
 
         return wave, fluxes, errors
 
