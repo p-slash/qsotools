@@ -8,7 +8,7 @@ with open("requirements.txt") as file_reqs:
 
 setup(
     name="qsotools",
-    version="2.5",
+    version="2.5.2",
     packages=find_namespace_packages(where='py'),
     package_dir={'': 'py/'},
     scripts=binscripts,
