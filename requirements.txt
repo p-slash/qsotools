@@ -1,10 +1,6 @@
 numpy
 numba
 scipy
-matplotlib
 astropy
-ipython
-plotly
-jupyter
 fitsio
 healpy
