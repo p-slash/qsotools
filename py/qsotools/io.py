@@ -1,6 +1,6 @@
 import struct
 from configparser import ConfigParser
-from os.path import exists as os_exists, join as ospath_join
+from os.path import join as ospath_join
 from collections import namedtuple
 from itertools import groupby
 import logging
@@ -8,8 +8,11 @@ import logging
 import numpy as np
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
-from scipy.stats import zscore as scipy_zscore, norm as scipy_norm, \
+from scipy.stats import (
+    zscore as scipy_zscore,
+    norm as scipy_norm,
     median_abs_deviation as scipy_mad
+)
 from scipy.ndimage import median_filter as scipy_median_filter
 
 import fitsio
@@ -27,40 +30,41 @@ from pkg_resources import resource_filename
 # --------------- Tables -------------------
 # ------------------------------------------
 
-TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
+TABLE_KODIAQ_ASU = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
 TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
-TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
-TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
-TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
+TABLE_XQ100_SUM = resource_filename('qsotools', 'tables/xq100_thework.fits')
+TABLE_XQ100_DLA = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
+TABLE_SQUAD_DR1 = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
 
 TABLE_KODIAQ_VI_DLA = resource_filename('qsotools', 'tables/kodiaq_vi_dlas.csv')
-TABLE_SQUAD_VI_DLA  = resource_filename('qsotools', 'tables/squad_vi_dlas.csv')
-TABLE_XQ100_VI_DLA  = resource_filename('qsotools', 'tables/xq100_vi_dlas.csv')
+TABLE_SQUAD_VI_DLA = resource_filename('qsotools', 'tables/squad_vi_dlas.csv')
+TABLE_XQ100_VI_DLA = resource_filename('qsotools', 'tables/xq100_vi_dlas.csv')
+
+SpectralRecord = namedtuple(
+    'SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
 
 def saveListByLine(array, fname):
     toWrite = open(fname, 'w')
-    toWrite.write('%d\n'%len(array))
+    toWrite.write('%d\n' % len(array))
     for a in array:
         if len(a) == 2:
-            toWrite.write("%d %.1f\n"%(a[0], a[1]))
+            toWrite.write("%d %.1f\n" % (a[0], a[1]))
         else:
-            toWrite.write('%s\n'%str(a))
+            toWrite.write('%s\n' % str(a))
     toWrite.close()
 
 # ------------------------------------------
 # ------------ SpectralRecord --------------
 # ------------------------------------------
 
-SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
 
 class SpectralRecordList():
     """
     A list of SpectralRecords.
     """
-    
-    def __init__(self, spr = []):
+    def __init__(self, spr=[]):
         self.spr = spr
-    
+
     def append(self, data_set, qso, s2n, coord, fnames):
         self.spr.append(SpectralRecord(data_set, qso, s2n, coord, fnames))
 
@@ -69,7 +73,7 @@ class SpectralRecordList():
         # a list first.
         qsos = np.array(list(map(lambda x: x.qso, self.spr)))
         sets = np.array(list(map(lambda x: x.set, self.spr)))
-        ras  = np.array(list(map(lambda x: x.c.icrs.ra.deg, self.spr)))
+        ras = np.array(list(map(lambda x: x.c.icrs.ra.deg, self.spr)))
         decs = np.array(list(map(lambda x: x.c.icrs.dec.deg, self.spr)))
         s2ns = np.array(list(map(lambda x: x.s2n, self.spr)))
         fnames = np.array(list(map(lambda x: ",".join(x.fnames), self.spr)))
@@ -77,7 +81,7 @@ class SpectralRecordList():
         data = Table([qsos, ras, decs, s2ns, sets, fnames], \
             names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET', 'FNAMES'])
         ascii.write(data, fname, format='csv', overwrite=True)
-    
+
     def readFromFile(self, fname):
         t = ascii.read(fname, format='csv')
         SRlambda = lambda x: SpectralRecord(x['SET'], x['QSO'], x['S2N [s/km]'], \
