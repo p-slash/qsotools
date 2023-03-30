@@ -226,7 +226,3 @@ def main():
             f"{args.fbase}bootstrap-power-n{args.bootnum}-s{args.seed}.txt")
         np.savetxt(output_fname, total_power)
         logging.info(f"Power saved as {output_fname}.")
-
-
-if __name__ == '__main__':
-    main()
