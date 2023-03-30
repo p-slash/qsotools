@@ -9,6 +9,8 @@ from scipy.interpolate import RectBivariateSpline
 from astropy.io import ascii
 from astropy.table import Table
 
+from qsotools.p1d_measurements import P1DMeasurements
+
 TICK_LBL_FONT_SIZE = 18
 AXIS_LBL_FONT_SIZE = 20
 
@@ -49,7 +51,7 @@ def set_topax_makeup(top_ax, majorgrid=True, ymin=None, ymax=None):
 
 def one_col_n_row_grid(
         nz, z_bins, ylab, ymin, ymax, scale="log",
-        xlab=r'$k$ [s$\,$km$^{-1}$]', colormap=plt.cm.trubo
+        xlab=r'$k$ [s$\,$km$^{-1}$]', colormap=plt.cm.turbo
 ):
     # Set up plotting env
     fig = plt.figure(figsize=(5, nz))
@@ -185,6 +187,14 @@ def add_legend_no_error_bars(
     ax.legend(
         handles, labels, loc=location, bbox_to_anchor=bbox_to_anchor,
         fontsize=fontsize, numpoints=1, ncol=ncol, handletextpad=0.4)
+
+
+def auto_ylimmer(k, pkpi, kmax=0.04, ymin_scale=0.5, ymax_scale=1.6):
+    wp = (pkpi > 0) & (k < kmax)
+    ymin = ymin_scale * np.min(pkpi[wp])
+    ymax = ymax_scale * np.max(pkpi[wp])
+
+    return ymin, ymax
 
 
 class PowerPlotter(object):
@@ -646,6 +656,100 @@ class PowerPlotter(object):
             d = np.delete(d, to_remove, axis=0)
 
         return d @ invcov @ d, d.size
+
+    def plot_grid_all(
+            self, ncols=3, colsize=5, rowsize=3, colormap=plt.cm.turbo,
+            outplot_fname=None, includes=['karacayli', 'eboss']
+    ):
+        nrows = int(np.ceil(self.nz / ncols))
+        noff_cols = ncols * nrows - self.nz
+
+        kpi_factor = self.k_bins / np.pi
+
+        colors = [plt.cm.turbo(i) for i in np.linspace(0, 1, self.nz)]
+        fig, axs = plt.subplots(
+            nrows, ncols,
+            sharex='all', sharey='row',
+            gridspec_kw={'hspace': 0, 'wspace': 0},
+            figsize=(colsize * ncols, rowsize * nrows)
+        )
+
+        if len(includes) > 0:
+            p1d_kwargs = {key: True for key in includes}
+        else:
+            p1d_kwargs = {}
+
+        previous_measurements = P1DMeasurements(**p1d_kwargs)
+
+        for jj in range(noff_cols):
+            axs[-1, -1 - jj].set_axis_off()
+
+        for iz in range(self.nz):
+            row = int(iz / ncols)
+            col = iz % ncols
+            ax = axs[row, col]
+            z = self.z_bins[iz]
+            fs = previous_measurements.plot_all(z, ax)
+            ls = []
+
+            pkpi = self.power_qmle[iz] * kpi_factor
+            ls.append(
+                ax.errorbar(
+                    self.k_bins, pkpi, self.error[iz] * kpi_factor,
+                    label="DLA mask", fmt=".-", alpha=0.8, c=colors[1]
+                )
+            )
+
+        # kmax = rcoeff / mean_rkms[iz]
+        # ax.axvspan(kmax, 1, facecolor='#db7b2b', alpha=0.2)
+        do_set_ylim = ((
+            ax.get_subplotspec().is_last_row()
+            and ax.get_subplotspec().is_first_col()
+        )) or col == 1
+
+        if do_set_ylim:
+            ax.set_ylim(auto_ylimmer(self.k_bins, pkpi))
+
+        if np.max(pkpi) > 0.08:
+            axs[row, 0].set_yticks([1e-2, 1e-1])
+        else:
+            axs[row, 0].set_yticks([1e-2])
+
+        ax.grid(True, "major")
+        ax.grid(which='minor', linestyle=':', linewidth=1)
+
+        ax.text(
+            0.74, 0.96, f"z={z:.1f}",
+            transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
+            verticalalignment='top', horizontalalignment='left',
+            backgroundcolor='white')    # bbox={'facecolor':'white', 'pad':5})
+
+        if col == 1 and row == 0:
+            ax.legend(handles=ls, fontsize='large', loc="lower right", ncol=1)
+        if col == 1 and row == 1:
+            ax.legend(handles=fs, fontsize='large', loc="upper left", ncol=1)
+
+        ax.set_xlim(xmin=2e-4, xmax=0.04)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.tick_params(direction='in', which='major', length=7, width=1)
+        ax.tick_params(direction='in', which='minor', length=4, width=1)
+
+        if ax.get_subplotspec().is_first_col():
+            ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
+            plt.setp(ax.get_yticklabels(), fontsize=TICK_LBL_FONT_SIZE)
+
+        do_set_xlabel = (
+            ax.get_subplotspec().is_last_row()
+            or (row == nrows - 2 and col >= ncols - noff_cols)
+        )
+        if do_set_xlabel:
+            ax.set_xlabel(r"$k$ [s km$^{-1}$]", fontsize=AXIS_LBL_FONT_SIZE)
+            ax.xaxis.set_tick_params(which='both', labelbottom=True)
+            plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
+            # ha='left')
+
+        save_figure(outplot_fname)
 
 
 class FisherPlotter(object):
