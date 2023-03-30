@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 import argparse
-import fitsio
 import numpy as np
 import healpy
 
@@ -9,7 +8,8 @@ from os import makedirs as os_makedirs
 
 import qsotools.io as qio
 
-if __name__ == '__main__':
+
+def main():
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
     parser.add_argument(

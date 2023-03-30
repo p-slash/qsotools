@@ -51,7 +51,7 @@ def mcdonald_eval_fix(boot_cov, qmle_cov, use_boot_base_evecs=True):
     return newcov
 
 
-if __name__ == '__main__':
+def main():
     # Arguments passed to run the script
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)

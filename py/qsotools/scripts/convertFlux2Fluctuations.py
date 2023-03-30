@@ -12,7 +12,8 @@ import qsotools.mocklib as lm
 import qsotools.fiducial as fid
 from qsotools.io import BinaryQSO
 
-if __name__ == '__main__':
+
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("InputDir", help="Input directory.")
     parser.add_argument(
@@ -74,7 +75,8 @@ if __name__ == '__main__':
         print("Mean flux is constant across redshift: ",
               args.const_mean_flux, flush=True)
 
-        def mean_flux_function(z): return args.const_mean_flux
+        def mean_flux_function(z):
+            return args.const_mean_flux
     else:
         print("Pass at least one option! Or reverse conflicts with chunk mean", flush=True)
         exit(0)
@@ -84,14 +86,16 @@ if __name__ == '__main__':
               (args.sigma_eta0, args.sigma_eta1), flush=True)
 
     file_list = open(args.FileNameList, 'r')
-    header = file_list.readline()
+    file_list.readline()
 
     for fl in file_list:
+        file2read = ospath_join(args.InputDir, fl.rstrip())
         try:
-            spectrum = BinaryQSO(ospath_join(args.InputDir, fl.rstrip()), 'r')
-        except:
-            print("Problem reading ", ospath_join(
-                args.InputDir, fl.rstrip()), flush=True)
+            spectrum = BinaryQSO(file2read, 'r')
+        except Exception as e:
+            print(
+                f"Problem reading {file2read}: {e}",
+                flush=True)
             continue
 
         spectrum_z = np.array(
@@ -134,11 +138,11 @@ if __name__ == '__main__':
             spectrum.error = np.array(
                 spectrum.error, dtype=np.double) / mean_flux_function_array
 
+        file2output = ospath_join(args.OutputDir, fl.rstrip())
         try:
-            spectrum.saveas(ospath_join(args.OutputDir, fl.rstrip()))
-        except:
-            print("Problem saving ", ospath_join(
-                args.OutputDir, fl.rstrip()), flush=True)
+            spectrum.saveas(file2output)
+        except Exception as e:
+            print(f"Problem saving {file2output}: {e}", flush=True)
 
     temp_fname = shutil_copy(args.FileNameList, args.OutputDir)
     print("Saving chunk spectra file list as ", temp_fname)
