@@ -46,6 +46,7 @@ def main():
     max_dv = []
 
     file_list = open(config_qmle.qso_list, 'r')
+    file_list.readline()
     for fl in file_list:
         f = ospath_join(config_qmle.qso_dir, fl.rstrip())
         bq = qio.BinaryQSO(f, 'r')

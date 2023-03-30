@@ -8,6 +8,7 @@ from astropy.table import Table
 
 import qsotools.mocklib as lm
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("Outputdir", help="Output directory")

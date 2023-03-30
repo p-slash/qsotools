@@ -9,6 +9,7 @@ import qsotools.fiducial as fid
 ions_modeled = ['Si II', 'Si III']
 velocity_seps = {'Si II': 5577., 'Si III': 2271.}
 
+
 class LyaP1DModel(object):
     def __init__(self, fname_qmle, fname_cov, ions):
         self.power_table = np.array(ascii.read(fname_qmle))
@@ -17,28 +18,29 @@ class LyaP1DModel(object):
 
         self.names = ['A', 'n', 'alpha', 'B', 'beta', 'k1']
         self.initial = {
-            'A':fid.PDW_FIT_AMP,
-            'n':fid.PDW_FIT_N,
-            'alpha':fid.PDW_FIT_APH,
-            'B':fid.PDW_FIT_B,
-            'beta':fid.PDW_FIT_BETA,
-            'k1':1/np.sqrt(fid.PDW_FIT_LMD)
+            'A': fid.PDW_FIT_AMP,
+            'n': fid.PDW_FIT_N,
+            'alpha': fid.PDW_FIT_APH,
+            'B': fid.PDW_FIT_B,
+            'beta': fid.PDW_FIT_BETA,
+            'k1': 1 / np.sqrt(fid.PDW_FIT_LMD)
         }
 
         for ion in self.fit_ions:
             self.names.append(f'a_{ion}')
-            self.initial[f'a_{ion}']=0.
-
+            self.initial[f'a_{ion}'] = 0.
 
     def getModelPower(self, **kwargs):
-        lmd = 1./kwargs['k1']**2
+        lmd = 1. / kwargs['k1']**2
         X = self.power_table['kc'], self.power_table['z']
         plya = fid.evaluatePD13Lorentz(X, kwargs['A'], kwargs['n'],
-            kwargs['alpha'], kwargs['B'], kwargs['beta'],
-            lmd)
+                                       kwargs['alpha'], kwargs['B'], kwargs['beta'],
+                                       lmd)
         for ion in self.fit_ions:
-            a = kwargs[f'a_{ion}'] # /(1-fid.meanFluxFG08(self.power_table['z']))
-            plya *= (1+a**2+2*a*np.cos(self.power_table['kc']*velocity_seps[ion]))
+            # /(1-fid.meanFluxFG08(self.power_table['z']))
+            a = kwargs[f'a_{ion}']
+            plya *= (1 + a**2 + 2 * a *
+                     np.cos(self.power_table['kc'] * velocity_seps[ion]))
 
         return plya
 
@@ -46,13 +48,18 @@ class LyaP1DModel(object):
         kwargs = {par: args[i] for i, par in enumerate(self.names)}
         pmodel = self.getModelPower(**kwargs)
         diff = pmodel - self.power_table['p_final']
-        return diff@np.linalg.inv(self.cov)@diff
+        return diff @ np.linalg.inv(self.cov) @ diff
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("--final-qmle", help="Final results file", required=True)
-    parser.add_argument("--final-cov", help="Final covariance with syst.", required=True)
-    parser.add_argument("--ions", help="Si ions to fit.", nargs='*', default=ions_modeled)
+
+def main():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        "--final-qmle", help="Final results file", required=True)
+    parser.add_argument(
+        "--final-cov", help="Final covariance with syst.", required=True)
+    parser.add_argument("--ions", help="Si ions to fit.",
+                        nargs='*', default=ions_modeled)
     args = parser.parse_args()
 
     model = LyaP1DModel(args.final_qmle, args.final_cov, args.ions)
@@ -75,7 +82,3 @@ if __name__ == '__main__':
 
     # print("Full inv hess")
     # print(result.hess_inv)
-
-
-
-

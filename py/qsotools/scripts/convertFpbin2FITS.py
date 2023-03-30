@@ -38,7 +38,7 @@ def getFPFilename(x):
     return base + "_Fp.bin"
 
 
-if __name__ == '__main__':
+def main():
     # Arguments passed to run the script
     parser = argparse.ArgumentParser()
     parser.add_argument("ConfigFile", help="Config file")
