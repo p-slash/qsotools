@@ -658,7 +658,7 @@ class PowerPlotter(object):
         return d @ invcov @ d, d.size
 
     def plot_grid_all(
-            self, ncols=3, colsize=5, rowsize=3, colormap=plt.cm.turbo,
+            self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss']
     ):
         nrows = int(np.ceil(self.nz / ncols))
@@ -666,7 +666,6 @@ class PowerPlotter(object):
 
         kpi_factor = self.k_bins / np.pi
 
-        colors = [plt.cm.turbo(i) for i in np.linspace(0, 1, self.nz)]
         fig, axs = plt.subplots(
             nrows, ncols,
             sharex='all', sharey='row',
@@ -696,58 +695,59 @@ class PowerPlotter(object):
             ls.append(
                 ax.errorbar(
                     self.k_bins, pkpi, self.error[iz] * kpi_factor,
-                    label="DLA mask", fmt=".-", alpha=0.8, c=colors[1]
+                    label=label, fmt=".-", alpha=0.8
                 )
             )
 
-        # kmax = rcoeff / mean_rkms[iz]
-        # ax.axvspan(kmax, 1, facecolor='#db7b2b', alpha=0.2)
-        do_set_ylim = ((
-            ax.get_subplotspec().is_last_row()
-            and ax.get_subplotspec().is_first_col()
-        )) or col == 1
+            # kmax = rcoeff / mean_rkms[iz]
+            # ax.axvspan(kmax, 1, facecolor='#db7b2b', alpha=0.2)
+            do_set_ylim = ((
+                ax.get_subplotspec().is_last_row()
+                and ax.get_subplotspec().is_first_col()
+            )) or col == 1
 
-        if do_set_ylim:
-            ax.set_ylim(auto_ylimmer(self.k_bins, pkpi))
+            if do_set_ylim:
+                ax.set_ylim(auto_ylimmer(self.k_bins, pkpi))
 
-        if np.max(pkpi) > 0.08:
-            axs[row, 0].set_yticks([1e-2, 1e-1])
-        else:
-            axs[row, 0].set_yticks([1e-2])
+            if np.max(pkpi) > 0.08:
+                axs[row, 0].set_yticks([1e-2, 1e-1])
+            else:
+                axs[row, 0].set_yticks([1e-2])
 
-        ax.grid(True, "major")
-        ax.grid(which='minor', linestyle=':', linewidth=1)
+            ax.text(
+                0.74, 0.96, f"z={z:.1f}",
+                transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
+                verticalalignment='top', horizontalalignment='left',
+                backgroundcolor='white')
+            # bbox={'facecolor':'white', 'pad':5})
 
-        ax.text(
-            0.74, 0.96, f"z={z:.1f}",
-            transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
-            verticalalignment='top', horizontalalignment='left',
-            backgroundcolor='white')    # bbox={'facecolor':'white', 'pad':5})
+            if col == 1 and row == 0:
+                ax.legend(handles=ls, fontsize='large', loc="lower right")
+            if col == 1 and row == 1:
+                ax.legend(handles=fs, fontsize='large', loc="upper left")
 
-        if col == 1 and row == 0:
-            ax.legend(handles=ls, fontsize='large', loc="lower right", ncol=1)
-        if col == 1 and row == 1:
-            ax.legend(handles=fs, fontsize='large', loc="upper left", ncol=1)
+            if ax.get_subplotspec().is_first_col():
+                ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
+                plt.setp(ax.get_yticklabels(), fontsize=TICK_LBL_FONT_SIZE)
 
-        ax.set_xlim(xmin=2e-4, xmax=0.04)
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.tick_params(direction='in', which='major', length=7, width=1)
-        ax.tick_params(direction='in', which='minor', length=4, width=1)
+            do_set_xlabel = (
+                ax.get_subplotspec().is_last_row()
+                or (row == nrows - 2 and col >= ncols - noff_cols)
+            )
+            if do_set_xlabel:
+                ax.set_xlabel(
+                    r"$k$ [s km$^{-1}$]", fontsize=AXIS_LBL_FONT_SIZE)
+                ax.xaxis.set_tick_params(which='both', labelbottom=True)
+                plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
+                # ha='left')
 
-        if ax.get_subplotspec().is_first_col():
-            ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
-            plt.setp(ax.get_yticklabels(), fontsize=TICK_LBL_FONT_SIZE)
-
-        do_set_xlabel = (
-            ax.get_subplotspec().is_last_row()
-            or (row == nrows - 2 and col >= ncols - noff_cols)
-        )
-        if do_set_xlabel:
-            ax.set_xlabel(r"$k$ [s km$^{-1}$]", fontsize=AXIS_LBL_FONT_SIZE)
-            ax.xaxis.set_tick_params(which='both', labelbottom=True)
-            plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
-            # ha='left')
+            ax.grid(True, "major")
+            ax.grid(which='minor', linestyle=':', linewidth=1)
+            ax.set_xlim(auto=True)
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.tick_params(direction='in', which='major', length=7, width=1)
+            ax.tick_params(direction='in', which='minor', length=4, width=1)
 
         save_figure(outplot_fname)
 

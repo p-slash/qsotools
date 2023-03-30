@@ -23,7 +23,7 @@ class P1DMeasurements():
         z = np.array(mw_ps_metal_masked['z'], dtype=np.double)
         z = np.unique(np.round(z, decimals=1))
         nz = z.size
-        nk = z.size // nz
+        nk = len(mw_ps_metal_masked) // nz
 
         k = np.array(
             mw_ps_metal_masked['k'], dtype=np.double
@@ -52,7 +52,7 @@ class P1DMeasurements():
             'qsotools', 'p1d-measurements/chabanier_Pk1D_data.txt'
         )
         fname_syst = resource_filename(
-            'qsotools', 'p1d-measurements/chabanier_Pk1D_data.txt'
+            'qsotools', 'p1d-measurements/chabanier_Pk1D_syst.txt'
         )
         # z=[2.2, 4.6]
         chab_table = ascii.read(fname_data)
@@ -63,7 +63,7 @@ class P1DMeasurements():
         z = np.array(chab_table['zLya'], dtype=np.double)
         z = np.unique(np.round(z, decimals=1))
         nz = z.size
-        nk = z.size // nz
+        nk = len(chab_table) // nz
 
         k = np.array(chab_table['k'], dtype=np.double).reshape((nz, nk))
         p = np.array(chab_table['PLya'], dtype=np.double).reshape((nz, nk))
@@ -94,7 +94,7 @@ class P1DMeasurements():
         z = np.array(karac_tbl['z'], dtype=np.double)
         z = np.unique(np.round(z, decimals=1))
         nz = z.size
-        nk = z.size // nz
+        nk = len(karac_tbl) // nz
 
         # karac_nz = 14
         # karac_nk = 13
