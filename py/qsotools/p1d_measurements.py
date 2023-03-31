@@ -9,7 +9,7 @@ class P1DMeasurements():
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
 
-    def _load_walther(self, load):
+    def load_walther(self, load=True):
         if not load:
             return
 
@@ -44,7 +44,7 @@ class P1DMeasurements():
             'color': P1DMeasurements.colors[-2]
         }
 
-    def _load_eboss(self, load):
+    def load_eboss(self, load=True):
         if not load:
             return
 
@@ -81,7 +81,7 @@ class P1DMeasurements():
             'color': P1DMeasurements.colors[-3]
         }
 
-    def _load_karacayli(self, load):
+    def load_karacayli(self, load=True):
         if not load:
             return
 
@@ -112,11 +112,11 @@ class P1DMeasurements():
             'color': P1DMeasurements.colors[-4]
         }
 
-    def __init__(self, karacayli=True, eboss=True, walther=True):
+    def __init__(self, karacayli=False, eboss=False, walther=False):
         self.measurements = {}
-        self._load_eboss(eboss)
-        self._load_walther(walther)
-        self._load_karacayli(karacayli)
+        self.load_eboss(eboss)
+        self.load_walther(walther)
+        self.load_karacayli(karacayli)
 
     def plot_one(self, zplot, ax, key):
         if key not in self.measurements:
