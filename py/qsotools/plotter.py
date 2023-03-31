@@ -194,10 +194,8 @@ def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
     """
     wp = (pkpi > 0) & (k < kmax)
 
-    if pkpi.ndim == 2:
-        new_pkpi = pkpi[:, wp].ravel()
-    else:
-        new_pkpi = pkpi[wp]
+    # wp is 2D, the next line ravels the array automaticall
+    new_pkpi = pkpi[wp]
     ymin = 10**(np.log10(np.min(new_pkpi) * (1 - margins[0])))
     ymax = 10**(np.log10(np.max(new_pkpi) * (1 + margins[1])))
 
