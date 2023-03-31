@@ -189,12 +189,26 @@ def add_legend_no_error_bars(
         fontsize=fontsize, numpoints=1, ncol=ncol, handletextpad=0.4)
 
 
-def auto_ylimmer(k, pkpi, kmax=0.04, ymin_scale=0.5, ymax_scale=1.6):
+def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
+    """ pkpi could be 2d array, first axis is redshift
+    """
     wp = (pkpi > 0) & (k < kmax)
-    ymin = ymin_scale * np.min(pkpi[wp])
-    ymax = ymax_scale * np.max(pkpi[wp])
+
+    if pkpi.ndim == 2:
+        new_pkpi = pkpi[:, wp].ravel()
+    else:
+        new_pkpi = pkpi[wp]
+    ymin = 10**(np.log10(np.min(new_pkpi) * (1 - margins[0])))
+    ymax = 10**(np.log10(np.max(new_pkpi) * (1 + margins[1])))
 
     return ymin, ymax
+
+
+def auto_logxlimmer(x, margins=(0.05, 0.05)):
+    xmin = 10**(np.log10(x[0]) * (1 - margins[0]))
+    xmax = 10**(np.log10(x[-1]) * (1 + margins[1]))
+
+    return xmin, xmax
 
 
 class PowerPlotter(object):
@@ -707,7 +721,11 @@ class PowerPlotter(object):
             )) or col == 1
 
             if do_set_ylim:
-                ax.set_ylim(auto_ylimmer(self.k_bins, pkpi))
+                j1 = row * ncols
+                j2 = min(j1 + ncols, self.nz)
+                pkpi_row = self.power_qmle[j1:j2]
+                ax.set_ylim(auto_logylimmer(
+                    self.k_bins, pkpi_row * kpi_factor))
 
             if np.max(pkpi) > 0.08:
                 axs[row, 0].set_yticks([1e-2, 1e-1])
@@ -715,11 +733,12 @@ class PowerPlotter(object):
                 axs[row, 0].set_yticks([1e-2])
 
             ax.text(
-                0.74, 0.96, f"z={z:.1f}",
+                0.96, 0.96, f"z={z:.1f}",
                 transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
-                verticalalignment='top', horizontalalignment='left',
-                backgroundcolor='white')
-            # bbox={'facecolor':'white', 'pad':5})
+                verticalalignment='top', horizontalalignment='right',
+                bbox={'facecolor': 'white', 'pad': 0.3,
+                      'alpha': 0.3, 'boxstyle': 'round'}
+            )
 
             if col == 1 and row == 0:
                 ax.legend(handles=ls, fontsize='large', loc="lower right")
@@ -743,7 +762,7 @@ class PowerPlotter(object):
 
             ax.grid(True, "major")
             ax.grid(which='minor', linestyle=':', linewidth=1)
-            ax.set_xlim(auto=True)
+            ax.set_xlim(auto_logxlimmer(self.k_bins))
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.tick_params(direction='in', which='major', length=7, width=1)

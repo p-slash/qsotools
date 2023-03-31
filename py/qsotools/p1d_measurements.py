@@ -41,7 +41,7 @@ class P1DMeasurements():
             'kppi': kppi,
             'ekpi': ekpi,
             'alpha': 0.4,
-            'color': P1DMeasurements.colors[-1]
+            'color': P1DMeasurements.colors[-2]
         }
 
     def _load_eboss(self, load):
