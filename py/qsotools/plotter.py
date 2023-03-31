@@ -203,15 +203,17 @@ def auto_logylimmer(k, pkpi, ekpi=None, kmax=0.04, margins=(0.05, 0.2)):
     new_pkpi = pkpi[wp]
 
     if ekpi is None:
-        ekpi = 0
+        new_ekpi = 0
+    else:
+        new_ekpi = ekpi[wp]
 
-    new_pkpi -= ekpi
+    new_pkpi -= new_ekpi
     we = new_pkpi > 0
     new_pkpi = new_pkpi[we]
 
     ymin = 10**(_pad_log_margin(np.min(new_pkpi), -margins[0]))
 
-    new_pkpi += 2 * ekpi
+    new_pkpi += 2 * new_ekpi
     ymax = 10**(_pad_log_margin(np.max(new_pkpi), margins[1]))
 
     return ymin, ymax
