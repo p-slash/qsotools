@@ -189,6 +189,10 @@ def add_legend_no_error_bars(
         fontsize=fontsize, numpoints=1, ncol=ncol, handletextpad=0.4)
 
 
+def _pad_margin(x, margin):
+    return x + np.abs(x) * margin
+
+
 def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
     """ pkpi could be 2d array, first axis is redshift
     """
@@ -196,15 +200,15 @@ def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
 
     # wp is 2D, the next line ravels the array automaticall
     new_pkpi = pkpi[wp]
-    ymin = 10**(np.log10(np.min(new_pkpi) * (1 - margins[0])))
-    ymax = 10**(np.log10(np.max(new_pkpi) * (1 + margins[1])))
+    ymin = 10**(_pad_margin(np.min(new_pkpi), -margins[0]))
+    ymax = 10**(_pad_margin(np.max(new_pkpi), margins[1]))
 
     return ymin, ymax
 
 
 def auto_logxlimmer(x, margins=(0.05, 0.05)):
-    xmin = 10**(np.log10(x[0]) * (1 - margins[0]))
-    xmax = 10**(np.log10(x[-1]) * (1 + margins[1]))
+    xmin = 10**(_pad_margin(np.log10(x[0]), -margins[0]))
+    xmax = 10**(_pad_margin(np.log10(x[-1]), margins[1]))
 
     return xmin, xmax
 
