@@ -194,14 +194,24 @@ def _pad_log_margin(x, margin):
     return xx + np.abs(xx) * margin
 
 
-def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
+def auto_logylimmer(k, pkpi, ekpi=None, kmax=0.04, margins=(0.05, 0.2)):
     """ pkpi could be 2d array, first axis is redshift
     """
     wp = (pkpi > 0) & (k < kmax)
 
     # wp is 2D, the next line ravels the array automaticall
     new_pkpi = pkpi[wp]
+
+    if ekpi is None:
+        ekpi = 0
+
+    new_pkpi -= ekpi
+    we = new_pkpi > 0
+    new_pkpi = new_pkpi[we]
+
     ymin = 10**(_pad_log_margin(np.min(new_pkpi), -margins[0]))
+
+    new_pkpi += 2 * ekpi
     ymax = 10**(_pad_log_margin(np.max(new_pkpi), margins[1]))
 
     return ymin, ymax
@@ -727,17 +737,18 @@ class PowerPlotter(object):
                 j1 = row * ncols
                 j2 = min(j1 + ncols, self.nz)
                 pkpi_row = self.power_qmle[j1:j2]
+                ekpi_row = self.error[j1:j2]
                 ymin, ymax = auto_logylimmer(
-                    self.k_bins, pkpi_row * kpi_factor)
+                    self.k_bins, pkpi_row * kpi_factor, ekpi_row * kpi_factor)
                 use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
 
                 ax.set_ylim(ymin, ymax)
                 ax.set_yticks(use_yticks)
 
             ax.text(
-                0.96, 0.96, f"z={z:.1f}",
+                0.06, 0.96, f"z={z:.1f}",
                 transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
-                verticalalignment='top', horizontalalignment='right',
+                verticalalignment='top', horizontalalignment='left',
                 bbox={'facecolor': 'white', 'pad': 0.3,
                       'alpha': 0.3, 'boxstyle': 'round'}
             )
