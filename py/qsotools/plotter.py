@@ -189,8 +189,9 @@ def add_legend_no_error_bars(
         fontsize=fontsize, numpoints=1, ncol=ncol, handletextpad=0.4)
 
 
-def _pad_margin(x, margin):
-    return x + np.abs(x) * margin
+def _pad_log_margin(x, margin):
+    xx = np.log10(x)
+    return xx + np.abs(xx) * margin
 
 
 def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
@@ -200,15 +201,15 @@ def auto_logylimmer(k, pkpi, kmax=0.04, margins=(0.05, 0.05)):
 
     # wp is 2D, the next line ravels the array automaticall
     new_pkpi = pkpi[wp]
-    ymin = 10**(_pad_margin(np.min(new_pkpi), -margins[0]))
-    ymax = 10**(_pad_margin(np.max(new_pkpi), margins[1]))
+    ymin = 10**(_pad_log_margin(np.min(new_pkpi), -margins[0]))
+    ymax = 10**(_pad_log_margin(np.max(new_pkpi), margins[1]))
 
     return ymin, ymax
 
 
 def auto_logxlimmer(x, margins=(0.05, 0.05)):
-    xmin = 10**(_pad_margin(np.log10(x[0]), -margins[0]))
-    xmax = 10**(_pad_margin(np.log10(x[-1]), margins[1]))
+    xmin = 10**(_pad_log_margin(x[0], -margins[0]))
+    xmax = 10**(_pad_log_margin(x[-1], margins[1]))
 
     return xmin, xmax
 
@@ -726,13 +727,12 @@ class PowerPlotter(object):
                 j1 = row * ncols
                 j2 = min(j1 + ncols, self.nz)
                 pkpi_row = self.power_qmle[j1:j2]
-                ax.set_ylim(auto_logylimmer(
-                    self.k_bins, pkpi_row * kpi_factor))
+                ymin, ymax = auto_logylimmer(
+                    self.k_bins, pkpi_row * kpi_factor)
+                use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
 
-            if np.max(pkpi) > 0.08:
-                axs[row, 0].set_yticks([1e-2, 1e-1])
-            else:
-                axs[row, 0].set_yticks([1e-2])
+                ax.set_ylim(ymin, ymax)
+                ax.set_yticks(use_yticks)
 
             ax.text(
                 0.96, 0.96, f"z={z:.1f}",
@@ -742,14 +742,16 @@ class PowerPlotter(object):
                       'alpha': 0.3, 'boxstyle': 'round'}
             )
 
-            if col == 1 and row == 0:
-                ax.legend(handles=ls, fontsize='large', loc="lower right")
-            if col == 1 and row == 1:
-                ax.legend(handles=fs, fontsize='large', loc="upper left")
-
-            if ax.get_subplotspec().is_first_col():
+            if col == 0:
                 ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
                 plt.setp(ax.get_yticklabels(), fontsize=TICK_LBL_FONT_SIZE)
+                ax.set_yscale("log")
+            elif col != 1:
+                pass
+            elif row == 0:
+                ax.legend(handles=ls, fontsize='large', loc="lower right")
+            elif row == 1:
+                ax.legend(handles=fs, fontsize='large', loc="lower right")
 
             do_set_xlabel = (
                 ax.get_subplotspec().is_last_row()
@@ -761,12 +763,11 @@ class PowerPlotter(object):
                 ax.xaxis.set_tick_params(which='both', labelbottom=True)
                 plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
                 # ha='left')
+                ax.set_xscale("log")
+                ax.set_xlim(auto_logxlimmer(self.k_bins))
 
             ax.grid(True, "major")
             ax.grid(which='minor', linestyle=':', linewidth=1)
-            ax.set_xlim(auto_logxlimmer(self.k_bins))
-            ax.set_xscale("log")
-            ax.set_yscale("log")
             ax.tick_params(direction='in', which='major', length=7, width=1)
             ax.tick_params(direction='in', which='minor', length=4, width=1)
 
