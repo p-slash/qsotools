@@ -18,6 +18,8 @@ import numpy as np
 from numba import njit
 from scipy.linalg import cho_factor, cho_solve
 
+from qsotools.utils import Progress
+
 
 def getNumbersfromBootfile(fname):
     filesize = ospath_getsize(fname)
@@ -181,8 +183,7 @@ def main():
         args.fbase += '-'
 
     # Set up log
-    logging.basicConfig(filename=f"{outdir}/bootstrapping.log",
-                        level=logging.DEBUG)
+    logging.basicConfig(level=logging.DEBUG)
     logging.info(" ".join(sys.argv))
 
     Nk, Nz, Nd, total_nkz, elems_count, nspec = getNumbersfromBootfile(
@@ -203,6 +204,7 @@ def main():
     total_power = np.empty((args.bootnum, newpowersize))
     n_iter = int(args.bootnum / args.nboot_per_it)
 
+    pcounter = Progress(n_iter)
     for jj in range(n_iter):
         logging.info(f"Iteration {jj+1}/{n_iter}.")
         i1 = jj * args.nboot_per_it
@@ -213,6 +215,7 @@ def main():
             spectra, booted_indices, nspec,
             Nk, Nd, total_nkz, elems_count,
             args.remove_last_nz_bins, args.nboot_per_it)
+        pcounter.increase()
 
     bootstrap_cov = np.cov(total_power, rowvar=False)
     output_fname = ospath_join(
