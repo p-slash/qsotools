@@ -751,7 +751,8 @@ class PowerPlotter(object):
                 0.06, 0.96, f"z={z:.1f}",
                 transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
                 verticalalignment='top', horizontalalignment='left',
-                bbox={'facecolor': 'white', 'pad': 0.3,
+                color="#9f2305",
+                bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
                       'alpha': 0.3, 'boxstyle': 'round'}
             )
 
