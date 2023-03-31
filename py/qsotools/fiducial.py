@@ -24,8 +24,8 @@ ONE_SIGMA_2_FWHM = 2.35482004503
 
 def formBins(nblin, nblog, dklin, dklog, k0, klast=-1):
     lin_bin_edges = np.arange(nblin + 1) * dklin + k0
-    log_bin_edges = lin_bin_edges[-1] * \
-        np.power(10., np.arange(1, nblog + 1) * dklog)
+    log_bin_edges = np.power(
+        10., np.arange(1, nblog + 1) * dklog) * lin_bin_edges[-1]
 
     # assert log_bin_edges[-1] < k_values[-1]
 
@@ -47,8 +47,10 @@ PDW_FIT_B = 3.59124427e+00
 PDW_FIT_BETA = -1.76804541e-01
 PDW_FIT_LMD = 3.59826056e+02
 
-PDW_FIT_PARAMETERS = PDW_FIT_AMP, PDW_FIT_N, PDW_FIT_APH, PDW_FIT_B, PDW_FIT_BETA, PDW_FIT_LMD
-PDW_FIT_PARAMETERS_0BETA = PDW_FIT_AMP, PDW_FIT_N, PDW_FIT_APH, PDW_FIT_B, 0, PDW_FIT_LMD
+PDW_FIT_PARAMETERS = (
+    PDW_FIT_AMP, PDW_FIT_N, PDW_FIT_APH, PDW_FIT_B, PDW_FIT_BETA, PDW_FIT_LMD)
+PDW_FIT_PARAMETERS_0BETA = (
+    PDW_FIT_AMP, PDW_FIT_N, PDW_FIT_APH, PDW_FIT_B, 0, PDW_FIT_LMD)
 PD13_PIVOT_K = 0.009
 PD13_PIVOT_Z = 3.0
 
@@ -108,7 +110,9 @@ def jacobianPD13Lorentz(X, A, n, alpha, B, beta, lmd):
 # initial_params always has 6 values: A, n, alpha, B, beta, lambda
 
 
-def fitPD13Lorentzian(k, z, power, error, initial_params=PDW_FIT_PARAMETERS, bounds=None):
+def fitPD13Lorentzian(
+        k, z, power, error, initial_params=PDW_FIT_PARAMETERS, bounds=None
+):
     fitted_power = np.zeros(len(power))
 
     mask = np.logical_and(power > 0, error > 0)
@@ -242,22 +246,20 @@ def fitBecker13MeanFlux(z, F, e):
     print("chisq = %.2f," % chisq, "dof = ", df)
 
     return pnew, pcov
-
 # -----------------------------------------------------
 # Mean flux ends
 # -----------------------------------------------------
-
-
-"""
-Returns the VARIANCE.
-if on_flux=True, returns variance on mean flux from LSS fluctuations, i.e. multiplied by F-bar^2
-"""
 
 
 def getLyaFlucErrors(
         z, dv, R_kms, lnk1=-4 * np.log(10), lnk2=-0.5 * np.log(10),
         dlnk=0.01, on_flux=True
 ):
+    """
+    Returns the VARIANCE.
+    if on_flux=True, returns variance on mean flux from LSS fluctuations,
+    i.e. multiplied by F-bar^2
+    """
     if isinstance(z, np.ndarray):
         pass
     elif isinstance(z, float):
@@ -330,14 +332,12 @@ def getLyaCorrFn(z, dlambda, log2ngrid=17, kms_grid=1., on_flux=True):
 
     return RectBivariateSpline(z, v_values, xi1d, kx=1, ky=1)
 
+
 # -----------------------------------------------------
 # DLA begins
 # -----------------------------------------------------
-
-# MBW 16.113
-
-
 def equivalentWidthDLA(nhi, z_dla):
+    # MBW 16.113
     w = 7.3 * np.sqrt(nhi / 10**20)  # A
     return w * (1 + z_dla)
 
