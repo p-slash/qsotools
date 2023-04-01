@@ -88,7 +88,9 @@ class KDE_PDF_Estimator(object):
 
         kde_estim_k = np.fft.rfft(kde_estim)
         xx = self.kfreq * sigma
-        kde_estim_k /= np.exp(-xx**2 / 2)
+        window = np.exp(-xx**2 / 2)
+        window[window <= 1e-1] = 1
+        kde_estim_k /= window
 
         return np.fft.irfft(kde_estim_k)
 
