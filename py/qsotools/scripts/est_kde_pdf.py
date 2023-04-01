@@ -25,11 +25,14 @@ def get_parser():
     parser.add_argument(
         "--f1", help="First flux bin", type=float, default=-0.5)
     parser.add_argument(
-        "--f2", help="Last flux bin", type=float, default=1.5)
+        "--f2", help="Last flux bin", type=float, default=1.75)
     parser.add_argument(
         "--nfbins", help="Number of flux bins", type=float, default=1000)
 
     parser.add_argument("--min-snr", type=float, default=0, help="Minimum SNR")
+    parser.add_argument(
+        "--deconvolve", action="store_true",
+        help="Deconvolve mean sigma from pdf.")
 
     # parser.add_argument(
     #     "--sigma1", help="First mean sigma bin", type=float, default=0)
@@ -76,6 +79,18 @@ class KDE_PDF_Estimator(object):
 
         self.flux_pdf = np.zeros(self.nfbins * self.config_qmle.z_n)
         self.counts = np.zeros(self.nfbins * self.config_qmle.z_n)
+        self.kfreq = 2. * np.pi * np.fft.rfftfreq(
+            self.nfbins, d=flux_centers[1] - flux_centers[0])
+
+    def deconvolve(self, kde_estim, sigma):
+        if not args.deconvolve:
+            return kde_estim
+
+        kde_estim_k = np.fft.rfft(kde_estim)
+        xx = self.kfreq * sigma
+        kde_estim_k /= np.exp(-xx**2 / 2)
+
+        return np.fft.irfft(kde_estim_k)
 
     def getEstimates(self, qso):
         qso.applyMask()
@@ -100,8 +115,9 @@ class KDE_PDF_Estimator(object):
 
         i1 = z_bin_no * self.nfbins
         i2 = i1 + self.nfbins
-        self.flux_pdf[i1:i2] += get_kde_estimate(
-            self.flux_centers, qso.flux, qso.error)
+        kde_estim = get_kde_estimate(self.flux_centers, qso.flux, qso.error)
+        kde_estim = self.deconvolve(kde_estim, qso.error.mean())
+        self.flux_pdf[i1:i2] += kde_estim
         self.counts[i1:i2] += qso.size
 
     def __call__(self, fname):
@@ -134,7 +150,9 @@ def main():
     # Read Config file
     config_qmle = qio.ConfigQMLE(args.ConfigFile)
     output_dir = config_qmle.parameters['OutputDir']
-    output_base = config_qmle.parameters['OutputFileBase']
+    output_base = (
+        f"{config_qmle.parameters['OutputFileBase']}"
+        f"-minsnr{args.min_snr:.2f}")
 
     # Set up logger
     logging.basicConfig()
