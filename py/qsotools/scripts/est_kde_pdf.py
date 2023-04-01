@@ -180,8 +180,8 @@ def main():
         formats={'z': '%.5e', 'F': '%.5e', 'FPDF': '%.5e', 'e_FPDF': '%.5e'})
     logging.info(f"Flux PDF saved as {fname2save}")
 
-    # Save Fisher
-    fname2save = f"{output_dir}/{output_base}-jackknife-flux-pdf-cov.txt"
-    np.savetxt(fname2save, cov_fdpd)
+    # # Save Fisher
+    # fname2save = f"{output_dir}/{output_base}-jackknife-flux-pdf-cov.txt"
+    # np.savetxt(fname2save, cov_fdpd)
 
     logging.info("DONE!")
