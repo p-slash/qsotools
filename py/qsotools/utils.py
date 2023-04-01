@@ -121,23 +121,3 @@ class SubsampleCov(object):
         cov = np.dot(xdiff.T, xdiff) * (self.nsamples - 1) / self.nsamples
 
         return mean_xvec, cov
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

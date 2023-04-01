@@ -222,6 +222,9 @@ class Spectrum:
         Computes the signal-to-noise in lyman alpha region as average(1/e)
 
     """
+    @property
+    def size(self):
+        return self.flux.size
 
     def __init__(
             self, wave, flux, error, z_qso, specres, dv, coord, reso_kms=None
@@ -239,7 +242,6 @@ class Spectrum:
         else:
             self.coord = SkyCoord(coord['RA'], coord['DEC'], unit=deg)
 
-        self.size = len(self.wave)
         self.mask = np.logical_and(error > 1e-7, flux != 0)
 
         if self.wave[self.mask].size == 0:
@@ -316,7 +318,6 @@ class Spectrum:
                 self.reso_kms = self.reso_kms[good_pixels]
 
             self.mask = self.mask[good_pixels]
-            self.size = len(self.wave)
             if self.size == 0:
                 raise ValueError("Empty spectrum")
         else:
@@ -1747,21 +1748,22 @@ class PiccaFile():
 
         delta_keys = set(['DELTA', 'DELTA_BLIND'])
         delta = data[delta_keys.intersection(colnames).pop()]
-        error = 1/np.sqrt(data['IVAR']+1e-16)
-        error[data['IVAR']<1e-4] = 0
+        error = 1 / np.sqrt(data['IVAR'] + 1e-16)
+        error[data['IVAR'] < 1e-4] = 0
 
-        specres = fid.LIGHT_SPEED/hdr['MEANRESO']/fid.ONE_SIGMA_2_FWHM
+        specres = fid.LIGHT_SPEED / hdr['MEANRESO'] / fid.ONE_SIGMA_2_FWHM
         if 'DLL' in hdr.keys():
-            dv = hdr['DLL']*fid.LIGHT_SPEED*np.log(10)
+            dv = hdr['DLL'] * fid.LIGHT_SPEED * np.log(10)
         else:
             dv = hdr['MEANRESO']
 
-        try:
+        if 'RESO' in colnames:
             reso_rkms = data['RESO']
-        except:
-            reso_rkms = np.ones(wave.size)*dv
+        else:
+            reso_rkms = np.ones(wave.size) * dv
 
-        qso = Spectrum(wave, delta, error, hdr['Z'], specres, dv,
+        qso = Spectrum(
+            wave, delta, error, hdr['Z'], specres, dv,
             {'RA': hdr['RA'], 'DEC': hdr['DEC']},
             reso_rkms)
 
