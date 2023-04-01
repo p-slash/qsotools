@@ -83,7 +83,7 @@ class KDE_PDF_Estimator(object):
             self.nfbins, d=flux_centers[1] - flux_centers[0])
 
     def deconvolve(self, kde_estim, sigma):
-        if not args.deconvolve:
+        if not self.args.deconvolve:
             return kde_estim
 
         kde_estim_k = np.fft.rfft(kde_estim)
