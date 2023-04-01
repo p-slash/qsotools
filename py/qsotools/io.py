@@ -254,7 +254,6 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
         self.cont = None
-        self.reso_kms = None
 
     def smoothNoise(self, sigma_A=20., pad_size=25, esigma=3.5):
         # Isolate masked pixels as they have high noise
@@ -1771,25 +1770,3 @@ class PiccaFile():
 
     def close(self):
         self.fitsfile.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
