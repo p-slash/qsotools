@@ -82,14 +82,14 @@ class KDE_PDF_Estimator(object):
         self.kfreq = 2. * np.pi * np.fft.rfftfreq(
             self.nfbins, d=flux_centers[1] - flux_centers[0])
 
-    def deconvolve(self, kde_estim, sigma):
+    def deconvolve(self, kde_estim, sigma, threshold=0.1):
         if not self.args.deconvolve:
             return kde_estim
 
         kde_estim_k = np.fft.rfft(kde_estim)
         xx = self.kfreq * sigma
         window = np.exp(-xx**2 / 2)
-        window[window <= 1e-1] = 1
+        window[window <= threshold] = threshold
         kde_estim_k /= window
 
         return np.fft.irfft(kde_estim_k)
