@@ -5,7 +5,7 @@ import numpy as np
 from scipy.stats     import binned_statistic
 from scipy.integrate import quad as scipy_quad
 from scipy.stats     import norm as scipy_normal_stat
-from scipy.special   import lambertw as scipy_lambertw
+from scipy.special   import erfcinv, lambertw as scipy_lambertw
 from scipy.interpolate import interp1d as scipy_interp1d
 
 from qsotools import specops
@@ -44,13 +44,18 @@ def xi_g_v_fn(v):
 sigma2 = scipy_quad(lognGeneratingPower, 0, np.inf, limit=100000)[0]/np.pi
 
 # Time evolution applied on the Gaussian field
-a2_z   = lambda zp: 58.6 * np.power((1. + zp) / 4., -2.82)
+def a2_z(zp):
+    return 58.6 * np.power((1. + zp) / 4., -2.82)
 
 # Time evolution applied on the optical depth
-t_of_z = lambda zp: 0.55 * np.power((1. + zp) / 4., 5.1)
+def t_of_z(zp):
+    return 0.55 * np.power((1. + zp) / 4., 5.1)
 # Define x(z)
-x_of_z = lambda zp: t_of_z(zp) * np.exp(- a2_z(zp) * sigma2)
-Flux_d_z = lambda delta_g, z: np.exp(-x_of_z(z) * np.exp(2 * np.sqrt(a2_z(z)) * delta_g))
+def x_of_z(zp, var_gauss=sigma2):
+    return t_of_z(zp) * np.exp(- a2_z(zp) * var_gauss)
+
+def Flux_d_z(delta_g, z):
+    return np.exp(-x_of_z(z) * np.exp(2 * np.sqrt(a2_z(z)) * delta_g))
 
 def lognMeanFluxSaddle(z):
     sigma2z = a2_z(z) * sigma2
@@ -198,6 +203,35 @@ class RedshiftGenerator(object):
 
 
 class DLASampler():
+    """ DLA sampling class.
+
+    The DLA model is based on the column density distribution in
+    fN_spline_z24.fits.gz file in pyigm, which is based on the paper cited in
+    the README file. It is a smooth function, fitted to many observations. The
+    redshift evolution of f(N) is (1 + z)^1.5 at pivot redshift of 2.4.
+    However, we are extending well beyond the confidence interval of the said
+    work.
+
+    This class has an internal wide pixel size ``wide_pix`` in kms. It works on
+    Gaussian random fields and resamples them onto this velocity spacing. This
+    makes the inverse CDF easier to calculate, which is just an inverse erfc.
+    When working on raw fields, DLAs were popuplated right next to each other.
+    This is due to small-scale clustering. After trying different methods, I
+    settled on resampling the input Gaussian field, which reduced the excess
+    clustering of DLAs.
+
+    Other methods tested:
+    - Optical depth mapping on the resampled (0.2 A) skewers. The PDF turns
+    out non-trivial when smoothed; and you can't control excess clustering.
+    - Smoothing the Gaussian field. Without resampling, the excess clustering
+    persists.
+
+    How to use this class:
+    - Initialize it at the top of your program, e.g. in main function.
+    - Pass a copy of this instance to other functions and objects.
+    - Then you only need to call :meth:`insert_random_dlas` to obtain a
+    random DLA data array.
+    """
     @staticmethod
     def convX2z(z, Om0=0.315):
         """ Conversion from X to z """
@@ -210,10 +244,17 @@ class DLASampler():
         return ((1 + z) / (1 + zpivot))**gamma_l
 
     def __init__(
-            self, dpixelA, nmin=19., nmax=22.5,
-            ntau_points=1000000, zmin=1.8, zmax=8.0, nzbins=100
+            self, wide_pix=64., nmin=19., nmax=23.,
+            zmin=0, zmax=20., nzbins=5000
     ):
-        self.dpixelA = dpixelA
+        self.nmin = nmin
+        self.nmax = nmax
+
+        self.wide_pix = None
+        self.sigma_scale = None
+        self.set_var_gauss(wide_pix)
+
+        self._zbins = np.linspace(zmin, zmax, nzbins)
 
         fname_fn = resource_filename(
             'qsotools', 'tables/fN_spline_z24.fits.gz')
@@ -223,17 +264,27 @@ class DLASampler():
             self._log10N = data['LGN']
             self._fN_24 = data['FN']
 
-        self._tau_c_interpolator = None
-        self._inv_cdf_interpolator = None
-        self.set_tau_c_interp(
-            nmin, nmax, ntau_points,
-            zbins=np.linspace(zmin, zmax, nzbins))
+        self._num_interp = None
+        self.set_num_interp(nmin, nmax)
+
+        # self._tau_c_interpolator = None
+        # self._inv_cdf_interpolator = None
+        # self.set_tau_c_interp(
+        #     nmin, nmax, ntau_points,
+        #     zbins=self._zbins)
         self.set_logn_invcdf(nmin, nmax)
 
-    def num_systems_per_pixel_z(self, z, nmin=19., nmax=22.5, dpixelA=None):
-        if dpixelA is not None:
-            self.dpixelA = dpixelA
+    def set_var_gauss(self, wide_pix):
+        lnkbins = np.linspace(-9, 5, 40000)
+        kbins = np.exp(lnkbins)
+        window = np.sinc(-kbins * wide_pix / 2 / np.pi)**2
+        ps = lognGeneratingPower(kbins) * window * kbins
+        var_gauss = np.trapz(ps, x=lnkbins) / np.pi
 
+        self.wide_pix = wide_pix
+        self.sigma_scale = np.sqrt(2 * var_gauss)
+
+    def calc_num_systems_per_pixel(self, z, nmin=19., nmax=23.):
         w = (nmin <= self.log10N) & (self.log10N < nmax)
         lgn = self.log10N[w]
         fn = self.fN[w]
@@ -241,12 +292,26 @@ class DLASampler():
         integral_fN_at_z24 = np.trapz(10**(lgn + fn), x=lgn) * np.log(10)
 
         fN_z_evo = DLASampler.fn_z_evo(z)
-        x2z = DLASampler.convX2z(z)
-        dz_pixel = self.dpixelA / fid.LYA_WAVELENGTH
+        x2z = DLASampler.convX2z(z) * (1 + z) / fid.LIGHT_SPEED
 
-        return  integral_fN_at_z24 * fN_z_evo * x2z * dz_pixel
+        return  integral_fN_at_z24 * fN_z_evo * x2z * self.wide_pix
 
-    def set_logn_invcdf(self, nmin=19., nmax=22.5):
+    def set_num_interp(self, nmin=19., nmax=23.):
+        nums = self.calc_num_systems_per_pixel(self._zbins, nmin, nmax)
+        self._num_interp = scipy_interp1d(self._zbins, nums, bounds_error=True)
+
+    def interp_num_systems_per_pixel(self, z):
+        if self._num_interp is None:
+            raise Exception("Error: set_num_interp first")
+
+        return self._num_interp(z)
+
+    def delta_g_c(self, z):
+        numsys = self.interp_num_systems_per_pixel(z)
+        dgc = erfcinv(2 * numsys) * self.sigma_scale
+        return dgc
+
+    def set_logn_invcdf(self, nmin=19., nmax=23.):
         w = (nmin <= self.log10N) & (self.log10N < nmax)
         lgn = self.log10N[w]
         fn = self.fN[w]
@@ -263,9 +328,14 @@ class DLASampler():
             cdf, lgn, bounds_error=True)
 
     def set_tau_c_interp(
-            self, nmin=19., nmax=22.5, ntau_points=1000000,
+            self, nmin=19., nmax=23., ntau_points=1000000,
             zbins=np.linspace(1.8, 6.0, 60), dpixelA=None
     ):
+        """ DEPRECATED!
+        This interpolator matches CDF of tau to number of systems per
+        pixel. However, it is invalid when skewers are downsampled as tau PDF
+        does not hold.
+        """
         if dpixelA is not None:
             self.dpixelA = dpixelA
 
@@ -275,8 +345,6 @@ class DLASampler():
         for iz, z in enumerate(zbins):
             tau_edges, tau_centers, pdf = LyaMocks.pdf_tau(
                 z, npoints=ntau_points)
-            norm = np.trapz(pdf, x=tau_centers)
-            pdf /= norm
 
             tau_data[iz][0] = tau_centers
             tau_data[iz][1] = pdf
@@ -302,25 +370,44 @@ class DLASampler():
 
         return NHi
 
-    def insert_random_dlas_into_transmission(
-            self, wave, fluxes, mockids, seed
-    ):
-        RNST = np.random.default_rng(seed)
-        taus = -np.log(fluxes)
-        zs = wave / fid.LYA_WAVELENGTH - 1
-        tau_c = self.tau_c(zs)
+    def insert_random_dlas(self, zgrid, delta_gs, mockids, RNST):
+        """ Insert random DLAs into skewers
 
-        if not np.allclose(np.diff(wave), self.dpixelA, rtol=1e-2):
-            raise Exception(
-                "DLASampler dpixelA does not match transmission files.")
+        ``delta_gs`` are resampled onto ``wide_pix`` sized pixels before DLA
+        matching.
+
+        Args:
+            zgrid (ndarray): Redshift array in the fine grid of LyaMocks
+            delta_gs (ndarray): Nmocks x zgrid.size array of the Gaussian
+                field of LyaMocks. Internal smoothing is applied.
+            mockids (ndarray): Array of integers for MOCKID of each skewer.
+            RNST (random state): Initialized random state.
+
+        Returns:
+            data_dlas (ndarray): With columns 'Z_DLA_NO_RSD', 'Z_DLA_RSD',
+                'N_HI_DLA', 'MOCKID' and 'DLAID'. There is no RSD, so both
+                redshifts are exactly equal. 'DLAID' is three digits attached
+                to 'MOCKID'.
+        """
+        dvkms = fid.LIGHT_SPEED * np.log((1 + zgrid[1]) / (1 + zgrid[0]))
+        downsample = int(self.wide_pix / dvkms)
+        newsize = zgrid.size // downsample
+
+        def _downsample(x):
+            y = x[:newsize * downsample].reshape(
+                newsize, downsample).sum(axis=1) / downsample
+            return y
+
+        refac_z = _downsample(zgrid)
+        dgc = self.delta_g_c(refac_z)
 
         list_of_dlas = []
         total_dlas = 0
         for jj in range(mockids.size):
-            w = taus[jj] >= tau_c
+            w = _downsample(delta_gs[jj]) >= dgc
             num_dlas = w.sum()
 
-            z_dlas = zs[w]
+            z_dlas = refac_z[w]
             Nhi_dlas = self.get_random_NHi(num_dlas, RNST)
             id_dlas = np.array([
                 int(f"{mockids[jj]}{x:03d}") for x in np.arange(num_dlas)
@@ -456,44 +543,65 @@ class LyaMocks():
         
     """
     @staticmethod
-    def pdf_tau(z=3.0, tau1=-6, tau2=3.5, npoints=1000000):
-        tau_edges = np.logspace(tau1, tau2, npoints+1)
+    def pdf_tau(
+            z=3.0, tau1=-6, tau2=3.5, npoints=1000000, var_gauss=sigma2
+    ):
+        tau_edges = np.logspace(tau1, tau2, npoints + 1)
         tau_centers = (tau_edges[1:] + tau_edges[:-1]) / 2
 
         a_z = np.sqrt(a2_z(z))
-        x_z = x_of_z(z)
+        x_z = x_of_z(z, var_gauss)
         delta_g = np.log(tau_centers / x_z) / 2 / a_z
 
-        pdf_delta_g = np.exp(- delta_g**2 / sigma2 / 2) / np.sqrt(2 * np.pi * sigma2)
+        pdf_delta_g = (
+            np.exp(- delta_g**2 / var_gauss / 2)
+            / np.sqrt(2 * np.pi * var_gauss)
+        )
         dtau_dDeltag = 2 * a_z * tau_centers
         pdf_tau = pdf_delta_g / dtau_dDeltag
 
+        norm = np.trapz(pdf_tau, x=tau_centers)
+        pdf_tau /= norm
+
         return tau_edges, tau_centers, pdf_tau
 
-    def createField(self, NMocks=1):
+    def createField(self, NMocks=1, mockids=None):
         self.delta_F = self.RNST.standard_normal((NMocks, self.N_CELLS))
 
-        delta_k  = np.fft.rfft(self.delta_F, axis=1) * self.DV_KMS
-        delta_k *= np.sqrt( self.power_spectrum_array / self.DV_KMS )
-        
-        self.delta_F = np.fft.irfft(delta_k, axis=1) / self.DV_KMS
+        self.delta_F  = np.fft.rfft(self.delta_F, axis=1) * self.DV_KMS
+        self.delta_F *= np.sqrt( self.power_spectrum_array / self.DV_KMS )
 
-    def __init__(self, SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True, \
-        GAUSSIAN_MOCKS=False, USE_LOG_V=True):
+        self.delta_F = np.fft.irfft(self.delta_F, axis=1) / self.DV_KMS
+        self.pick_dla_locations(mockids)
+
+    def pick_dla_locations(self, mockids):
+        """ Use it while delta_F is in k space """
+        if self.dla_sampler is None:
+            self.data_dlas = None
+            return None
+
+        self.data_dlas = self.dla_sampler.insert_random_dlas(
+            self.z_values, self.delta_F, mockids, self.RNST)
+
+    def __init__(
+            self, SEED, N_CELLS=65536, DV_KMS=1.0, REDSHIFT_ON=True,
+            GAUSSIAN_MOCKS=False, USE_LOG_V=True, dla_sampler=None
+    ):
         self.RNST           = np.random.default_rng(SEED)
         self.N_CELLS        = N_CELLS
         self.DV_KMS         = DV_KMS
         self.REDSHIFT_ON    = REDSHIFT_ON
         self.GAUSSIAN_MOCKS = GAUSSIAN_MOCKS
+        self.dla_sampler = dla_sampler
 
-        self.v_values  = self.DV_KMS * (np.arange(self.N_CELLS) - self.N_CELLS/2)
+        v_values  = self.DV_KMS * (np.arange(self.N_CELLS) - self.N_CELLS/2)
         self.k_values  = 2. * np.pi * np.fft.rfftfreq(self.N_CELLS, d=self.DV_KMS)
 
         if USE_LOG_V:
-            self.z0_values = np.exp(self.v_values / fid.LIGHT_SPEED) - 1.
+            self.z0_values = np.exp(v_values / fid.LIGHT_SPEED) - 1
         else:
-            self.z0_values = np.power(1. - self.v_values / 2. / fid.LIGHT_SPEED, -2) - 1.
-        
+            self.z0_values = (1 - v_values / 2. / fid.LIGHT_SPEED)**-2 - 1
+
         self.Z_CENTER = 0
         
         if self.GAUSSIAN_MOCKS:
@@ -501,7 +609,8 @@ class LyaMocks():
         else:
             self.power_spectrum_array = lognGeneratingPower(self.k_values)
 
-        self.init_variance = np.sum(self.power_spectrum_array) * self.k_values[1] / np.pi
+        self.init_variance = np.trapz(
+            self.power_spectrum_array, dx=self.k_values[1]) / np.pi
 
     def setCentralRedshift(self, Z_C):
         self.Z_CENTER = Z_C
@@ -513,7 +622,7 @@ class LyaMocks():
             self.evo_redshifts = np.ones(self.N_CELLS) * self.Z_CENTER
 
     def smoothGaussian(self, R):
-        if R:
+        if R is not None:
             k = self.k_values
             delta_k  = np.fft.rfft(self.delta_F, axis=1) * self.DV_KMS
             delta_k *= np.exp(-k*k * R*R / 2.0)
@@ -522,7 +631,9 @@ class LyaMocks():
 
     def applySpectographResolution(self, spectrograph_resolution):
         if spectrograph_resolution:
-            self.smoothGaussian(fid.LIGHT_SPEED / spectrograph_resolution / fid.ONE_SIGMA_2_FWHM)
+            self.smoothGaussian(
+                fid.LIGHT_SPEED / spectrograph_resolution
+                / fid.ONE_SIGMA_2_FWHM)
 
     def redshiftEvolutionGaussian(self):
         a_z = np.power((1 + self.evo_redshifts) / 4, fid.PDW_FIT_B / 2)
@@ -546,9 +657,11 @@ class LyaMocks():
     def transformFlux(self):
         self.delta_F = np.exp(-self.delta_F)
 
-    def generateMocks(self, NMocks=1, spectrograph_resolution=None, R_tau=None):
-        self.createField(NMocks)
-        
+    def generateMocks(
+        self, NMocks=1, spectrograph_resolution=None, R_tau=None, mockids=None
+    ):
+        self.createField(NMocks, mockids)
+
         if self.GAUSSIAN_MOCKS:
             # The fiducial power spectrum has NOT redshift evolution of fluctuations in it.
             # Multiply by (1.+z / 4)^B/2
@@ -605,11 +718,11 @@ class LyaMocks():
     def resampledMocks(
             self, howmany, err_per_final_pixel=0, spectrograph_resolution=None,
             resample_dv=None, obs_wave_edges=None, delta_z=None,
-            keep_empty_bins=False
+            keep_empty_bins=False, mockids=None
     ):
         wave = fid.LYA_WAVELENGTH * (1. + self.z_values)
 
-        self.generateMocks(howmany, spectrograph_resolution)
+        self.generateMocks(howmany, spectrograph_resolution, mockids=mockids)
         fluxes = self.delta_F
 
         # Resample onto an observed grid if obs_wave_centers given
