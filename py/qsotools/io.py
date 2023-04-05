@@ -1609,10 +1609,17 @@ class QQFile():
         data = np.array(fluxes, dtype='float32').T
         self.fitsfile.write(data, extname='TRANSMISSION')
 
-    def writeAll(self, metadata, metahdr, wave, fluxes):
+    def writeDLAExtention(self, data_dla):
+        if data_dla is None:
+            return
+
+        self.fitsfile.write(data_dla, extname='DLA')
+
+    def writeAll(self, metadata, metahdr, wave, fluxes, data_dla=None):
         self.writeMetadata(metadata, metahdr)
         self.writeWavelength(wave)
         self.writeTransmission(fluxes)
+        self.writeDLAExtention(data_dla)
         self.close()
 
     def readAll(self):

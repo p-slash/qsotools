@@ -316,7 +316,8 @@ def chunkHelper(i, waves, fluxes, errors, z_qso, args):
 
 
 def save_data(
-        wave, fmocks, emocks, fnames, z_qso, dec, ra, args, rmat, picca, tid):
+        wave, fmocks, emocks, fnames, z_qso, dec, ra, args, rmat, picca, tid
+):
     if picca:
         fnames = []
         for (w, f, e) in zip(wave, fmocks, emocks):
@@ -335,7 +336,7 @@ def save_data(
     return fnames
 
 
-def saveQQFile(ipix, meta1, wave, fluxes, args):
+def saveQQFile(ipix, meta1, wave, fluxes, args, data_dla=None):
     P = ipix // 100
     dir1 = ospath_join(args.OutputDir, f"{P}")
     dir2 = ospath_join(dir1, f"{ipix}")
@@ -349,7 +350,7 @@ def saveQQFile(ipix, meta1, wave, fluxes, args):
 
     qqfile = QQFile(fname, 'rw')
     header = {'HPXNSIDE': args.hp_nside, 'HPXNEST': not args.hp_ring}
-    qqfile.writeAll(meta1, header, wave, fluxes)
+    qqfile.writeAll(meta1, header, wave, fluxes, data_dla)
 
     return fname
 
@@ -366,8 +367,9 @@ def remove_above_lya_absorption(wave, fluxes, z_qso):
 
 
 class MockGenerator(object):
-    def __init__(self, args):
+    def __init__(self, args, dla_sampler):
         self.args = args
+        self.dla_sampler = dla_sampler
         self.TURNOFF_ZEVO = args.fixed_zforest is not None
         # Set up DESI observed wavelength grid
         self.DESI_WAVEGRID, self.DESI_WAVEEDGES = getDESIwavegrid(args)
@@ -397,8 +399,8 @@ class MockGenerator(object):
         n_iter = int(nmocks / n_one_iter) + 1
         n_gen_mocks = 0
 
-        wave = np.array(self.DESI_WAVEGRID, dtype=np.float32)
-        fluxes = np.empty((nmocks, nwave), dtype=np.float32)
+        wave = self.DESI_WAVEGRID.copy()
+        fluxes = np.empty((nmocks, nwave))
         if self.args.save_qqfile:
             errors = None
         else:
@@ -422,14 +424,22 @@ class MockGenerator(object):
                 keep_empty_bins=self.args.keep_nolya_pixels
             )
 
-            fluxes[_slice] = _f.astype(np.float32)
+            fluxes[_slice] = _f
 
             if self.args.save_qqfile:
                 continue
 
-            errors[_slice] = _e.astype(np.float32)
+            errors[_slice] = _e
 
         return wave, fluxes, errors
+
+    def insert_dlas(self, ipix, wave, fluxes, mockids):
+        assert not self.args.use_logspaced_wave
+
+        data_dla = self.dla_sampler.insert_random_dlas_into_transmission(
+            wave, fluxes, mockids, self.args.seed + ipix)
+
+        return data_dla
 
     def divide_by_mean_flux(self, wave, fluxes, errors):
         if self.args.save_full_flux:
@@ -509,15 +519,17 @@ class MockGenerator(object):
         # Remove absorption above Lya
         fluxes = remove_above_lya_absorption(wave, fluxes, z_qso)
 
+        data_dla = self.insert_dlas(ipix, wave, fluxes, meta1['MOCKID'])
+
         # Divide by mean flux if required
         fluxes, errors = self.divide_by_mean_flux(wave, fluxes, errors)
 
         # If save-qqfile option is passed, do not save as BinaryQSO files
         # This also means no chunking or removing pixels
         if self.args.save_qqfile:
-            fname = saveQQFile(ipix, meta1, wave, fluxes, self.args)
+            fname = saveQQFile(ipix, meta1, wave, fluxes, self.args, data_dla)
 
-            return [fname], nmocks
+            return [fname], nmocks, data_dla
 
         # Cut Lyman-alpha forest region and convert wave to waves = [wave]
         waves, fluxes, errors = self.cut_lya_forest_region(
@@ -538,7 +550,7 @@ class MockGenerator(object):
             if fname:
                 all_fnames.extend(fname)
 
-        return all_fnames, nmocks
+        return all_fnames, nmocks, data_dla
 
 
 def main():
@@ -559,6 +571,9 @@ def main():
         args.z_forest_min = 0
         args.keep_nolya_pixels = True
         args.save_full_flux = True
+        dla_sampler = lm.DLASampler(args.pixel_dlambda)
+    else:
+        dla_sampler = None
 
     sett_txt = '_gaussian' if args.gauss else '_lognormal'
     # sett_txt += '_noz' if args.without_z_evo else ''
@@ -577,11 +592,24 @@ def main():
     pcounter = Progress(metadata.size)
 
     filename_list = []
+    master_dla_catalog = []
     with Pool(processes=args.nproc) as pool:
-        imap_it = pool.imap(MockGenerator(args), zip(u_pix, split_meta))
-        for fname, nmocks in imap_it:
+        imap_it = pool.imap(
+            MockGenerator(args, dla_sampler),
+            zip(u_pix, split_meta)
+        )
+        for fname, nmocks, data_dla in imap_it:
             filename_list.extend(fname)
+            master_dla_catalog.append(data_dla)
             pcounter.increase(nmocks)
+
+    if master_dla_catalog[0] is not None:
+        mdla_fts = QQFile(
+            ospath_join(args.OutputDir, "master_dla_catalog.fits"), "rw")
+        logging.info(f"Saving master DLA catalog as {mdla_fts.fname}")
+        master_dla_catalog = np.concatenate(master_dla_catalog)
+        mdla_fts.writeDLAExtention(master_dla_catalog)
+        mdla_fts.close()
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt")

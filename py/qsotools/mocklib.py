@@ -1,3 +1,6 @@
+from pkg_resources import resource_filename
+
+import fitsio
 import numpy as np
 from scipy.stats     import binned_statistic
 from scipy.integrate import quad as scipy_quad
@@ -193,11 +196,171 @@ class RedshiftGenerator(object):
     def generate(self, RNST, nmocks):
         return self.inv_cdf_interp(RNST.uniform(size=nmocks))
 
+
+class DLASampler():
+    @staticmethod
+    def convX2z(z, Om0=0.315):
+        """ Conversion from X to z """
+        Ez = np.sqrt((1 - Om0) + Om0 * (1 + z)**3)
+        return (1 + z)**2 / Ez
+
+    @staticmethod
+    def fn_z_evo(z, zpivot=2.4, gamma_l=1.5):
+        """ Redshift evolution of f(N, X)"""
+        return ((1 + z) / (1 + zpivot))**gamma_l
+
+    def __init__(
+            self, dpixelA, nmin=19., nmax=22.5,
+            ntau_points=1000000, zmin=1.8, zmax=8.0, nzbins=100
+    ):
+        self.dpixelA = dpixelA
+
+        fname_fn = resource_filename(
+            'qsotools', 'tables/fN_spline_z24.fits.gz')
+
+        with fitsio.FITS(fname_fn) as f:
+            data = f[1].read()[0]
+            self._log10N = data['LGN']
+            self._fN_24 = data['FN']
+
+        self._tau_c_interpolator = None
+        self._inv_cdf_interpolator = None
+        self.set_tau_c_interp(
+            nmin, nmax, ntau_points,
+            zbins=np.linspace(zmin, zmax, nzbins))
+        self.set_logn_invcdf(nmin, nmax)
+
+    def num_systems_per_pixel_z(self, z, nmin=19., nmax=22.5, dpixelA=None):
+        if dpixelA is not None:
+            self.dpixelA = dpixelA
+
+        w = (nmin <= self.log10N) & (self.log10N < nmax)
+        lgn = self.log10N[w]
+        fn = self.fN[w]
+
+        integral_fN_at_z24 = np.trapz(10**(lgn + fn), x=lgn) * np.log(10)
+
+        fN_z_evo = DLASampler.fn_z_evo(z)
+        x2z = DLASampler.convX2z(z)
+        dz_pixel = self.dpixelA / fid.LYA_WAVELENGTH
+
+        return  integral_fN_at_z24 * fN_z_evo * x2z * dz_pixel
+
+    def set_logn_invcdf(self, nmin=19., nmax=22.5):
+        w = (nmin <= self.log10N) & (self.log10N < nmax)
+        lgn = self.log10N[w]
+        fn = self.fN[w]
+        cdf = np.empty_like(fn)
+
+        integrand = 10**(lgn + fn)
+        dlgn = (lgn[1] - lgn[0]) * np.log(10)
+
+        np.cumsum(integrand * dlgn, out=cdf)
+        cdf -= cdf[0]
+        cdf /= cdf[-1]
+
+        self._inv_cdf_interpolator = scipy_interp1d(
+            cdf, lgn, bounds_error=True)
+
+    def set_tau_c_interp(
+            self, nmin=19., nmax=22.5, ntau_points=1000000,
+            zbins=np.linspace(1.8, 6.0, 60), dpixelA=None
+    ):
+        if dpixelA is not None:
+            self.dpixelA = dpixelA
+
+        tau_c = np.empty_like(zbins)
+        tau_data = np.empty((zbins.size, 3, ntau_points))
+
+        for iz, z in enumerate(zbins):
+            tau_edges, tau_centers, pdf = LyaMocks.pdf_tau(
+                z, npoints=ntau_points)
+            norm = np.trapz(pdf, x=tau_centers)
+            pdf /= norm
+
+            tau_data[iz][0] = tau_centers
+            tau_data[iz][1] = pdf
+            np.cumsum(pdf * np.diff(tau_edges), out=tau_data[iz][2])
+
+        nsys = self.num_systems_per_pixel_z(zbins, nmin, nmax)
+
+        for iz in range(zbins.size):
+            itau = np.searchsorted(tau_data[iz, 2, :], 1 - nsys[iz])
+            tau_c[iz] = tau_data[iz, 0, itau]
+
+        self._tau_c_interpolator = scipy_interp1d(zbins, tau_c)
+
+    def tau_c(self, z):
+        if self._tau_c_interpolator is None:
+            raise Exception("Error: set_tau_c_interp first")
+
+        return self._tau_c_interpolator(z)
+
+    def get_random_NHi(self, ndlas, RNST):
+        u = RNST.uniform(0, 1, ndlas)
+        NHi = self._inv_cdf_interpolator(u)
+
+        return NHi
+
+    def insert_random_dlas_into_transmission(
+            self, wave, fluxes, mockids, seed
+    ):
+        RNST = np.random.default_rng(seed)
+        taus = -np.log(fluxes)
+        zs = wave / fid.LYA_WAVELENGTH - 1
+        tau_c = self.tau_c(zs)
+
+        if not np.allclose(np.diff(wave), self.dpixelA, rtol=1e-2):
+            raise Exception(
+                "DLASampler dpixelA does not match transmission files.")
+
+        list_of_dlas = []
+        total_dlas = 0
+        for jj in range(mockids.size):
+            w = taus[jj] >= tau_c
+            num_dlas = w.sum()
+
+            z_dlas = zs[w]
+            Nhi_dlas = self.get_random_NHi(num_dlas, RNST)
+            id_dlas = np.array([
+                int(f"{mockids[jj]}{x:03d}") for x in np.arange(num_dlas)
+            ])
+
+            list_of_dlas.append((mockids[jj], id_dlas, z_dlas, Nhi_dlas))
+            total_dlas += num_dlas
+
+        dtype = [
+            ('Z_DLA_NO_RSD', 'f8'), ('Z_DLA_RSD', 'f8'), ('N_HI_DLA', 'f8'),
+            ('MOCKID', 'i8'), ('DLAID', 'i8')]
+
+        data_dlas = np.empty(total_dlas, dtype=dtype)
+        jj = 0
+        for item in list_of_dlas:
+            mockid, id_dlas, z_dlas, Nhi_dlas = item
+            num_dlas = id_dlas.size
+            data_slice = data_dlas[jj:jj + num_dlas]
+
+            data_slice['Z_DLA_NO_RSD'] = z_dlas
+            data_slice['Z_DLA_RSD'] = z_dlas
+            data_slice['N_HI_DLA'] = Nhi_dlas
+            data_slice['MOCKID'] = mockid
+            data_slice['DLAID'] = id_dlas
+            jj += num_dlas
+
+        return data_dlas
+
+    @property
+    def log10N(self):
+        return self._log10N
+
+    @property
+    def fN(self):
+        return self._fN_24
         
 class LyaMocks():
     """
-    Generates lognormal mocks with a power spectrum similar to Lya 1D power spectrum 
-    up to small scales ~0.0003-0.2 s/km.
+    Generates lognormal mocks with a power spectrum similar to Lya 1D power
+    spectrum up to small scales ~0.0003-0.2 s/km.
 
     Parameters
     ----------
@@ -292,6 +455,21 @@ class LyaMocks():
         Returns wavelength array and list of fluxes: wave, fluxes, errors.
         
     """
+    @staticmethod
+    def pdf_tau(z=3.0, tau1=-6, tau2=3.5, npoints=1000000):
+        tau_edges = np.logspace(tau1, tau2, npoints+1)
+        tau_centers = (tau_edges[1:] + tau_edges[:-1]) / 2
+
+        a_z = np.sqrt(a2_z(z))
+        x_z = x_of_z(z)
+        delta_g = np.log(tau_centers / x_z) / 2 / a_z
+
+        pdf_delta_g = np.exp(- delta_g**2 / sigma2 / 2) / np.sqrt(2 * np.pi * sigma2)
+        dtau_dDeltag = 2 * a_z * tau_centers
+        pdf_tau = pdf_delta_g / dtau_dDeltag
+
+        return tau_edges, tau_centers, pdf_tau
+
     def createField(self, NMocks=1):
         self.delta_F = self.RNST.standard_normal((NMocks, self.N_CELLS))
 
@@ -464,47 +642,3 @@ class LyaMocks():
             wave   = wave[(wave_min < wave) & (wave < wave_max)]
 
         return wave, fluxes, errors
-
-
-            
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
