@@ -73,4 +73,9 @@ References
 + O’Meara J. M., Lehner N., Howk J. C., Prochaska J. X., Fox A. J., Peeples M. S., Tumlinson J., O’Shea B. W., 2017, AJ, 154, 114
 + Sánchez-Ramírez R., et al., 2016, MNRAS, 456, 4488
 
+DLA file `tables/fN_spline_z24.fits.gz` is obtained from [pyigm](https://github.com/pyigm/pyigm). Following papers and links should be cited:
++ https://github.com/pyigm/pyigm
++ https://zenodo.org/record/1045480
++ J. Xavier Prochaska, Piero Madau, John M. O'Meara, Michele Fumagalli, Towards a unified description of the intergalactic medium at redshift z ≈ 2.5, Monthly Notices of the Royal Astronomical Society, Volume 438, Issue 1, 11 February 2014, Pages 476–486, https://doi.org/10.1093/mnras/stt2218
+
 
