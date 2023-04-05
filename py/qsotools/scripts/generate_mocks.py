@@ -380,14 +380,16 @@ class MockGenerator(object):
         else:
             self.mean_flux_function = lm.lognMeanFluxGH
 
-    def generate_wfe_hpx(self, ipix, nmocks, n_one_iter=100):
+    def generate_wfe_hpx(self, ipix, mockids, n_one_iter=100):
         """New seed is seed + healpix no"""
+        nmocks = mockids.size
         lya_m = lm.LyaMocks(
             self.args.seed + ipix,
             N_CELLS=2**self.args.log2ngrid,
             DV_KMS=self.args.griddv,
             GAUSSIAN_MOCKS=self.args.gauss,
-            REDSHIFT_ON=not self.TURNOFF_ZEVO
+            REDSHIFT_ON=not self.TURNOFF_ZEVO,
+            dla_sampler=self.dla_sampler
         )
 
         if self.TURNOFF_ZEVO:
@@ -406,6 +408,8 @@ class MockGenerator(object):
         else:
             errors = np.empty_like(fluxes)
 
+        data_dlas = []
+
         for _ in range(n_iter):
             rem_mocks = nmocks - n_gen_mocks
 
@@ -421,25 +425,24 @@ class MockGenerator(object):
                 err_per_final_pixel=self.args.sigma_per_pixel,
                 spectrograph_resolution=self.args.specres,
                 obs_wave_edges=self.DESI_WAVEEDGES,
-                keep_empty_bins=self.args.keep_nolya_pixels
+                keep_empty_bins=self.args.keep_nolya_pixels,
+                mockids=mockids[_slice]
             )
 
             fluxes[_slice] = _f
+            data_dlas.append(lya_m.data_dlas)
 
             if self.args.save_qqfile:
                 continue
 
             errors[_slice] = _e
 
-        return wave, fluxes, errors
+        if self.dla_sampler:
+            data_dlas = np.concatenate(data_dlas)
+        else:
+            data_dlas = None
 
-    def insert_dlas(self, ipix, wave, fluxes, mockids):
-        assert not self.args.use_logspaced_wave
-
-        data_dla = self.dla_sampler.insert_random_dlas_into_transmission(
-            wave, fluxes, mockids, self.args.seed + ipix)
-
-        return data_dla
+        return wave, fluxes, errors, data_dlas
 
     def divide_by_mean_flux(self, wave, fluxes, errors):
         if self.args.save_full_flux:
@@ -494,6 +497,7 @@ class MockGenerator(object):
                         f"_z{z_qso_i:.1f}{self.sett_txt}.dat")
 
             fname = [_get_bq_fname(nc) for nc in range(nchunks)]
+            RESOMAT = None
         else:
             assert nchunks == 1
             RESOMAT = setResolutionMatrix(wave_c[0], self.args)
@@ -506,6 +510,21 @@ class MockGenerator(object):
 
         return fname
 
+    def trim_dlas(self, data_dlas, mockids, z_qso):
+        if data_dlas is None:
+            return None
+
+        new_data_dlas = []
+
+        for jj, targetid in enumerate(mockids):
+            w = data_dlas['MOCKID'] == targetid
+            this_dlas = data_dlas[w]
+            zdlas = this_dlas['Z_DLA_NO_RSD']
+            w2 = zdlas < z_qso[jj]
+            new_data_dlas.append(this_dlas[w2])
+
+        return np.concatenate(new_data_dlas)
+
     def __call__(self, ipix_meta):
         ipix, meta1 = ipix_meta
         nmocks = meta1['MOCKID'].size
@@ -514,12 +533,13 @@ class MockGenerator(object):
         if nmocks == 0:
             return [], nmocks
 
-        wave, fluxes, errors = self.generate_wfe_hpx(ipix, nmocks)
+        wave, fluxes, errors, data_dlas = self.generate_wfe_hpx(
+            ipix, meta1['MOCKID'])
+
+        data_dlas = self.trim_dlas(data_dlas, meta1['MOCKID'], meta1['Z'])
 
         # Remove absorption above Lya
         fluxes = remove_above_lya_absorption(wave, fluxes, z_qso)
-
-        data_dla = self.insert_dlas(ipix, wave, fluxes, meta1['MOCKID'])
 
         # Divide by mean flux if required
         fluxes, errors = self.divide_by_mean_flux(wave, fluxes, errors)
@@ -527,9 +547,9 @@ class MockGenerator(object):
         # If save-qqfile option is passed, do not save as BinaryQSO files
         # This also means no chunking or removing pixels
         if self.args.save_qqfile:
-            fname = saveQQFile(ipix, meta1, wave, fluxes, self.args, data_dla)
+            fname = saveQQFile(ipix, meta1, wave, fluxes, self.args, data_dlas)
 
-            return [fname], nmocks, data_dla
+            return [fname], nmocks, data_dlas
 
         # Cut Lyman-alpha forest region and convert wave to waves = [wave]
         waves, fluxes, errors = self.cut_lya_forest_region(
@@ -550,7 +570,7 @@ class MockGenerator(object):
             if fname:
                 all_fnames.extend(fname)
 
-        return all_fnames, nmocks, data_dla
+        return all_fnames, nmocks, data_dlas
 
 
 def main():
@@ -571,7 +591,7 @@ def main():
         args.z_forest_min = 0
         args.keep_nolya_pixels = True
         args.save_full_flux = True
-        dla_sampler = lm.DLASampler(args.pixel_dlambda)
+        dla_sampler = lm.DLASampler()
     else:
         dla_sampler = None
 
