@@ -386,8 +386,8 @@ class DLASampler():
         Returns:
             data_dlas (ndarray): With columns 'Z_DLA_NO_RSD', 'Z_DLA_RSD',
                 'N_HI_DLA', 'MOCKID' and 'DLAID'. There is no RSD, so both
-                redshifts are exactly equal. 'DLAID' is three digits attached
-                to 'MOCKID'.
+                redshifts are exactly equal. 'DLAID' is a hash of two digits
+                attached to 'MOCKID'.
         """
         dvkms = fid.LIGHT_SPEED * np.log((1 + zgrid[1]) / (1 + zgrid[0]))
         downsample = int(self.wide_pix / dvkms)
@@ -410,15 +410,15 @@ class DLASampler():
             z_dlas = refac_z[w]
             Nhi_dlas = self.get_random_NHi(num_dlas, RNST)
             id_dlas = np.array([
-                int(f"{mockids[jj]}{x:03d}") for x in np.arange(num_dlas)
-            ])
+                hash(f"{mockids[jj]:020d}{x:02d}") for x in np.arange(num_dlas)
+            ]).astype(np.uint64)
 
             list_of_dlas.append((mockids[jj], id_dlas, z_dlas, Nhi_dlas))
             total_dlas += num_dlas
 
         dtype = [
             ('Z_DLA_NO_RSD', 'f8'), ('Z_DLA_RSD', 'f8'), ('N_HI_DLA', 'f8'),
-            ('MOCKID', 'i8'), ('DLAID', 'i8')]
+            ('MOCKID', 'i8'), ('DLAID', np.uint64)]
 
         data_dlas = np.empty(total_dlas, dtype=dtype)
         jj = 0
