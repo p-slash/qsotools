@@ -244,7 +244,7 @@ class DLASampler():
         return ((1 + z) / (1 + zpivot))**gamma_l
 
     def __init__(
-            self, wide_pix=64., nmin=19., nmax=23.,
+            self, wide_pix=2**10., nmin=19., nmax=23.,
             zmin=0, zmax=20., nzbins=5000
     ):
         self.nmin = nmin
@@ -390,13 +390,11 @@ class DLASampler():
                 attached to 'MOCKID'.
         """
         dvkms = fid.LIGHT_SPEED * np.log((1 + zgrid[1]) / (1 + zgrid[0]))
-        downsample = int(self.wide_pix / dvkms)
-        newsize = zgrid.size // downsample
+        m = np.round(self.wide_pix / dvkms).astype(int)
+        newsize = zgrid.size // m
 
         def _downsample(x):
-            y = x[:newsize * downsample].reshape(
-                newsize, downsample).sum(axis=1) / downsample
-            return y
+            return x[:newsize * m].reshape(newsize, m).mean(axis=1)
 
         refac_z = _downsample(zgrid)
         dgc = self.delta_g_c(refac_z)
