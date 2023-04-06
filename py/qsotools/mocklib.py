@@ -311,10 +311,9 @@ class DLASampler():
         dgc = erfcinv(2 * numsys) * self.sigma_scale
         return dgc
 
-    def set_logn_invcdf(self, nmin=19., nmax=23.):
-        w = (nmin <= self.log10N) & (self.log10N < nmax)
-        lgn = self.log10N[w]
-        fn = self.fN[w]
+    def set_logn_invcdf(self, nmin=19., nmax=23., nnhibins=400):
+        lgn = np.linspace(nmin, nmax, nnhibins)
+        fn = np.interp(lgn, self.log10N, self.fN)
         cdf = np.empty_like(fn)
 
         integrand = 10**(lgn + fn)
