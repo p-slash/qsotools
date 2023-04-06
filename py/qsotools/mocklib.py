@@ -411,14 +411,14 @@ class DLASampler():
             Nhi_dlas = self.get_random_NHi(num_dlas, RNST)
             id_dlas = np.array([
                 hash(f"{mockids[jj]:020d}{x:02d}") for x in np.arange(num_dlas)
-            ]).astype(np.uint64)
+            ], dtype=int)
 
             list_of_dlas.append((mockids[jj], id_dlas, z_dlas, Nhi_dlas))
             total_dlas += num_dlas
 
         dtype = [
             ('Z_DLA_NO_RSD', 'f8'), ('Z_DLA_RSD', 'f8'), ('N_HI_DLA', 'f8'),
-            ('MOCKID', 'i8'), ('DLAID', np.uint64)]
+            ('MOCKID', 'i8'), ('DLAID', 'i8')]
 
         data_dlas = np.empty(total_dlas, dtype=dtype)
         jj = 0
