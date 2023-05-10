@@ -141,7 +141,7 @@ def calculate_original(
     total_data = np.ones((1, nspec)) @ spectra
     total_power_b4, F = getPSandFisher(
         total_data, Nk, Nd, total_nkz, args.remove_last_nz_bins)
-    orig_power = 0.5 * np.linalg.solve(F, total_power_b4)
+    orig_power = 0.5 * my_cho_solve(F, total_power_b4)
 
     # Save power to a file
     # Set up output file
