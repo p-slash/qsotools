@@ -199,7 +199,7 @@ def auto_logylimmer(k, pkpi, ekpi=None, kmax=0.04, margins=(0.05, 0.2)):
     """
     wp = (pkpi > 0) & (k < kmax)
 
-    # wp is 2D, the next line ravels the array automaticall
+    # wp is 2D, the next line ravels the array automatically
     new_pkpi = pkpi[wp]
 
     if ekpi is None:
@@ -209,12 +209,11 @@ def auto_logylimmer(k, pkpi, ekpi=None, kmax=0.04, margins=(0.05, 0.2)):
 
     new_pkpi -= new_ekpi
     we = new_pkpi > 0
-    new_pkpi = new_pkpi[we]
-
-    ymin = 10**(_pad_log_margin(np.min(new_pkpi), -margins[0]))
+    ymin = 10**(_pad_log_margin(np.min(new_pkpi[we]), -margins[0]))
 
     new_pkpi += 2 * new_ekpi
-    ymax = 10**(_pad_log_margin(np.max(new_pkpi), margins[1]))
+    we = new_pkpi > 0
+    ymax = 10**(_pad_log_margin(np.max(new_pkpi[we]), margins[1]))
 
     return ymin, ymax
 
@@ -688,12 +687,16 @@ class PowerPlotter(object):
 
     def plot_grid_all(
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
-            outplot_fname=None, includes=['karacayli', 'eboss']
+            outplot_fname=None, includes=['karacayli', 'eboss'],
+            ratio_wrt_fid=False
     ):
         nrows = int(np.ceil(self.nz / ncols))
         noff_cols = ncols * nrows - self.nz
 
-        kpi_factor = self.k_bins / np.pi
+        if ratio_wrt_fid:
+            kpi_factor = 1
+        else:
+            kpi_factor = self.k_bins / np.pi
 
         fig, axs = plt.subplots(
             nrows, ncols,
@@ -702,7 +705,7 @@ class PowerPlotter(object):
             figsize=(colsize * ncols, rowsize * nrows)
         )
 
-        if len(includes) > 0:
+        if len(includes) > 0 and not ratio_wrt_fid:
             p1d_kwargs = {key: True for key in includes}
         else:
             p1d_kwargs = {}
@@ -721,9 +724,15 @@ class PowerPlotter(object):
             ls = []
 
             pkpi = self.power_qmle[iz] * kpi_factor
+            ekpi = self.error[iz] * kpi_factor
+            if ratio_wrt_fid:
+                ax.axhline(1, c='k')
+                pkpi /= self.power_fid[iz]
+                ekpi /= self.power_fid[iz]
+
             ls.append(
                 ax.errorbar(
-                    self.k_bins, pkpi, self.error[iz] * kpi_factor,
+                    self.k_bins, pkpi, ekpi,
                     label=label, fmt=".-", alpha=0.8
                 )
             )
@@ -738,33 +747,43 @@ class PowerPlotter(object):
             if do_set_ylim:
                 j1 = row * ncols
                 j2 = min(j1 + ncols, self.nz)
-                pkpi_row = self.power_qmle[j1:j2]
-                ekpi_row = self.error[j1:j2]
-                ymin, ymax = auto_logylimmer(
-                    self.k_bins, pkpi_row * kpi_factor, ekpi_row * kpi_factor)
-                use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
+                pkpi_row = self.power_qmle[j1:j2] * kpi_factor
+                ekpi_row = self.error[j1:j2] * kpi_factor
+
+                if not ratio_wrt_fid:
+                    ymin, ymax = auto_logylimmer(
+                        self.k_bins, pkpi_row, ekpi_row)
+                    use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
+                else:
+                    ymin, ymax = 0.8, 1.2
+                    use_yticks = [0.85, 1.0, 1.15]
 
                 ax.set_ylim(ymin, ymax)
                 ax.set_yticks(use_yticks)
 
             ax.text(
-                0.06, 0.96, f"z={z:.1f}",
+                0.06, 0.94, f"z={z:.1f}",
                 transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
                 verticalalignment='top', horizontalalignment='left',
                 color="#9f2305",
                 bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
-                      'alpha': 0.3, 'boxstyle': 'round'}
+                      'alpha': 0.5, 'boxstyle': 'round', "lw": 2}
             )
 
             if col == 0:
-                ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
+                if ratio_wrt_fid:
+                    ax.set_ylabel(
+                        r"$P/P_{\mathrm{true}}$", fontsize=AXIS_LBL_FONT_SIZE)
+                else:
+                    ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
+                    ax.set_yscale("log")
+
                 plt.setp(ax.get_yticklabels(), fontsize=TICK_LBL_FONT_SIZE)
-                ax.set_yscale("log")
             elif col != 1:
                 pass
             elif row == 0:
                 ax.legend(handles=ls, fontsize='large', loc="lower right")
-            elif row == 1:
+            elif row == 1 and p1d_kwargs:
                 ax.legend(handles=fs, fontsize='large', loc="lower right")
 
             do_set_xlabel = (
@@ -781,7 +800,7 @@ class PowerPlotter(object):
                 ax.set_xlim(auto_logxlimmer(self.k_bins))
 
             ax.grid(True, "major")
-            ax.grid(which='minor', linestyle=':', linewidth=1)
+            ax.grid(which='minor', linestyle=':', linewidth=0.8)
             ax.tick_params(direction='in', which='major', length=7, width=1)
             ax.tick_params(direction='in', which='minor', length=4, width=1)
 
