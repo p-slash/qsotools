@@ -150,7 +150,7 @@ def main():
     imap_it = pool.imap(readfile_calcpsfisher, args_list)
 
     logging.info("Reading chunk files and calculating total power & fisher...")
-    for chunks, power, fisher in tqdm(imap_it):
+    for chunks, power, fisher in tqdm(imap_it, total=len(args_list)):
         all_chunks.extend(chunks)
         total_power += power
         total_fisher += fisher
@@ -175,7 +175,7 @@ def main():
     ]
     all_powers = []
     imap_it = pool.imap(jackknife_method, args_list)
-    for xpower in tqdm(imap_it):
+    for xpower in tqdm(imap_it, total=len(args_list)):
         all_powers.append(xpower)
 
     logging.info("Done.")
