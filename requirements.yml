@@ -2,7 +2,7 @@ name: lya
 channels:
   - conda-forge
 dependencies:
-  - python>=3.6
+  - python>=3.7
   - numpy
   - numba
   - scipy
@@ -13,3 +13,4 @@ dependencies:
   - jupyter
   - fitsio
   - healpy
+  - tqdm
