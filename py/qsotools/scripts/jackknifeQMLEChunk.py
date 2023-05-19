@@ -1,6 +1,6 @@
 import argparse
 import glob
-from multiprocessing import Pool
+from multiprocessing import Pool, RawArray
 from os.path import (
     join as ospath_join,
     dirname as ospath_dir
@@ -13,6 +13,68 @@ from scipy.linalg import cho_factor, cho_solve
 import fitsio
 
 from tqdm import tqdm
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument(
+        "BootChunkFileBase", help="BootChunkFile as described in QMLE.")
+    parser.add_argument("Nk", help="Number of k bins", type=int)
+    parser.add_argument("Nz", help="Number of z bins", type=int)
+    parser.add_argument(
+        "--nblocks", help="Use block jackknife instead.", type=int)
+    # parser.add_argument("--save-powers", action="store_true")
+    # parser.add_argument("--calculate-originals", action="store_true")
+    parser.add_argument("--fbase", default="")
+    parser.add_argument("--nproc", type=int, default=None)
+    return parser
+
+
+# Global total power and fisher
+g_total_power = None
+g_total_fisher = None
+g_dia_indices = None
+g_size = None
+
+
+def init_worker(tp, tf, s):
+    global g_total_power
+    global g_total_fisher
+    global g_dia_indices
+    global g_size
+
+    g_total_power = tp
+    g_total_fisher = tf
+    g_dia_indices = np.diag_indices(s)
+    g_size = s
+
+
+def my_cho_solve(fisher, power):
+    di = g_dia_indices
+    fisher[di] = np.where(np.isclose(fisher[di], 0), 1, fisher[di])
+    return cho_solve(cho_factor(fisher), power)
+
+
+def one_jackknife_est(chunk):
+    xpower = np.frombuffer(g_total_power).copy()
+    xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
+
+    xpower = chunk.add_to_total_power(xpower, m=-1)
+    xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
+
+    return my_cho_solve(xfisher, xpower)
+
+
+def block_jackknife_est(chunks):
+    xpower = np.frombuffer(g_total_power).copy()
+    xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
+
+    for chunk in chunks:
+        xpower = chunk.add_to_total_power(xpower, m=-1)
+        xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
+
+    return my_cho_solve(xfisher, xpower)
 
 
 @njit("f8[:, :](i8, f8[:])")
@@ -86,48 +148,75 @@ def readfile_calcpsfisher(X):
     return chunks, power, fisher
 
 
-def one_jackknife_est(X):
-    chunk, total_power, total_fisher, di = X
-    xpower = total_power.copy()
-    xfisher = total_fisher.copy()
+def read_set_totals(all_bootfilenames, nk, nz, nproc):
+    args_list = [(fname, nk, nz) for fname in all_bootfilenames]
+    all_chunks = []
+    ntot = nk * nz
+    total_fisher = np.zeros((ntot, ntot))
+    total_power = np.zeros(ntot)
 
-    xpower = chunk.add_to_total_power(xpower, m=-1)
-    xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
-    xfisher[di] = np.where(xfisher[di] == 0, 1, xfisher[di])
-    c, low = cho_factor(xfisher)
-    xpower = cho_solve((c, low), xpower)
-    return xpower
+    pool = Pool(processes=nproc)
+    imap_it = pool.imap(readfile_calcpsfisher, args_list)
+
+    logging.info("Reading chunk files and calculating total power & fisher...")
+    for chunks, power, fisher in tqdm(imap_it, total=len(args_list)):
+        all_chunks.extend(chunks)
+        total_power += power
+        total_fisher += fisher
+    pool.close()
+
+    return all_chunks, total_power, total_fisher
 
 
-def block_jackknife_est(X):
-    chunks, total_power, total_fisher, di = X
-    xpower = total_power.copy()
-    xfisher = total_fisher.copy()
+def get_jackknife_method(all_chunks, nblocks):
+    nchunks = len(all_chunks)
+    if nblocks and nblocks > 1 and nblocks < nchunks / 10:
+        logging.info(f"Using {nblocks} blocks for jackknife.")
+        indices = np.linspace(0, nchunks, nblocks + 1).astype(int)
+        all_chunks = [
+            all_chunks[indices[_]:indices[_ + 1]]
+            for _ in range(nblocks)
+        ]
 
-    for chunk in chunks:
-        xpower = chunk.add_to_total_power(xpower, m=-1)
-        xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
-    xfisher[di] = np.where(xfisher[di] == 0, 1, xfisher[di])
-    c, low = cho_factor(xfisher)
-    xpower = cho_solve((c, low), xpower)
-    return xpower
+        jackknife_method = block_jackknife_est
+    else:
+        jackknife_method = one_jackknife_est
+
+    return all_chunks, jackknife_method
+
+
+def calc_all_jackknife_estimates(
+        all_chunks, jackknife_method, total_power, total_fisher, nproc
+):
+    logging.info("Calculating all jackknife estimates...")
+    all_powers = []
+    ntot = total_power.size
+
+    r_tot_p = RawArray('d', ntot)
+    np_tot_p = np.frombuffer(r_tot_p)
+    np.copyto(np_tot_p, total_power)
+
+    r_tot_f = RawArray('d', ntot * ntot)
+    np_tot_f = np.frombuffer(r_tot_f).reshape(ntot, ntot)
+    np.copyto(np_tot_f, total_fisher)
+
+    pool = Pool(
+        processes=nproc, initializer=init_worker,
+        initargs=(r_tot_p, r_tot_f, ntot)
+    )
+    imap_it = pool.imap(jackknife_method, all_chunks)
+    for xpower in tqdm(imap_it, total=len(all_chunks)):
+        all_powers.append(xpower)
+
+    all_powers = np.vstack(all_powers)
+    logging.info("Done.")
+    pool.close()
+
+    return all_powers
 
 
 def main():
-    # Arguments passed to run the script
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument(
-        "BootChunkFileBase", help="BootChunkFile as described in QMLE.")
-    parser.add_argument("Nk", help="Number of k bins", type=int)
-    parser.add_argument("Nz", help="Number of z bins", type=int)
-    parser.add_argument(
-        "--nblocks", help="Use block jackknife instead.", type=int)
-    # parser.add_argument("--save-powers", action="store_true")
-    # parser.add_argument("--calculate-originals", action="store_true")
-    parser.add_argument("--fbase", default="")
-    parser.add_argument("--nproc", type=int, default=None)
-    args = parser.parse_args()
+    args = get_parser().parse_args()
     logging.basicConfig(level=logging.DEBUG)
 
     outdir = ospath_dir(args.BootChunkFileBase)
@@ -140,49 +229,20 @@ def main():
     if len(all_bootfilenames) == 0:
         raise RuntimeError("Boot chunk files not found.")
 
-    args_list = [(fname, args.Nk, args.Nz) for fname in all_bootfilenames]
-    all_chunks = []
-    ntot = args.Nk * args.Nz
-    total_fisher = np.zeros((ntot, ntot))
-    total_power = np.zeros(ntot)
+    all_chunks, total_power, total_fisher = \
+        read_set_totals(all_bootfilenames, args.Nk, args.Nz, args.nproc)
 
-    pool = Pool(processes=args.nproc)
-    imap_it = pool.imap(readfile_calcpsfisher, args_list)
+    global g_dia_indices
+    g_dia_indices = np.diag_indices(total_power.size)
+    logging.info(f"Original result {my_cho_solve(total_fisher, total_power)}")
 
-    logging.info("Reading chunk files and calculating total power & fisher...")
-    for chunks, power, fisher in tqdm(imap_it, total=len(args_list)):
-        all_chunks.extend(chunks)
-        total_power += power
-        total_fisher += fisher
+    all_chunks, jackknife_method = \
+        get_jackknife_method(all_chunks, args.nblocks)
 
-    nchunks = len(all_chunks)
-    if args.nblocks and args.nblocks > 1 and args.nblocks < nchunks / 10:
-        indices = np.linspace(0, nchunks, args.nblocks + 1).astype(int)
-        all_chunks = [
-            all_chunks[indices[_]:indices[_ + 1]]
-            for _ in range(args.nblocks)
-        ]
-
-        jackknife_method = block_jackknife_est
-    else:
-        jackknife_method = one_jackknife_est
-
-    logging.info("Calculating all jackknife estimates...")
-    di = np.diag_indices(total_power.size)
-    args_list = [
-        (chunk, total_power, total_fisher, di)
-        for chunk in all_chunks
-    ]
-    all_powers = []
-    imap_it = pool.imap(jackknife_method, args_list)
-    for xpower in tqdm(imap_it, total=len(args_list)):
-        all_powers.append(xpower)
-
-    logging.info("Done.")
-    pool.close()
+    all_powers = calc_all_jackknife_estimates(
+        all_chunks, jackknife_method, total_power, total_fisher, args.nproc)
 
     logging.info("Calculating jackknife covariance...")
-    all_powers = np.vstack(all_powers)
     jackknife_cov = np.cov(all_powers, rowvar=False)
     output_fname = ospath_join(outdir, f"{args.fbase}jackknife-chunks-cov.txt")
     np.savetxt(output_fname, jackknife_cov)
