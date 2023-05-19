@@ -1,4 +1,5 @@
 import argparse
+import cProfile
 import glob
 from multiprocessing import Pool, RawArray
 from os.path import (
@@ -28,6 +29,9 @@ def get_parser():
     # parser.add_argument("--calculate-originals", action="store_true")
     parser.add_argument("--fbase", default="")
     parser.add_argument("--nproc", type=int, default=None)
+    parser.add_argument(
+        "--profile", type=int, default=None,
+        help="Pass integer to limit number chunks and enable profiling.")
     return parser
 
 
@@ -117,7 +121,7 @@ def readOneFitsFile(fname):
     f = fitsio.FITS(fname)
     chunks = []
 
-    for hdu in f[1:]:
+    for hdu in f:
         hdr = hdu.read_header()
         data = hdu.read()
 
@@ -189,7 +193,6 @@ def calc_all_jackknife_estimates(
         all_chunks, jackknife_method, total_power, total_fisher, nproc
 ):
     logging.info("Calculating all jackknife estimates...")
-    all_powers = []
     ntot = total_power.size
 
     r_tot_p = RawArray('d', ntot)
@@ -205,14 +208,40 @@ def calc_all_jackknife_estimates(
         initargs=(r_tot_p, r_tot_f, ntot)
     )
     imap_it = pool.imap(jackknife_method, all_chunks)
+    all_powers = np.empty((len(all_chunks), ntot))
+    jj = 0
     for xpower in tqdm(imap_it, total=len(all_chunks)):
-        all_powers.append(xpower)
+        all_powers[jj] = xpower
+        jj += 1
 
-    all_powers = np.vstack(all_powers)
     logging.info("Done.")
     pool.close()
 
     return all_powers
+
+
+def run(all_bootfilenames, outdir, args):
+    all_chunks, total_power, total_fisher = \
+        read_set_totals(all_bootfilenames, args.Nk, args.Nz, args.nproc)
+
+    global g_dia_indices
+    g_dia_indices = np.diag_indices(total_power.size)
+    logging.info(f"Original result {my_cho_solve(total_fisher, total_power)}")
+
+    if args.profile:
+        all_chunks = all_chunks[:args.profile]
+
+    all_chunks, jackknife_method = \
+        get_jackknife_method(all_chunks, args.nblocks)
+
+    all_powers = calc_all_jackknife_estimates(
+        all_chunks, jackknife_method, total_power, total_fisher, args.nproc)
+
+    logging.info("Calculating jackknife covariance...")
+    jackknife_cov = np.cov(all_powers, rowvar=False)
+    output_fname = ospath_join(outdir, f"{args.fbase}jackknife-chunks-cov.txt")
+    np.savetxt(output_fname, jackknife_cov)
+    logging.info(f"Covariance saved as {output_fname}.")
 
 
 def main():
@@ -229,21 +258,12 @@ def main():
     if len(all_bootfilenames) == 0:
         raise RuntimeError("Boot chunk files not found.")
 
-    all_chunks, total_power, total_fisher = \
-        read_set_totals(all_bootfilenames, args.Nk, args.Nz, args.nproc)
+    if args.profile:
+        pr = cProfile.Profile()
+        pr.enable()
 
-    global g_dia_indices
-    g_dia_indices = np.diag_indices(total_power.size)
-    logging.info(f"Original result {my_cho_solve(total_fisher, total_power)}")
+    run(all_bootfilenames, outdir, args)
 
-    all_chunks, jackknife_method = \
-        get_jackknife_method(all_chunks, args.nblocks)
-
-    all_powers = calc_all_jackknife_estimates(
-        all_chunks, jackknife_method, total_power, total_fisher, args.nproc)
-
-    logging.info("Calculating jackknife covariance...")
-    jackknife_cov = np.cov(all_powers, rowvar=False)
-    output_fname = ospath_join(outdir, f"{args.fbase}jackknife-chunks-cov.txt")
-    np.savetxt(output_fname, jackknife_cov)
-    logging.info(f"Covariance saved as {output_fname}.")
+    if args.profile:
+        pr.disable()
+        pr.print_stats()
