@@ -39,22 +39,19 @@ def get_parser():
 g_total_power = None
 g_total_fisher = None
 g_dia_indices = None
-g_all_powers = None
 g_size = None
 
 
-def init_worker(tp, tf, s, tall):
+def init_worker(tp, tf, s):
     global g_total_power
     global g_total_fisher
     global g_dia_indices
     global g_size
-    global g_all_powers
 
     g_total_power = tp
     g_total_fisher = tf
     g_dia_indices = np.diag_indices(s)
     g_size = s
-    g_all_powers = tall
 
 
 def my_cho_solve(fisher, power):
@@ -63,29 +60,25 @@ def my_cho_solve(fisher, power):
     return cho_solve(cho_factor(fisher), power)
 
 
-def one_jackknife_est(X):
-    jj, chunk = X
-    i1 = jj * g_size
+def one_jackknife_est(chunk):
     xpower = np.frombuffer(g_total_power).copy()
     xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
 
-    xpower = chunk.add_to_total_power(xpower, m=-1)
-    xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
+    xpower[chunk.s1] -= chunk.pk
+    xfisher[chunk.s1, chunk.s1] -= chunk.fisher
 
-    g_all_powers[i1:i1 + g_size] = my_cho_solve(xfisher, xpower)
+    return my_cho_solve(xfisher, xpower)
 
 
-def block_jackknife_est(X):
-    jj, chunks = X
-    i1 = jj * g_size
+def block_jackknife_est(chunks):
     xpower = np.frombuffer(g_total_power).copy()
     xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
 
     for chunk in chunks:
-        xpower = chunk.add_to_total_power(xpower, m=-1)
-        xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
+        xpower[chunk.s1] -= chunk.pk
+        xfisher[chunk.s1, chunk.s1] -= chunk.fisher
 
-    g_all_powers[i1:i1 + g_size] = my_cho_solve(xfisher, xpower)
+    return my_cho_solve(xfisher, xpower)
 
 
 @njit("f8[:, :](i8, f8[:])")
@@ -104,24 +97,11 @@ def _fast_construct_fisher(ndim, upper_fisher):
 
 class Chunk():
     def __init__(self, data, ndim, istart):
-        self.ndim = ndim
-        self.istart = istart
+        # self.ndim = ndim
+        # self.istart = istart
         self.pk = data[:ndim] - data[ndim:2 * ndim] - data[2 * ndim:3 * ndim]
-        self.upper_fisher = data[3 * ndim:]
-
-    def form_square_fisher(self):
-        return _fast_construct_fisher(self.ndim, self.upper_fisher)
-
-    def add_to_total_fisher(self, total_fisher, m=1):
-        fisher = self.form_square_fisher()
-        s1 = np.s_[self.istart:self.istart + self.ndim]
-        total_fisher[s1, s1] += m * fisher
-        return total_fisher
-
-    def add_to_total_power(self, total_power, m=1):
-        s1 = np.s_[self.istart:self.istart + self.ndim]
-        total_power[s1] += m * self.pk
-        return total_power
+        self.fisher = _fast_construct_fisher(ndim, data[3 * ndim:])
+        self.s1 = np.s_[istart:istart + ndim]
 
 
 def readOneFitsFile(fname):
@@ -146,8 +126,8 @@ def calc_total_ps_fisher(chunks, nk, nz):
     power = np.zeros(ntot)
 
     for chunk in chunks:
-        fisher = chunk.add_to_total_fisher(fisher)
-        power = chunk.add_to_total_power(power)
+        power[chunk.s1] += chunk.pk
+        fisher[chunk.s1, chunk.s1] += chunk.fisher
 
     return power, fisher
 
@@ -211,17 +191,16 @@ def calc_all_jackknife_estimates(
     np_tot_f = np.frombuffer(r_tot_f).reshape(ntot, ntot)
     np.copyto(np_tot_f, total_fisher)
 
-    r_all_powers = RawArray('d', nchunks * ntot)
-
     pool = Pool(
         processes=nproc, initializer=init_worker,
-        initargs=(r_tot_p, r_tot_f, ntot, r_all_powers)
+        initargs=(r_tot_p, r_tot_f, ntot)
     )
-    imap_it = pool.imap(jackknife_method, enumerate(all_chunks))
-    for _ in tqdm(imap_it, total=nchunks):
-        pass
+    imap_it = pool.imap(jackknife_method, all_chunks)
+    all_powers = []
+    for xpower in tqdm(imap_it, total=nchunks):
+        all_powers.append(xpower)
 
-    all_powers = np.frombuffer(r_all_powers).reshape(nchunks, ntot)
+    all_powers = np.vstack(all_powers)
     logging.info("Done.")
     pool.close()
 
