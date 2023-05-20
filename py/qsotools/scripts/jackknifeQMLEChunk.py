@@ -39,19 +39,22 @@ def get_parser():
 g_total_power = None
 g_total_fisher = None
 g_dia_indices = None
+g_all_powers = None
 g_size = None
 
 
-def init_worker(tp, tf, s):
+def init_worker(tp, tf, s, tall):
     global g_total_power
     global g_total_fisher
     global g_dia_indices
     global g_size
+    global g_all_powers
 
     g_total_power = tp
     g_total_fisher = tf
     g_dia_indices = np.diag_indices(s)
     g_size = s
+    g_all_powers = tall
 
 
 def my_cho_solve(fisher, power):
@@ -60,17 +63,21 @@ def my_cho_solve(fisher, power):
     return cho_solve(cho_factor(fisher), power)
 
 
-def one_jackknife_est(chunk):
+def one_jackknife_est(X):
+    jj, chunk = X
+    i1 = jj * g_size
     xpower = np.frombuffer(g_total_power).copy()
     xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
 
     xpower = chunk.add_to_total_power(xpower, m=-1)
     xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
 
-    return my_cho_solve(xfisher, xpower)
+    g_all_powers[i1:i1 + g_size] = my_cho_solve(xfisher, xpower)
 
 
-def block_jackknife_est(chunks):
+def block_jackknife_est(X):
+    jj, chunks = X
+    i1 = jj * g_size
     xpower = np.frombuffer(g_total_power).copy()
     xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
 
@@ -78,7 +85,7 @@ def block_jackknife_est(chunks):
         xpower = chunk.add_to_total_power(xpower, m=-1)
         xfisher = chunk.add_to_total_fisher(xfisher, m=-1)
 
-    return my_cho_solve(xfisher, xpower)
+    g_all_powers[i1:i1 + g_size] = my_cho_solve(xfisher, xpower)
 
 
 @njit("f8[:, :](i8, f8[:])")
@@ -193,6 +200,7 @@ def calc_all_jackknife_estimates(
         all_chunks, jackknife_method, total_power, total_fisher, nproc
 ):
     logging.info("Calculating all jackknife estimates...")
+    nchunks = len(all_chunks)
     ntot = total_power.size
 
     r_tot_p = RawArray('d', ntot)
@@ -203,17 +211,17 @@ def calc_all_jackknife_estimates(
     np_tot_f = np.frombuffer(r_tot_f).reshape(ntot, ntot)
     np.copyto(np_tot_f, total_fisher)
 
+    r_all_powers = RawArray('d', nchunks * ntot)
+
     pool = Pool(
         processes=nproc, initializer=init_worker,
-        initargs=(r_tot_p, r_tot_f, ntot)
+        initargs=(r_tot_p, r_tot_f, ntot, r_all_powers)
     )
-    imap_it = pool.imap(jackknife_method, all_chunks)
-    all_powers = np.empty((len(all_chunks), ntot))
-    jj = 0
-    for xpower in tqdm(imap_it, total=len(all_chunks)):
-        all_powers[jj] = xpower
-        jj += 1
+    imap_it = pool.imap(jackknife_method, enumerate(all_chunks))
+    for _ in tqdm(imap_it, total=nchunks):
+        pass
 
+    all_powers = np.frombuffer(r_all_powers).reshape(nchunks, ntot)
     logging.info("Done.")
     pool.close()
 
