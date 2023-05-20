@@ -228,7 +228,7 @@ def run(all_bootfilenames, outdir, args):
     g_dia_indices = np.diag_indices(total_power.size)
     logging.info(f"Original result {my_cho_solve(total_fisher, total_power)}")
 
-    if args.profile:
+    if args.profile and args.profile > 0:
         all_chunks = all_chunks[:args.profile]
 
     all_chunks, jackknife_method = \
@@ -258,12 +258,12 @@ def main():
     if len(all_bootfilenames) == 0:
         raise RuntimeError("Boot chunk files not found.")
 
-    if args.profile:
+    if args.profile and args.profile > 0:
         pr = cProfile.Profile()
         pr.enable()
 
     run(all_bootfilenames, outdir, args)
 
-    if args.profile:
+    if args.profile and args.profile > 0:
         pr.disable()
-        pr.print_stats()
+        pr.print_stats(sort='cumulative')
