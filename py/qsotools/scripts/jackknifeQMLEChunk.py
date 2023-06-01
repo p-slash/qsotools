@@ -1,7 +1,7 @@
 import argparse
 import cProfile
 import glob
-from multiprocessing import Pool, RawArray
+from multiprocessing import Pool
 from os.path import (
     join as ospath_join,
     dirname as ospath_dir
@@ -61,13 +61,15 @@ def my_cho_solve(fisher, power):
 
 
 def one_jackknife_est(chunk):
-    xpower = np.frombuffer(g_total_power).copy()
-    xfisher = np.frombuffer(g_total_fisher).reshape((g_size, g_size)).copy()
+    g_total_power[chunk.s1] -= chunk.pk
+    g_total_fisher[chunk.s1, chunk.s1] -= chunk.fisher
 
-    xpower[chunk.s1] -= chunk.pk
-    xfisher[chunk.s1, chunk.s1] -= chunk.fisher
+    res = my_cho_solve(g_total_fisher, g_total_power)
 
-    return my_cho_solve(xfisher, xpower)
+    g_total_power[chunk.s1] += chunk.pk
+    g_total_fisher[chunk.s1, chunk.s1] += chunk.fisher
+
+    return res
 
 
 def block_jackknife_est(chunks):
@@ -183,17 +185,9 @@ def calc_all_jackknife_estimates(
     nchunks = len(all_chunks)
     ntot = total_power.size
 
-    r_tot_p = RawArray('d', ntot)
-    np_tot_p = np.frombuffer(r_tot_p)
-    np.copyto(np_tot_p, total_power)
-
-    r_tot_f = RawArray('d', ntot * ntot)
-    np_tot_f = np.frombuffer(r_tot_f).reshape(ntot, ntot)
-    np.copyto(np_tot_f, total_fisher)
-
     pool = Pool(
         processes=nproc, initializer=init_worker,
-        initargs=(r_tot_p, r_tot_f, ntot)
+        initargs=(total_power, total_fisher, ntot)
     )
     imap_it = pool.imap(jackknife_method, all_chunks)
     all_powers = []
