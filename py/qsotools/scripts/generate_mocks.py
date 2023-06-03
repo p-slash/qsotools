@@ -520,7 +520,9 @@ class MockGenerator(object):
             w = data_dlas['MOCKID'] == targetid
             this_dlas = data_dlas[w]
             zdlas = this_dlas['Z_DLA_NO_RSD']
-            w2 = zdlas < z_qso[jj]
+            w2 = (
+                fid.LYA_WAVELENGTH * (1 + zdlas) > 910. * (1 + z_qso[jj])
+            ) & (zdlas < z_qso[jj])
             new_data_dlas.append(this_dlas[w2])
 
         return np.concatenate(new_data_dlas)
