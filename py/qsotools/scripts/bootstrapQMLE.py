@@ -21,6 +21,26 @@ from scipy.linalg import cho_factor, cho_solve
 from qsotools.utils import Progress
 
 
+def get_parser():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("Bootfile", help="File as described in QMLE.")
+    parser.add_argument(
+        "--bootnum", default=10000, type=int,
+        help="Number of bootstrap resamples.")
+    parser.add_argument("--nboot-per-it", default=10000, type=int,
+                        help="Number of bootstraps to generate per iteration.")
+    parser.add_argument(
+        "--remove-last-nz-bins", default=0, type=int,
+        help="Remove last nz bins to obtain invertable Fisher.")
+    parser.add_argument("--seed", help="Seed", default=3422, type=int)
+    parser.add_argument("--save-powers", action="store_true")
+    parser.add_argument("--calculate-originals", action="store_true")
+    parser.add_argument("--fbase", default="")
+
+    return parser
+
+
 def getNumbersfromBootfile(fname):
     filesize = ospath_getsize(fname)
 
@@ -158,22 +178,7 @@ def calculate_original(
 
 def main():
     # Arguments passed to run the script
-    parser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("Bootfile", help="File as described in QMLE.")
-    parser.add_argument(
-        "--bootnum", default=10000, type=int,
-        help="Number of bootstrap resamples.")
-    parser.add_argument("--nboot-per-it", default=10000, type=int,
-                        help="Number of bootstraps to generate per iteration.")
-    parser.add_argument(
-        "--remove-last-nz-bins", default=0, type=int,
-        help="Remove last nz bins to obtain invertable Fisher.")
-    parser.add_argument("--seed", help="Seed", default=3422, type=int)
-    parser.add_argument("--save-powers", action="store_true")
-    parser.add_argument("--calculate-originals", action="store_true")
-    parser.add_argument("--fbase", default="")
-    args = parser.parse_args()
+    args = get_parser().parse_args()
 
     outdir = ospath_dir(args.Bootfile)
     if outdir == "":
