@@ -16,6 +16,9 @@ from tqdm import tqdm
 import qsotools.scripts.bootstrapQMLE as qsoboot
 
 
+g_dia_indices = None
+
+
 class Chunk():
     @classmethod
     def list_from_fitsfile(cls, fname):
@@ -58,12 +61,6 @@ def get_parser():
     return parser
 
 
-def my_cho_solve(fisher, power):
-    di = np.diag_indices(power.size)
-    fisher[di] = np.where(np.isclose(fisher[di], 0), 1, fisher[di])
-    return cho_solve(cho_factor(fisher), power)
-
-
 @njit("f8[:, :](i8, f8[:])")
 def _fast_construct_fisher(ndim, upper_fisher):
     fisher = np.empty((ndim, ndim))
@@ -86,6 +83,20 @@ def add_to_fisher(fisher, upper_fisher, ndim, istart):
             ii = jj + istart
             fisher[ii, ii + did] += upper_fisher[fari + jj]
             fisher[ii + did, ii] += upper_fisher[fari + jj]
+
+        fari += ndim - did
+
+    return fisher
+
+
+@njit("f8[:, :, :](f8[:, :, :], f8[:], i8[:], i8, i8)")
+def add_to_fisher_b(fisher, upper_fisher, bc, ndim, istart):
+    fari = 0
+    for did in range(ndim):
+        for jj in range(ndim - did):
+            ii = jj + istart
+            fisher[:, ii, ii + did] += bc * upper_fisher[fari + jj]
+            fisher[:, ii + did, ii] += bc * upper_fisher[fari + jj]
 
         fari += ndim - did
 
@@ -134,21 +145,31 @@ def read_all_chunks(all_bootfilenames):
 
 
 def getOneSliceBoot(
-        spectra, booted_indices, nspec,
-        Nk, Nd, total_nkz, elems_count,
-        remove_last_nz_bins, nboot_per_it
+        chunks, booted_indices, nk, nz, remove_last_nz_bins
 ):
+    # shape: nboots, nspec
     boot_counts = qsoboot.getCounts(booted_indices)
     logging.info("    > Generated boot indices.")
 
     # Allocate memory for matrices
-    # total_data = np.empty((nboot_per_it, elems_count))
-    total_data = boot_counts @ spectra
+    nboots = booted_indices.shape[0]
+    nspec = len(chunks)
+    ntot = nk * nz
+    fisher = np.zeros((nboots, ntot, ntot))
+    power = np.zeros(nboots, ntot)
 
-    logging.info("    > Calculating bootstrapped inverse Fisher and power...")
-    total_power_b4, F = getPSandFisher(
-        total_data, Nk, Nd, total_nkz, remove_last_nz_bins)
-    total_power = 0.5 * my_cho_solve(F, total_power_b4)
+    logging.info("    > Calculating bootstrapped Fisher and power...")
+
+    for bc, chunk in tqdm(zip(boot_counts, chunks), total=nspec):
+        power[:, chunk.s1] += bc[:, np.newaxis] * chunk.pk[np.newaxis, :]
+        fisher = add_to_fisher_b(
+            fisher, chunk.upper_fisher, bc, chunk.ndim, chunk.istart)
+
+    fisher[:, g_dia_indices] = np.where(
+        np.isclose(fisher[:, g_dia_indices], 0), 1, fisher[:, g_dia_indices])
+
+    logging.info("    > Solving for power...")
+    total_power = qsoboot.my_cho_solve(fisher, power)
 
     return total_power
 
@@ -160,7 +181,10 @@ def calculate_original(all_chunks, outdir, args):
     logging.info("Calculating original power.")
     power, fisher = calc_total_ps_fisher(all_chunks, args.Nk, args.Nz)
 
-    orig_power = my_cho_solve(fisher, power)
+    fisher[g_dia_indices] = np.where(
+        np.isclose(fisher[g_dia_indices], 0), 1, fisher[g_dia_indices])
+
+    orig_power = cho_solve(cho_factor(fisher), power)
 
     # Save power to a file
     # Set up output file
@@ -176,41 +200,31 @@ def calculate_original(all_chunks, outdir, args):
 
 
 def run(all_bootfilenames, outdir, args):
+    global g_dia_indices
+
     all_chunks = read_all_chunks(all_bootfilenames)
     total_nkz = args.Nk * args.Nz
     nspec = len(all_chunks)
 
     calculate_original(all_chunks, outdir, args)
 
-    g_dia_indices = np.diag_indices(total_power.size)
-
-    # all_chunks, jackknife_method = \
-    #     get_jackknife_method(all_chunks, args.nblocks)
-    # all_powers = calc_all_jackknife_estimates(
-    #     all_chunks, jackknife_method, total_power, total_fisher, args.nproc)
-
-    # logging.info("Calculating jackknife covariance...")
-    # jackknife_cov = np.cov(all_powers, rowvar=False)
-    # output_fname = ospath_join(outdir, f"{args.fbase}jackknife-chunks-cov.txt")
-    # np.savetxt(output_fname, jackknife_cov)
-    # logging.info(f"Covariance saved as {output_fname}.")
+    g_dia_indices = np.diag_indices(total_nkz)
 
     # Generate bootstrap realizations through indexes
     RND = np.random.default_rng(args.seed)
-    newpowersize = total_nkz - args.remove_last_nz_bins * args.Nk
+    newpowersize = total_nkz  # - args.remove_last_nz_bins * args.Nk
     total_power = np.empty((args.bootnum, newpowersize))
     n_iter = args.bootnum // args.nboot_per_it
 
     for jj in tqdm(range(n_iter)):
-        logging.info(f"Iteration {jj+1}/{n_iter}.")
+        logging.info(f"Iteration {jj + 1} / {n_iter}.")
         i1 = jj * args.nboot_per_it
-        i2 = i1 + args.nboot_per_it
+        i2 = min(args.bootnum, i1 + args.nboot_per_it)
         booted_indices = RND.integers(
             low=0, high=nspec, size=(args.nboot_per_it, nspec))
         total_power[i1:i2] = getOneSliceBoot(
-            spectra, booted_indices, nspec,
-            Nk, Nd, total_nkz, elems_count,
-            args.remove_last_nz_bins, args.nboot_per_it)
+            all_chunks, booted_indices, args.Nk, args.Nz,
+            args.remove_last_nz_bins)
 
     bootstrap_cov = np.cov(total_power, rowvar=False)
     output_fname = ospath_join(
