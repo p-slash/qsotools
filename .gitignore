@@ -8,3 +8,4 @@ __pycache__
 *.pdf
 *.png
 *.egg-info
+*.sublime-project
