@@ -1,13 +1,16 @@
-name: science
+name: lya
 channels:
   - conda-forge
 dependencies:
+  - python>=3.7
   - numpy
+  - numba
   - scipy
   - matplotlib
   - astropy
   - ipython
   - plotly
-  - setuptools
   - jupyter
   - fitsio
+  - healpy
+  - tqdm
