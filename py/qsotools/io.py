@@ -1,14 +1,18 @@
 import struct
 from configparser import ConfigParser
-from os.path import exists as os_exists, join as ospath_join
+from os.path import join as ospath_join
 from collections import namedtuple
 from itertools import groupby
+import logging
 
 import numpy as np
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
-from scipy.stats import zscore as scipy_zscore, norm as scipy_norm, \
+from scipy.stats import (
+    # zscore as scipy_zscore,
+    norm as scipy_norm,
     median_abs_deviation as scipy_mad
+)
 from scipy.ndimage import median_filter as scipy_median_filter
 
 import fitsio
@@ -22,26 +26,51 @@ import qsotools.fiducial as fid
 import qsotools.specops as so
 
 from pkg_resources import resource_filename
-TABLE_KODIAQ_ASU    = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
-TABLE_KODIAQ_MASTER = resource_filename('qsotools', 'tables/master_kodiaq_table.tsv')
-TABLE_XQ100_SUM     = resource_filename('qsotools', 'tables/xq100_thework.fits')
-TABLE_XQ100_DLA     = resource_filename('qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
-TABLE_SQUAD_DR1     = resource_filename('qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
+# ------------------------------------------
+# --------------- Tables -------------------
+# ------------------------------------------
 
-TABLE_KODIAQ_VI_DLA = resource_filename('qsotools', 'tables/kodiaq_vi_dlas.csv')
-TABLE_SQUAD_VI_DLA  = resource_filename('qsotools', 'tables/squad_vi_dlas.csv')
-TABLE_XQ100_VI_DLA  = resource_filename('qsotools', 'tables/xq100_vi_dlas.csv')
+TABLE_KODIAQ_ASU = resource_filename('qsotools', 'tables/kodiaq_asu.tsv')
+TABLE_KODIAQ_MASTER = resource_filename(
+    'qsotools', 'tables/master_kodiaq_table.tsv')
+TABLE_XQ100_SUM = resource_filename('qsotools', 'tables/xq100_thework.fits')
+TABLE_XQ100_DLA = resource_filename(
+    'qsotools', 'tables/xq100_dla_table_sanchez-ramirez_2016.csv')
+TABLE_SQUAD_DR1 = resource_filename(
+    'qsotools', 'tables/uves_squad_dr1_quasars_master.csv')
 
-SpectralRecord = namedtuple('SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
+TABLE_KODIAQ_VI_DLA = resource_filename(
+    'qsotools', 'tables/kodiaq_vi_dlas.csv')
+TABLE_SQUAD_VI_DLA = resource_filename('qsotools', 'tables/squad_vi_dlas.csv')
+TABLE_XQ100_VI_DLA = resource_filename('qsotools', 'tables/xq100_vi_dlas.csv')
+
+SpectralRecord = namedtuple(
+    'SpectralRecord', ['set', 'qso', 's2n', 'c', 'fnames'])
+
+
+def saveListByLine(array, fname):
+    toWrite = open(fname, 'w')
+    toWrite.write('%d\n' % len(array))
+    for a in array:
+        if len(a) == 2:
+            toWrite.write("%d %.1f\n" % (a[0], a[1]))
+        else:
+            toWrite.write('%s\n' % str(a))
+    toWrite.close()
+
+# ------------------------------------------
+# ------------ SpectralRecord --------------
+# ------------------------------------------
+
 
 class SpectralRecordList():
     """
     A list of SpectralRecords.
     """
-    
-    def __init__(self, spr = []):
+
+    def __init__(self, spr=[]):
         self.spr = spr
-    
+
     def append(self, data_set, qso, s2n, coord, fnames):
         self.spr.append(SpectralRecord(data_set, qso, s2n, coord, fnames))
 
@@ -50,32 +79,39 @@ class SpectralRecordList():
         # a list first.
         qsos = np.array(list(map(lambda x: x.qso, self.spr)))
         sets = np.array(list(map(lambda x: x.set, self.spr)))
-        ras  = np.array(list(map(lambda x: x.c.icrs.ra.deg, self.spr)))
+        ras = np.array(list(map(lambda x: x.c.icrs.ra.deg, self.spr)))
         decs = np.array(list(map(lambda x: x.c.icrs.dec.deg, self.spr)))
         s2ns = np.array(list(map(lambda x: x.s2n, self.spr)))
         fnames = np.array(list(map(lambda x: ",".join(x.fnames), self.spr)))
 
-        data = Table([qsos, ras, decs, s2ns, sets, fnames], \
-            names=['QSO', 'RA (ICRS)', 'DEC (ICRS)', 'S2N [s/km]', 'SET', 'FNAMES'])
+        data = Table(
+            [qsos, ras, decs, s2ns, sets, fnames],
+            names=[
+                'QSO', 'RA (ICRS)', 'DEC (ICRS)',
+                'S2N [s/km]', 'SET', 'FNAMES'])
         ascii.write(data, fname, format='csv', overwrite=True)
-    
+
     def readFromFile(self, fname):
         t = ascii.read(fname, format='csv')
-        SRlambda = lambda x: SpectralRecord(x['SET'], x['QSO'], x['S2N [s/km]'], \
-            SkyCoord(x['RA (ICRS)'], x['DEC (ICRS)'], unit='deg'), \
-            x['FNAMES'].split(","))
+
+        def SRlambda(x):
+            return SpectralRecord(
+                x['SET'], x['QSO'], x['S2N [s/km]'],
+                SkyCoord(x['RA (ICRS)'], x['DEC (ICRS)'], unit='deg'),
+                x['FNAMES'].split(","))
 
         self.spr = list(map(SRlambda, t))
 
     def _mergeTwoCatalogs(cs1, cs2, sep_arcsec):
-        idx, d2d, d3d = cs1.coord.match_to_catalog_sky(cs2.coord, nthneighbor=1)
+        idx, d2d, d3d = cs1.coord.match_to_catalog_sky(
+            cs2.coord, nthneighbor=1)
         sep_constraint = d2d < sep_arcsec * arcsec
 
         nonduplicates = []
         added_idx = []
 
         for i, obj1 in enumerate(cs1.spr):
-            obj2 = cs2.spr[idx[i]] # Corresponding object
+            obj2 = cs2.spr[idx[i]]  # Corresponding object
 
             # See if obj2 is identified as a match for other targets
             other_idx = np.where(idx == idx[i])[0]
@@ -87,25 +123,31 @@ class SpectralRecordList():
                     nonduplicates.append(obj1)
                     continue
 
-            if sep_constraint[i] and (idx[i] not in added_idx) and (obj2.s2n > obj1.s2n):
+            doit = (sep_constraint[i]
+                    and (idx[i] not in added_idx)
+                    and (obj2.s2n > obj1.s2n))
+            if doit:
                 nonduplicates.append(obj2)
                 added_idx.append(idx[i])
             else:
                 nonduplicates.append(obj1)
 
-        rem_objs2 = [cs2i for i, cs2i in enumerate(cs2.spr) if i not in set(idx[sep_constraint])]
+        rem_objs2 = [
+            cs2i
+            for i, cs2i in enumerate(cs2.spr)
+            if i not in set(idx[sep_constraint])
+        ]
         nonduplicates += rem_objs2
 
         return nonduplicates
 
     def getNonDuplicates(self, sep_arcsec):
-        set_func = lambda x: x.set
-        self.spr.sort(key=set_func)
-        
+        self.spr.sort(key=lambda x: x.set)
+
         CoordSPR = namedtuple('CoordSPR', ['coord', 'spr'])
         cs_list = []
 
-        for key, gr in groupby(self.spr, key=set_func):
+        for key, gr in groupby(self.spr, key=lambda x: x.set):
             # key would be KOD, XQ and UVE
             data = list(gr)
             cs = list(map(lambda x: x.c.fk5, data))
@@ -114,17 +156,18 @@ class SpectralRecordList():
         if len(cs_list) == 1:
             return self
 
-        two_spr = SpectralRecordList._mergeTwoCatalogs( \
+        two_spr = SpectralRecordList._mergeTwoCatalogs(
             cs_list[0], cs_list[1], sep_arcsec)
 
         if len(cs_list) == 2:
             return SpectralRecordList(two_spr)
 
-        two_cs   = SkyCoord(list(map(lambda x: x.c.fk5, two_spr)))
-        three_cs = SpectralRecordList._mergeTwoCatalogs( \
+        two_cs = SkyCoord(list(map(lambda x: x.c.fk5, two_spr)))
+        three_cs = SpectralRecordList._mergeTwoCatalogs(
             CoordSPR(two_cs, two_spr), cs_list[2], sep_arcsec)
-        
+
         return SpectralRecordList(three_cs)
+
 
 class Spectrum:
     """
@@ -137,7 +180,7 @@ class Spectrum:
     flux : float
         Normalized flux.
     error : float
-        Error on flux.    
+        Error on flux.
     z_qso : float
         Emission redshift of the quasar.
     specres : int
@@ -152,14 +195,15 @@ class Spectrum:
 
     Attributes
     ----------
-    mask : 
+    mask :
         Good pixels on full spectrum, error>0 by default.
     size : int
         Length of arrays.
     s2n : float
         Signal to noise ratio of the entire spectrum as ave(1/error).
     s2n_lya : float
-        Signal to noise ratio of the Lya forest. -1 if there is no Lya coverage for a given spectrum.
+        Signal to noise ratio of the Lya forest. -1 if there is no Lya coverage
+        for a given spectrum.
     z_dlas : list, float
         Redshift of DLAs. Needs to be set by hand. None as default
     nhi_dlas : list, float
@@ -168,7 +212,7 @@ class Spectrum:
     Methods
     -------
     applyMask(good_pixels=None)
-        Remove masked values from wave, flux and error. 
+        Remove masked values from wave, flux and error.
         Keeps good_pixels and updates the length the arrays.
 
     maskZScore(thres=3.5)
@@ -178,41 +222,82 @@ class Spectrum:
         Computes the signal-to-noise in lyman alpha region as average(1/e)
 
     """
+    @property
+    def size(self):
+        return self.flux.size
 
-    def __init__(self, wave, flux, error, z_qso, specres, dv, coord):
-        self.wave  = wave
-        self.flux  = flux
+    def __init__(
+            self, wave, flux, error, z_qso, specres, dv, coord, reso_kms=None
+    ):
+        self.wave = wave
+        self.flux = flux
         self.error = error
         self.z_qso = z_qso
         self.specres = specres
+        self.rkms = fid.LIGHT_SPEED / specres / fid.ONE_SIGMA_2_FWHM
+        self.reso_kms = reso_kms
         self.dv = dv
-        self.coord = coord
-        
-        self.size = len(self.wave)
-        self.mask = np.logical_and(error > 0, flux != 0)
-        self.s2n = 1/np.sqrt(np.mean(error[self.mask]**2))
+        if isinstance(coord, SkyCoord):
+            self.coord = coord
+        else:
+            self.coord = SkyCoord(coord['RA'], coord['DEC'], unit=deg)
+
+        self.mask = np.logical_and(error > 1e-7, flux != 0)
+
+        if self.wave[self.mask].size == 0:
+            self.s2n = -1
+        else:
+            self.s2n = 1 / np.mean(error[self.mask])
+
         self.s2n_lya = self.getS2NLya()
 
         self.z_dlas = None
         self.nhi_dlas = None
+        self.cont = None
 
-    def addLyaFlucErrors(self):
+    def smoothNoise(self, sigma_A=20., pad_size=25, esigma=3.5):
+        # Isolate masked pixels as they have high noise
+        zsc_mask_e = Spectrum.modifiedZScore(self.error) < esigma
+        good_pixels = self.mask & zsc_mask_e
+
+        # Replace bad pixels with the median
+        clean_err = np.where(good_pixels, self.error, np.median(self.error))
+
+        # Pad the input array to get rid of annoying edge effects
+        # Pad values are set to the edge value
+        arrsize = self.size + 2 * pad_size
+        padded_arr = np.pad(clean_err, pad_size, mode='edge')
+
+        sigmapix = sigma_A / np.mean(np.diff(self.wave))
+        kvals = np.fft.rfftfreq(arrsize)
+        smerror_k = np.fft.rfft(
+            padded_arr) * np.exp(-(kvals * sigmapix)**2 / 2.)
+
+        clean_err = np.fft.irfft(smerror_k, n=arrsize)[pad_size:-pad_size]
+
+        # Restore values of bad pixels
+        self.error = np.where(good_pixels, clean_err, self.error)
+
+    # Adds variance on Flux not delta
+    def addLyaFlucErrors(self, on_flux=True):
         R_kms = fid.LIGHT_SPEED / self.specres / fid.ONE_SIGMA_2_FWHM
         z = self.wave / fid.LYA_WAVELENGTH - 1
 
-        err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms)
-        
+        err2_lya = fid.getLyaFlucErrors(z, self.dv, R_kms, on_flux=on_flux)
+
         self.error = np.sqrt(err2_lya + self.error**2)
-        self.s2n = 1/np.sqrt(np.mean(self.error**2))
+        self.s2n = 1 / np.mean(self.error)
         self.s2n_lya = self.getS2NLya()
 
     def cutForestAnalysisRegion(self, f1, f2, zmin, zmax):
         # Cut Lyman-alpha forest region
-        lyman_alpha_ind = np.logical_and(self.wave >= f1 * (1+self.z_qso), \
-            self.wave <= f2 * (1+self.z_qso))
+        lyman_alpha_ind = np.logical_and(
+            self.wave >= f1 * (1 + self.z_qso),
+            self.wave <= f2 * (1 + self.z_qso))
         # Cut analysis boundaries
-        forest_boundary = np.logical_and(self.wave >= fid.LYA_WAVELENGTH*(1+zmin), \
-            self.wave <= fid.LYA_WAVELENGTH*(1+zmax))
+        forest_boundary = np.logical_and(
+            self.wave >= fid.LYA_WAVELENGTH * (1 + zmin),
+            self.wave <= fid.LYA_WAVELENGTH * (1 + zmax))
         lyman_alpha_ind = np.logical_and(lyman_alpha_ind, forest_boundary)
 
         self.applyMask(lyman_alpha_ind, removePixels=True)
@@ -222,37 +307,35 @@ class Spectrum:
             good_pixels = self.mask
 
         if removePixels:
-            self.wave  = self.wave[good_pixels]
-            self.flux  = self.flux[good_pixels]
+            self.wave = self.wave[good_pixels]
+            self.flux = self.flux[good_pixels]
             self.error = self.error[good_pixels]
 
-            try:
+            if self.cont is not None:
                 self.cont = self.cont[good_pixels]
-            except:
-                pass
+            if self.reso_kms is not None:
+                self.reso_kms = self.reso_kms[good_pixels]
 
             self.mask = self.mask[good_pixels]
-            self.size = len(self.wave)
             if self.size == 0:
                 raise ValueError("Empty spectrum")
         else:
-            self.flux[~good_pixels]  = 0
+            self.flux[~good_pixels] = 0
             self.error[~good_pixels] = 1e10
             self.mask[~good_pixels] = False
-            try:
-                self.cont[~good_pixels]  = 0
-            except:
-                pass
+            if self.cont is not None:
+                self.cont[~good_pixels] = 0
 
     def setOutliersMask(self, sigma=2.5):
         sigma = np.abs(sigma)
-        high_perc = scipy_norm.cdf(sigma)*100
-        low_perc  = scipy_norm.cdf(-sigma)*100
+        high_perc = scipy_norm.cdf(sigma) * 100
+        low_perc = scipy_norm.cdf(-sigma) * 100
 
         lp_flux, hp_flux = np.percentile(self.flux, [low_perc, high_perc])
         hp_error = np.percentile(self.error, high_perc)
 
-        flux_within_perc  = np.logical_and(self.flux > lp_flux, self.flux < hp_flux)
+        flux_within_perc = np.logical_and(
+            self.flux > lp_flux, self.flux < hp_flux)
         error_within_perc = self.error < hp_error
 
         good_pixels = np.logical_and(flux_within_perc, error_within_perc)
@@ -263,23 +346,33 @@ class Spectrum:
         N = len(self.wave)
         indices = np.arange(N)
 
-        consecutive = lambda x: np.split(x, np.where(np.diff(x) != 1)[0]+1)
-        low_flux_regions = indices[self.flux<mfluxfunc(self.wave/fid.LYA_WAVELENGTH-1)+self.error]
+        def consecutive(x):
+            return np.split(x, np.where(np.diff(x) != 1)[0] + 1)
+
+        w = (
+            self.flux < mfluxfunc(self.wave / fid.LYA_WAVELENGTH - 1)
+            + self.error)
+
+        low_flux_regions = indices[w]
         low_flux_regions = consecutive(low_flux_regions)
 
-        z_dlas   = []
+        z_dlas = []
         nhi_dlas = []
 
         for lfr in low_flux_regions:
             w1 = self.wave[lfr[0]]
             w2 = self.wave[lfr[-1]]
-            z_dla = (w1+w2)/2./fid.LYA_WAVELENGTH - 1
+            z_dla = (w1 + w2) / 2. / fid.LYA_WAVELENGTH - 1
 
-            thres_w = fid.equivalentWidthDLA(10**NHI_THRES, z_dla) # A
+            thres_w = fid.equivalentWidthDLA(10**NHI_THRES, z_dla)  # A
             if w2 - w1 > thres_w:
                 z_dlas.append(z_dla)
-                nhi_dlas.append(np.log10(2*fid.getNHIfromEquvalentWidthDLA(w2-w1, z_dla)))
-        
+                nhi_dlas.append(
+                    np.log10(
+                        2 * fid.getNHIfromEquvalentWidthDLA(w2 - w1, z_dla)
+                    )
+                )
+
         if len(z_dlas) != 0 and self.z_dlas:
             self.z_dlas.extend(z_dlas)
             self.nhi_dlas.extend(nhi_dlas)
@@ -288,7 +381,7 @@ class Spectrum:
         elif len(z_dlas) != 0:
             self.z_dlas = z_dlas
             self.nhi_dlas = nhi_dlas
-            
+
             return z_dlas, nhi_dlas
 
         return None, None
@@ -298,9 +391,11 @@ class Spectrum:
             self.mask_dla = np.ones_like(self.wave, dtype=bool)
 
             for (zd, nhi) in zip(self.z_dlas, self.nhi_dlas):
-                lobs = (1+zd) * fid.LYA_WAVELENGTH
-                wi = fid.equivalentWidthDLA(10**nhi, zd)*scale
-                dla_ind  = np.logical_and(self.wave>lobs-wi/2, self.wave<lobs+wi/2)
+                lobs = (1 + zd) * fid.LYA_WAVELENGTH
+                wi = fid.equivalentWidthDLA(10**nhi, zd) * scale
+                dla_ind = np.logical_and(
+                    self.wave > lobs - wi / 2,
+                    self.wave < lobs + wi / 2)
                 self.mask_dla[dla_ind] = 0
 
             self.applyMask(self.mask_dla, removePixels)
@@ -308,8 +403,8 @@ class Spectrum:
     def modifiedZScore(arr, pivot=None):
         if pivot is None:
             pivot = np.median(arr)
-        
-        MAD = min(scipy_mad(arr), 1)
+
+        MAD = scipy_mad(arr) + 1e-8
 
         return (arr - pivot) / MAD
 
@@ -317,33 +412,74 @@ class Spectrum:
         # zsc_mask_f = np.abs(Spectrum.modifiedZScore(self.flux)) < thres
         # instead demand f - 0 > - thres * MAD & f - 1 < thres * MAD
         zsc_mask_f_0 = Spectrum.modifiedZScore(self.flux, 0) > -fsigma
-        zsc_mask_f_1 = Spectrum.modifiedZScore(self.flux, 1) <  fsigma
-        zsc_mask_f   = np.logical_and(zsc_mask_f_0, zsc_mask_f_1)
-        
-        zsc_mask_e = Spectrum.modifiedZScore(self.error)< esigma
+        zsc_mask_f_1 = Spectrum.modifiedZScore(self.flux, 1) < fsigma
+        zsc_mask_f = np.logical_and(zsc_mask_f_0, zsc_mask_f_1)
+
+        zsc_mask_e = Spectrum.modifiedZScore(self.error) < esigma
 
         zsc_mask = np.logical_and(zsc_mask_f, zsc_mask_e)
         # zsc_mask = np.abs(scipy_zscore(self.flux))<thres
-        # zsc_mask = np.logical_and(zsc_mask, np.abs(scipy_zscore(self.error))<thres)
+        # zsc_mask = np.logical_and(
+        #   zsc_mask, np.abs(scipy_zscore(self.error))<thres)
         self.mask = np.logical_and(zsc_mask, self.mask)
 
-    def getS2NLya(self, lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL):            
-        lyman_alpha_ind = np.logical_and(self.wave >= fid.LYA_FIRST_WVL*(1+self.z_qso), \
-            self.wave <= fid.LYA_LAST_WVL*(1+self.z_qso))
-        
+    def getS2NLya(
+            self, lya_lower=fid.LYA_FIRST_WVL, lya_upper=fid.LYA_LAST_WVL
+    ):
+        lyman_alpha_ind = np.logical_and(
+            self.wave >= lya_lower * (1 + self.z_qso),
+            self.wave <= lya_upper * (1 + self.z_qso))
+
         temp = self.error[lyman_alpha_ind & self.mask]
 
         if len(temp) == 0:
             return -1
         else:
-            return 1/np.sqrt(np.mean(temp**2))
+            return 1 / np.mean(temp)
 
     def saveAsBQ(self, fname):
         tbq = BinaryQSO(fname, 'w')
-        tbq.save(self.wave, self.flux, self.error, self.size, self.z_qso, \
-            self.coord.icrs.dec.rad, self.coord.icrs.ra.rad, self.s2n, \
+        tbq.save(
+            self.wave, self.flux, self.error, self.size, self.z_qso,
+            self.coord.icrs.dec.rad, self.coord.icrs.ra.rad, self.s2n,
             self.specres, self.dv)
         tbq.close()
+
+    def split(self, z_edges, min_nopix=0):
+        z = self.wave / fid.LYA_WAVELENGTH - 1
+        sp_indx = np.searchsorted(z, z_edges)
+
+        # assert len(np.hsplit(z, sp_indx)) == len(sp_indx)+1
+
+        wave_chunks = [
+            x for x in np.hsplit(self.wave, sp_indx)[1:-1]
+            if 0 not in x.shape]
+        flux_chunks = [
+            x for x in np.hsplit(self.flux, sp_indx)[1:-1]
+            if 0 not in x.shape]
+        error_chunks = [
+            x for x in np.hsplit(self.error, sp_indx)[1:-1]
+            if 0 not in x.shape]
+        reso_chunks = [
+            x for x in np.hsplit(self.reso_kms, sp_indx)[1:-1]
+            if 0 not in x.shape]
+
+        split_qsos = []
+        for i in range(len(wave_chunks)):
+            wave = wave_chunks[i]
+            flux = flux_chunks[i]
+            error = error_chunks[i]
+            reso_kms = reso_chunks[i]
+
+            tmp_qso = Spectrum(
+                wave, flux, error, self.z_qso,
+                self.specres, self.dv, self.coord, reso_kms)
+
+            if tmp_qso.s2n > 0 and wave.size > min_nopix:
+                split_qsos.append(tmp_qso)
+
+        return split_qsos
+
 
 class BinaryQSO(Spectrum):
     """
@@ -355,15 +491,11 @@ class BinaryQSO(Spectrum):
         Filename to read or write.
     rw : char
         Mode to open file. Can be either r or w.
-    
-    __init__(self, fname, rw)
-        Opens a file buffer.
 
     Attributes
     ----------
     file : File
         File buffer. Closed after read or save methods.
-
     wave : float
         Wavelength array in Angstrom.
     flux : float
@@ -372,7 +504,6 @@ class BinaryQSO(Spectrum):
         Error on flux.
     N : int
         Length of these arrays.
-    
     z_qso : float
         Emission redshift of the quasar.
     dv : float
@@ -389,11 +520,12 @@ class BinaryQSO(Spectrum):
     Methods
     -------
     save(wave, flux, error, N, z_qso, dec, ra, s2n, specres, dv)
-        Saves the given parameters in binary format. Does not hold them as attributes.
+        Saves the given parameters in binary format.
+        Does not hold them as attributes.
 
     read()
         Reads the file. Saves as attributes.
-        N : int
+        size : int
             Number of pixels
         z_qso : double
             Emission redshift of the quasar.
@@ -406,7 +538,7 @@ class BinaryQSO(Spectrum):
             Signal to noise
         dv : double
             Pixel width in km/s
-        low_ob_l : double 
+        low_ob_l : double
             Lower observed wavelength
         upp_ob_l : double
             Upper observed wavelength
@@ -420,19 +552,22 @@ class BinaryQSO(Spectrum):
     """
 
     def __init__(self, fname, rw):
-        self.file  = open(fname, mode=rw + 'b')
-        self.qso_name = fname[:10]
+        self.file = open(fname, mode=rw + 'b')
+        self.qso_name = fname.split("/")[-1][:10]
 
         if rw == 'r':
             self.read()
-            c = SkyCoord(self.ra*180/np.pi, self.dec*180/np.pi, frame='fk5', unit=deg)
-            super(BinaryQSO, self).__init__(self.wave, self.flux, self.error, \
+            c = SkyCoord(
+                self.ra * 180 / np.pi,
+                self.dec * 180 / np.pi, frame='fk5', unit=deg)
+            super(BinaryQSO, self).__init__(
+                self.wave, self.flux, self.error,
                 self.z_qso, self.specres, self.dv, c)
-    
+
     def close(self):
         self.file.close()
 
-    def save(self, wave, flux, error, N, z_qso, dec, ra, s2n, specres, dv): 
+    def save(self, wave, flux, error, N, z_qso, dec, ra, s2n, specres, dv):
         # Set up binary data
         low_ob_l = wave[0]
         upp_ob_l = wave[-1]
@@ -440,8 +575,9 @@ class BinaryQSO(Spectrum):
         low_re_l = low_ob_l / (1. + z_qso)
         upp_re_l = upp_ob_l / (1. + z_qso)
 
-        hdr = struct.pack('idddidddddd', N, z_qso, dec, ra, specres, s2n, dv, \
-                          low_ob_l, upp_ob_l, low_re_l, upp_re_l)
+        hdr = struct.pack(
+            'idddidddddd', N, z_qso, dec, ra, specres, s2n, dv,
+            low_ob_l, upp_ob_l, low_re_l, upp_re_l)
         wave_bin = struct.pack('d' * N, *wave)
         flux_bin = struct.pack('d' * N, *flux)
         nois_bin = struct.pack('d' * N, *error)
@@ -463,7 +599,8 @@ class BinaryQSO(Spectrum):
         low_re_l = low_ob_l / (1. + self.z_qso)
         upp_re_l = upp_ob_l / (1. + self.z_qso)
 
-        hdr = struct.pack('idddidddddd', self.N, self.z_qso, self.dec, self.ra, self.specres, \
+        hdr = struct.pack(
+            'idddidddddd', self.N, self.z_qso, self.dec, self.ra, self.specres,
             self.s2n, self.dv, low_ob_l, upp_ob_l, low_re_l, upp_re_l)
         wave_bin = struct.pack('d' * self.N, *self.wave)
         flux_bin = struct.pack('d' * self.N, *self.flux)
@@ -477,34 +614,36 @@ class BinaryQSO(Spectrum):
         new_file.close()
 
     def read(self):
-        header_fmt  = 'idddidddddd'
+        header_fmt = 'idddidddddd'
         header_size = struct.calcsize(header_fmt)
 
         d = self.file.read(header_size)
 
-        self.size, self.z_qso, self.dec, self.ra, \
-        self.specres, self.s2n, self.dv, \
-        low_ob_l, upp_ob_l, low_re_l, upp_re_l  = struct.unpack(header_fmt, d)
+        (self.size, self.z_qso, self.dec, self.ra,
+         self.specres, self.s2n, self.dv,
+         low_ob_l, upp_ob_l, low_re_l, upp_re_l) = struct.unpack(header_fmt, d)
 
-        array_fmt  = 'd' * self.size
+        array_fmt = 'd' * self.size
         array_size = struct.calcsize(array_fmt)
 
-        d           = self.file.read(array_size)
-        self.wave   = np.array(struct.unpack(array_fmt, d), dtype=np.double)
-        d           = self.file.read(array_size)
-        self.flux   = np.array(struct.unpack(array_fmt, d), dtype=np.double)
-        d           = self.file.read(array_size)
-        self.error  = np.array(struct.unpack(array_fmt, d), dtype=np.double)
-        
+        d = self.file.read(array_size)
+        self.wave = np.array(struct.unpack(array_fmt, d), dtype=np.double)
+        d = self.file.read(array_size)
+        self.flux = np.array(struct.unpack(array_fmt, d), dtype=np.double)
+        d = self.file.read(array_size)
+        self.error = np.array(struct.unpack(array_fmt, d), dtype=np.double)
+
         self.file.close()
+
 
 class ConfigQMLE:
     """ConfigQMLE reads config.param for the estimator and sets up k & z bins
-    
+
     Attributes
     ----------
     parameters : ConfigParser section
-        You can directly access to variables using config.param keys. Note they are str.
+        You can directly access to variables using config.param keys.
+        Note they are str.
 
     k_0 : float
     k_nlin : int
@@ -520,34 +659,50 @@ class ConfigQMLE:
     z_d : float
     z_bins : np.array
     z_edges : np.array
-    
+
     qso_list : str
     qso_dir : str
 
     sq_vlength : float
     sq_dvgrid : float
     """
+
     def _getKBins(self):
-        self.k_0     = float(self.parameters['K0'])
-        self.k_nlin  = int(self.parameters['NumberOfLinearBins'])
-        self.k_nlog  = int(self.parameters['NumberOfLog10Bins'])
-        self.k_dlin  = float(self.parameters['LinearKBinWidth'])
-        self.k_dlog  = float(self.parameters['Log10KBinWidth'])
+        self.k_0 = float(self.parameters['K0'])
+        self.k_nlin = int(self.parameters['NumberOfLinearBins'])
+        self.k_nlog = int(self.parameters['NumberOfLog10Bins'])
+        self.k_dlin = float(self.parameters['LinearKBinWidth'])
+        self.k_dlog = float(self.parameters['Log10KBinWidth'])
         try:
             self.k_ledge = float(self.parameters['LastKEdge'])
         except Exception as e:
             self.k_ledge = 0
 
-        self.k_edges, self.k_bins = fid.formBins(self.k_nlin, self.k_nlog, self.k_dlin, \
+        self.k_edges, self.k_bins = fid.formBins(
+            self.k_nlin, self.k_nlog, self.k_dlin,
             self.k_dlog, self.k_0, self.k_ledge)
 
     def _getZBins(self):
-        self.z_0  = float(self.parameters['FirstRedshiftBinCenter'])
-        self.z_n  = int(self.parameters['NumberOfRedshiftBins'])
-        self.z_d  = float(self.parameters['RedshiftBinWidth'])
+        self.z_0 = float(self.parameters['FirstRedshiftBinCenter'])
+        self.z_n = int(self.parameters['NumberOfRedshiftBins'])
+        self.z_d = float(self.parameters['RedshiftBinWidth'])
 
-        self.z_bins  = self.z_0 + self.z_d * np.arange(self.z_n)
-        self.z_edges = self.z_0 + self.z_d * (np.arange(self.z_n+1)-0.5)
+        self.z_bins = self.z_0 + self.z_d * np.arange(self.z_n)
+        self.z_edges = self.z_0 + self.z_d * (np.arange(self.z_n + 1) - 0.5)
+
+    def readFnameSpectra(self):
+        """Returns list of first N filenames, where N is the first line in
+        file.
+        """
+        file_list = open(self.qso_list, 'r')
+        # First line: Number of spectra to read
+        header = file_list.readline()
+        fnames_spectra = file_list.readlines()
+        # Read only first N spectra
+        fnames_spectra = fnames_spectra[:int(header)]
+        file_list.close()
+
+        return fnames_spectra
 
     def __init__(self, filename):
         f = open(filename)
@@ -565,7 +720,14 @@ class ConfigQMLE:
         self.qso_dir = self.parameters['FileInputDir']
 
         self.sq_vlength = float(self.parameters['VelocityLength'])
-        self.sq_dvgrid  = self.sq_vlength / (int(self.parameters['NumberVPoints'])-1)
+        self.sq_dvgrid = self.sq_vlength / (
+            int(self.parameters['NumberVPoints']) - 1)
+
+        if ('InputIsPicca' in self.parameters
+            and int(self.parameters['InputIsPicca']) > 0):
+            self.picca_input = True
+        else:
+            self.picca_input = False
 
 # ------------------------------------------
 # --------------- KODIAQ -------------------
@@ -750,7 +912,7 @@ class KODIAQFits(Spectrum):
         return np.searchsorted(self.wave/(1.+self.z_qso), rest_frame_edges)
 
     def print_details(self):
-        print(self.qso_name, self.pi_date, self.spec_prefix, "at", self.z_qso)
+        print(self.qso_name, self.pi_date, self.spec_prefix, "at", self.z_qso, flush=True)
 
 class KODIAQ_QSO_Iterator:
     """
@@ -978,12 +1140,14 @@ class KODIAQ_OBS_Iterator:
 
         return obs.spectrum
 
+
 class KODIAQMasterTable():
     """
     This class generates a master table for the KODIAQ sample.
     You can read the master table simply by astropy.io.ascii
 
     """
+
     def __init__(self, kodiaq_dir, fname, rw='r', asu_path='asu.tsv'):
         self.kodiaq_dir = kodiaq_dir
         self.fname = fname
@@ -991,7 +1155,8 @@ class KODIAQMasterTable():
             self.master_table = ascii.read(fname)
         elif rw == 'w':
             self.generate(asu_path)
-            ascii.write(self.master_table, OUTPUT_TABLE_FNAME, format='tab', fast_writer=False)
+            ascii.write(
+                self.master_table, fname, format='tab', fast_writer=False)
 
     def generate(self, asu_path):
         qso_iter = KODIAQ_QSO_Iterator(self.kodiaq_dir, asu_path)
@@ -1198,7 +1363,7 @@ class XQ100Fits(Spectrum):
         
         if correctSeeing:
             seeing_ave = (d['SEEING_MIN']+d['SEEING_MAX'])/2
-            seeing_ave = 1.0 if np.isnan(seeing_ave) else seeing_ave
+            seeing_ave = d['SEEING_MIN'] if np.isnan(seeing_ave) else seeing_ave
             specres = XQ100Fits._seeingCorrectedResolution(self.arm, seeing_ave)
         else:
             specres = int(hdr0["SPEC_RES"])
@@ -1299,7 +1464,7 @@ class SQUADFits(Spectrum):
     
     """
 
-    dr1_csv = ascii.read(TABLE_SQUAD_DR1, fill_values="")
+    dr1_csv = ascii.read(TABLE_SQUAD_DR1)
     dla_csv = ascii.read(TABLE_SQUAD_VI_DLA, format='csv')
     dla_coords = SkyCoord(dla_csv["ra"], dla_csv["dec"], \
         frame='fk5', unit=deg)
@@ -1392,26 +1557,223 @@ class SQUADFits(Spectrum):
 
 
 
+# ------------------------------------------
+# ---------- DESI MOCK FILE ----------------
+# ------------------------------------------
+
+class QQFile():
+    """docstring for filename
+    MOCKDIR/master.fits
+    MOCKDIR/P/PIXNUM/lya-transmission-N-PIXNUM.fits
+    
+    N : nside of healpix sphere tiling method
+    PIXNUM : healpix pixel number
+    P=int(PIXNUM/100)
+    master.fits (or any other fits filename) contains a binary table in HDU 1 
+        with all the skewers from the mock with (at least) RA,DEC,Z,MOCKID,PIXNUM
+    MOCKID is a integer number, it is a unique identifier of a skewer
+    RA DEC are floating point number in degrees, with sufficient precision
+    Z is the QSO redshift, floating point number
+    PIXNUM is a function of RA,DEC and N, so it's a duplication of information, 
+        but it is convenient to find the transmission files without calls to healpix.
+    lya-transmission-N-PIXNUM.fits contains the lyman-alpha transmission of 
+        all the skewers in the healpix PIXNUM as a function of 
+        observer-frame wavelength (in vacuum).
+
+    0  PRIMARY      PrimaryHDU       7   ()
+    1  METADATA     BinTableHDU     17   1864R x 4C   [E, E, E, 10A]
+            The METADATA HDU contains a binary table with (at least) RA,DEC,Z,MOCKID
+    2  WAVELENGTH   ImageHDU         7   (571,)   float32
+    3  TRANSMISSION ImageHDU         8   (1864, 571)   float32
+    4  DLA          BinTableHDU      17 1864R x 4C [long, double, double, double]
+    """
+    meta_dt = np.dtype([
+        ('RA', 'f8'), ('DEC', 'f8'), ('Z', 'f8'), ('MOCKID', 'i8'),
+        ('COADD_EXPTIME', 'f8'), ('FLUX_R', 'f8'), ('TSNR2_LRG', 'f8')
+    ])
+
+    def __init__(self, fname, rw='r', clobber=True):
+        self.fname = fname
+        self.rw = rw
+
+        self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
+
+    def writeMetadata(self, metadata, metahdr):
+        self.fitsfile.write(metadata, extname='METADATA', header=metahdr)
+
+    def writeWavelength(self, wave):
+        data = np.array(wave, dtype='float32')
+        self.fitsfile.write(data, extname='WAVELENGTH')
+
+    def writeTransmission(self, fluxes):
+        data = np.array(fluxes, dtype='float32').T
+        self.fitsfile.write(data, extname='TRANSMISSION')
+
+    def writeDLAExtention(self, data_dla):
+        if data_dla is None:
+            return
+
+        self.fitsfile.write(data_dla, extname='DLA')
+
+    def writeAll(self, metadata, metahdr, wave, fluxes, data_dla=None):
+        self.writeMetadata(metadata, metahdr)
+        self.writeWavelength(wave)
+        self.writeTransmission(fluxes)
+        self.writeDLAExtention(data_dla)
+        self.close()
+
+    def readAll(self):
+        self.readMetadata()
+
+        self.wave = self.fitsfile['WAVELENGTH'].read()
+        self.fluxes = self.fitsfile['TRANSMISSION'].read().T
+        self.close()
+
+    def getColList(colnames):
+        l1 = []
+
+        def add_colname(radec, l1):
+            if f'TARGET_{radec}' in colnames:
+                l1.append(f'TARGET_{radec}')
+            elif radec in colnames:
+                l1.append(radec)
+            else:
+                raise Exception(f"Missing metadata info: {radec}")
+
+            return l1
+
+        l1 = add_colname('RA', l1)
+        l1 = add_colname('DEC', l1)
+        l1.append('Z')
+
+        # Check must-have columns are present
+        if not all(elem in colnames for elem in l1):
+            raise Exception("Missing metadata info: RA, DEC or Z.")
+        if 'MOCKID' in colnames:
+            l1.append('MOCKID')
+        elif 'TARGETID' in colnames:
+            l1.append('TARGETID')
+        else:
+            raise Exception("Missing metadata info: MOCKID or TARGETID.")
+
+        return l1
+
+    def readMetadata(self):
+        extnames = [hdu.get_extname() for hdu in self.fitsfile]
+        if 'METADATA' in extnames:
+            metadata_str = 'METADATA'
+        elif 'QSO_CAT' in extnames:
+            metadata_str = 'QSO_CAT'
+        else:
+            metadata_str = 1
+            logging.warning(
+                "Metadata not found by hduname. Using extension 1.")
+
+        metahdu = self.fitsfile[metadata_str]
+        colnames = metahdu.get_colnames()
+
+        self.metadata = np.zeros(metahdu.get_nrows(), dtype=QQFile.meta_dt)
+
+        for mcol, fcol in zip(
+            ['RA', 'DEC', 'Z', 'MOCKID'], QQFile.getColList(colnames)
+        ):
+            self.metadata[mcol] = metahdu[fcol].read()
+
+        def read_xcols(xcol, l1):
+            if xcol in colnames:
+                xres = metahdu[xcol].read()
+                l1.append(xcol)
+            return xres, l1
+
+        l1 = ['RA', 'DEC', 'Z', 'MOCKID']
+        for xcol in ['COADD_EXPTIME', 'FLUX_R', 'TSNR2_LRG']:
+            self.metadata[xcol], l1 = read_xcols(xcol, l1)
+
+        self.nqso = self.metadata.size
+
+        return l1
+
+    def close(self):
+        self.fitsfile.close()
 
 
 
+# ------------------------------------------
+# ---------- DESI PICCA FILE ---------------
+# ------------------------------------------
 
+class PiccaFile():
+    """docstring for PiccaFile
+    BinaryTable: LOGLAM, DELTA, IVAR, RESOMAT"""
+    def __init__(self, fname, rw='r', clobber=True):
+        self.fname = fname
+        self.rw = rw
+        self.no_spectra = 0
+        self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
+    
+    def writeSpectrum(self, tid, wave, delta, error, specres, z_qso, ra, dec, \
+        rmat=None, islinbin=False, oversampling=1):
+        if rmat is not None:
+            ndiags = rmat.shape[1]
+        else:
+            ndiags = 11
 
+        R_kms = fid.LIGHT_SPEED/specres/fid.ONE_SIGMA_2_FWHM
+        data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
+                              ('RESOMAT','f8', ndiags)])
 
+        data['LOGLAM'] = np.log10(wave)
+        data['DELTA']  = delta
+        data['IVAR']   = 1/error**2
+        if rmat is not None:
+            data['RESOMAT'] = rmat
 
+        hdr_dict = {'TARGETID':tid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
+            'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
+            'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': islinbin, \
+            'DLL':np.median(np.diff(data['LOGLAM'])) , 'DLAMBDA':np.median(np.diff(wave))}
 
+        if oversampling>1:
+            hdr_dict['OVERSAMP'] = oversampling
 
+        self.fitsfile.write(data, header=hdr_dict)
+        self.no_spectra += 1
 
+        return f"{self.fname}[{self.no_spectra}]"
 
+    def readSpectrum(self, hdu):
+        hdr = self.fitsfile[hdu].read_header()
+        data = self.fitsfile[hdu].read()
 
+        colnames = self.fitsfile[hdu].get_colnames()
 
+        if "LAMBDA" in colnames:
+            wave = data['LAMBDA']
+        else:
+            wave = 10**data['LOGLAM']
 
+        delta_keys = set(['DELTA', 'DELTA_BLIND'])
+        delta = data[delta_keys.intersection(colnames).pop()]
+        error = 1 / np.sqrt(data['IVAR'] + 1e-16)
+        error[data['IVAR'] < 1e-4] = 0
 
+        specres = fid.LIGHT_SPEED / hdr['MEANRESO'] / fid.ONE_SIGMA_2_FWHM
+        if 'DLL' in hdr.keys():
+            dv = hdr['DLL'] * fid.LIGHT_SPEED * np.log(10)
+        else:
+            dv = hdr['MEANRESO']
 
+        if 'RESO' in colnames:
+            reso_rkms = data['RESO']
+        else:
+            reso_rkms = np.ones(wave.size) * dv
 
+        qso = Spectrum(
+            wave, delta, error, hdr['Z'], specres, dv,
+            {'RA': hdr['RA'], 'DEC': hdr['DEC']},
+            reso_rkms)
 
+        return qso
 
-
-
-
-
+    def close(self):
+        self.fitsfile.close()
