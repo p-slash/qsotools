@@ -22,6 +22,8 @@ filename_list = []
 specres_list  = set()
 spectral_record_list = qio.SpectralRecordList()
 
+ERROR_EPS_CUT = 1e-6
+
 # Define Saving Functions
 # ------------------------------
 def saveParameters(txt_basefilename, f1, f2, args):
@@ -60,7 +62,7 @@ def saveParameters(txt_basefilename, f1, f2, args):
         "ON" if not args.without_z_evo else "OFF")
             
     temp_fname = "%s_parameters.txt" % txt_basefilename
-    print("Saving parameteres to", temp_fname)
+    print("Saving parameteres to", temp_fname, flush=True)
     toWrite = open(temp_fname, 'w')
     toWrite.write(Parameters_txt)
     toWrite.close()
@@ -70,16 +72,6 @@ def saveData(waves, fluxes, errors, fnames, obs_fits, spec_res, pixel_width, arg
         mfile = qio.BinaryQSO(ospath_join(args.OutputDir, fname), 'w')
         mfile.save(w, f, e, len(w), obs_fits.z_qso, obs_fits.coord.dec.rad, obs_fits.coord.ra.rad, \
             obs_fits.s2n, spec_res, pixel_width)
-
-def saveListByLine(array, fname):
-    toWrite = open(fname, 'w')
-    toWrite.write('%d\n'%len(array))
-    for a in array:
-        if len(a) == 2:
-            toWrite.write("%d %.1f\n"%(a[0], a[1]))
-        else:
-            toWrite.write('%s\n'%str(a))
-    toWrite.close()
 
 # ------------------------------
 def convert2DeltaFlux(wave, fluxes, errors, meanFluxFunc, args):
@@ -104,7 +96,7 @@ def safeResample(qso, lowdv, keep_masked_pix=False):
     qso.wave  = wave
     qso.flux  = fluxes[0]
     qso.error = errors[0]
-    qso.mask  = np.logical_and(qso.error>1e-5, qso.error<10)
+    qso.mask  = np.logical_and(qso.error>ERROR_EPS_CUT, qso.error<10)
     qso.size  = qso.wave.size
     
     qso.applyMask(removePixels=not keep_masked_pix)
@@ -129,7 +121,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
 
         qso = lya_m.qsoMock(qso, mock_spec_res, args.const_error)
 
-    qso.applyMask(good_pixels=np.logical_and(qso.error>1e-5, qso.error<10), \
+    qso.applyMask(good_pixels=np.logical_and(qso.error>ERROR_EPS_CUT, qso.error<10), \
         removePixels=not args.keep_masked_pix)
 
     # manageDLAs(qso, meanFluxFunc, args)
@@ -156,7 +148,7 @@ def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False
 
     # If computing mean flux end the pipeline here.
     if mean_flux_hist:
-        mean_flux_hist.addSpectrum(qso, qso.s2n_lya**2/qso.dv, f1, f2)
+        mean_flux_hist.addSpectrum(qso, qso.s2n_lya**2/qso.dv, f1, f2, args.compute_scatter_error)
         return
 
     # If computing continuum power, approximate the error as the error on f.
@@ -233,13 +225,13 @@ def readFile(it, dataset, f1, f2, args):
         qso = qio.SQUADFits(it, correctSeeing=True, corrError=True)
         s2n_this = qso.getS2NLya(f1, f2)
         qso.qso_name = qso.qso_name.replace(" ", "")
-        print(qso.qso_name)
+        print(qso.qso_name, flush=True)
 
     elif dataset == "MOCK":
         qso = qio.BinaryQSO(it, 'r')
         s2n_this = qso.getS2NLya(f1, f2)
         qso.qso_name = qso.qso_name.replace(" ", "")
-        print(qso.qso_name)
+        print(qso.qso_name, flush=True)
 
     if s2n_this == -1:
         raise Exception("SKIP: No Lya or Side Band coverage!")
@@ -276,7 +268,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
             print(e)
             continue
     
-    mf_hist.getMeanStatistics()
+    mf_hist.getMeanStatistics(args.compute_scatter_error)
     mf_hist.saveHistograms(ospath_join(args.OutputDir, "%s-stats%s"%(dataset, settings_txt)))
 
     # Fit mean flux
@@ -340,6 +332,7 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
 
 if __name__ == '__main__':
     # Arguments passed to run the script
+    print("Parsing arguments....", flush=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("OutputDir", help="Output directory")
     parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
@@ -389,7 +382,7 @@ if __name__ == '__main__':
     parser.add_argument("--keep-masked-pix", help="Assign large errors.", action="store_true")
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
-    parser.add_argument("--z-forest-max", help="Lower end of the forest. Default: %(default)s", \
+    parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
         type=float, default=4.3)
     
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
@@ -401,6 +394,7 @@ if __name__ == '__main__':
     parser.add_argument("--mean-flux-lowdv", type=float, \
         help="Resample the grid using inverse variance without LSS fluctuations for mean flux" \
         " calculation. 300 is recommended.")
+    parser.add_argument("--compute-scatter-error", action="store_true")
 
     parser.add_argument("--nosave", help="Does not save mocks to output when passed", \
         action="store_true")
@@ -458,7 +452,7 @@ if __name__ == '__main__':
     # ------------------------------    
     # Start with KODIAQ
     if args.KODIAQDir and not args.continuum_power:
-        print("RUNNING ON KODIAQ.........")        
+        print("RUNNING ON KODIAQ.........", flush=True)        
         # Start iterating quasars in KODIAQ sample
         # Each quasar has multiple observations
         # Pick the one with highest signal to noise in Ly-alpha region
@@ -466,17 +460,17 @@ if __name__ == '__main__':
     # ------------------------------
     # XQ-100
     if args.XQ100Dir:
-        print("RUNNING ON XQ-100.........")
+        print("RUNNING ON XQ-100.........", flush=True)
         iterateSpectra(args.XQ100Dir, 'XQ', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # UVES/SQUAD
     if args.UVESSQUADDir:
-        print("RUNNING ON SQUAD/UVES.........")
+        print("RUNNING ON SQUAD/UVES.........", flush=True)
         iterateSpectra(args.UVESSQUADDir, 'UVE', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
     # MOCKS
     if args.MockDir:
-        print("RUNNING ON MOCKS.........")
+        print("RUNNING ON MOCKS.........", flush=True)
         iterateSpectra(args.MockDir, 'MOCK', forest_1, forest_2, meanFluxFunc, settings_txt, args)
     # ------------------------------
 
@@ -485,12 +479,12 @@ if __name__ == '__main__':
 
     temp_fname = ospath_join(args.OutputDir, "specres_list.txt")
     print("Saving spectral resolution values as ", temp_fname)
-    saveListByLine(specres_list, temp_fname)
+    qio.saveListByLine(specres_list, temp_fname)
 
     # Save the list of files in a txt
     temp_fname = ospath_join(args.OutputDir, "file_list_qso.txt")
     print("Saving chunk spectra file list as ", temp_fname)
-    saveListByLine(filename_list, temp_fname)
+    qio.saveListByLine(filename_list, temp_fname)
 
     spectral_record_list.saveAsTable(ospath_join(args.OutputDir, "spr-all.csv"))
     nondups = spectral_record_list.getNonDuplicates(args.separation)
@@ -501,7 +495,7 @@ if __name__ == '__main__':
         filename_list.extend(fl)
     temp_fname = ospath_join(args.OutputDir, "file_list_qso-nonduplicates.txt")
     print("Saving chunk spectra file list as ", temp_fname)
-    saveListByLine(filename_list, temp_fname)
+    qio.saveListByLine(filename_list, temp_fname)
 
 
 
