@@ -1,9 +1,7 @@
 numpy
+numba
 scipy
-matplotlib
 astropy
-ipython
-plotly
-setuptools
-jupyter
 fitsio
+healpy
+tqdm
