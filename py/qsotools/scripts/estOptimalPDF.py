@@ -338,25 +338,3 @@ if __name__ == '__main__':
         np.savetxt(fname2save, fisher_cpu)
 
         logging.info("DONE!")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
