@@ -118,6 +118,9 @@ class P1DMeasurements():
         self.load_walther(walther)
         self.load_karacayli(karacayli)
 
+    def __bool__(self):
+        return bool(self.measurements)
+
     def plot_one(self, zplot, ax, key):
         if key not in self.measurements:
             return
