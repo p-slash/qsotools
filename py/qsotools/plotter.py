@@ -688,15 +688,10 @@ class PowerPlotter(object):
     def plot_grid_all(
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
-            ratio_wrt_fid=False
+            ratio_wrt_fid=False, is_sb=False
     ):
         nrows = int(np.ceil(self.nz / ncols))
         noff_cols = ncols * nrows - self.nz
-
-        if ratio_wrt_fid:
-            kpi_factor = 1
-        else:
-            kpi_factor = self.k_bins / np.pi
 
         fig, axs = plt.subplots(
             nrows, ncols,
@@ -706,14 +701,26 @@ class PowerPlotter(object):
         )
 
         if len(includes) > 0 and not ratio_wrt_fid:
-            p1d_kwargs = {key: True for key in includes}
+            p1d_kwargs = {key: True for key in includes
+                          if isinstance(key, str)}
         else:
             p1d_kwargs = {}
 
         previous_measurements = P1DMeasurements(**p1d_kwargs)
+        other_measurements = [pp for pp in includes
+                              if isinstance(pp, tuple)]
+
+        for opp in other_measurements:
+            assert len(opp) == 2
+            assert isinstance(opp[0], PowerPlotter)
+            assert isinstance(opp[1], str)
 
         for jj in range(noff_cols):
             axs[-1, -1 - jj].set_axis_off()
+
+        kpi_factor = self.k_bins / np.pi
+        if is_sb:
+            kpi_factor *= 10**3
 
         for iz in range(self.nz):
             row = int(iz / ncols)
@@ -723,12 +730,15 @@ class PowerPlotter(object):
             fs = previous_measurements.plot_all(z, ax)
             ls = []
 
-            pkpi = self.power_qmle[iz] * kpi_factor
-            ekpi = self.error[iz] * kpi_factor
             if ratio_wrt_fid:
                 ax.axhline(1, c='k')
-                pkpi /= self.power_fid[iz]
-                ekpi /= self.power_fid[iz]
+                kpi_factor = 1 / self.power_fid[iz]
+
+            if is_sb:
+                ax.axhline(0, c='k')
+
+            pkpi = self.power_qmle[iz] * kpi_factor
+            ekpi = self.error[iz] * kpi_factor
 
             ls.append(
                 ax.errorbar(
@@ -736,6 +746,15 @@ class PowerPlotter(object):
                     label=label, fmt=".-", alpha=0.8
                 )
             )
+
+            for (opp, olbl) in other_measurements:
+                oiz = np.nonzero(np.isclose(opp.z_bins, z))[0][0]
+                okfactor = np.interp(opp.k_bins, self.k_bins, kpi_factor)
+                ls.append(
+                    ax.errorbar(
+                        opp.k_bins, opp.power_qmle[oiz] * okfactor,
+                        opp.error[iz] * okfactor, label=olbl, fmt=".-")
+                )
 
             # kmax = rcoeff / mean_rkms[iz]
             # ax.axvspan(kmax, 1, facecolor='#db7b2b', alpha=0.2)
@@ -750,10 +769,15 @@ class PowerPlotter(object):
                 pkpi_row = self.power_qmle[j1:j2] * kpi_factor
                 ekpi_row = self.error[j1:j2] * kpi_factor
 
-                if not ratio_wrt_fid:
+                if is_sb:
+                    ymin, ymax = -1.5, 4.5
+                    use_yticks = np.arange(-1, 5)
+                elif not ratio_wrt_fid:
                     ymin, ymax = auto_logylimmer(
                         self.k_bins, pkpi_row, ekpi_row)
                     use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
+                    if ymin < 0.002:
+                        use_yticks = [1e-3] + use_yticks
                 else:
                     ymin, ymax = 0.8, 1.2
                     use_yticks = [0.85, 1.0, 1.15]
@@ -774,6 +798,10 @@ class PowerPlotter(object):
                 if ratio_wrt_fid:
                     ax.set_ylabel(
                         r"$P/P_{\mathrm{true}}$", fontsize=AXIS_LBL_FONT_SIZE)
+                elif is_sb:
+                    ax.set_ylabel(
+                        r"$kP/\pi\,\times 10^3$", fontsize=AXIS_LBL_FONT_SIZE)
+                    ax.set_yscale("linear")
                 else:
                     ax.set_ylabel(r"$kP/\pi$", fontsize=AXIS_LBL_FONT_SIZE)
                     ax.set_yscale("log")
