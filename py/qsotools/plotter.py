@@ -685,6 +685,25 @@ class PowerPlotter(object):
 
         return d @ invcov @ d, d.size
 
+    @staticmethod
+    def _parse_includes(includes, ratio_wrt_fid):
+        if len(includes) > 0 and not ratio_wrt_fid:
+            p1d_kwargs = {key: True for key in includes
+                          if isinstance(key, str)}
+        else:
+            p1d_kwargs = {}
+
+        previous_measurements = P1DMeasurements(**p1d_kwargs)
+        other_measurements = [pp for pp in includes
+                              if isinstance(pp, tuple)]
+
+        for opp in other_measurements:
+            assert len(opp) == 2
+            assert isinstance(opp[0], PowerPlotter)
+            assert isinstance(opp[1], str)
+
+        return previous_measurements, other_measurements
+
     def plot_grid_all(
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
@@ -700,20 +719,8 @@ class PowerPlotter(object):
             figsize=(colsize * ncols, rowsize * nrows)
         )
 
-        if len(includes) > 0 and not ratio_wrt_fid:
-            p1d_kwargs = {key: True for key in includes
-                          if isinstance(key, str)}
-        else:
-            p1d_kwargs = {}
-
-        previous_measurements = P1DMeasurements(**p1d_kwargs)
-        other_measurements = [pp for pp in includes
-                              if isinstance(pp, tuple)]
-
-        for opp in other_measurements:
-            assert len(opp) == 2
-            assert isinstance(opp[0], PowerPlotter)
-            assert isinstance(opp[1], str)
+        previous_measurements, other_measurements = (
+            PowerPlotter._parse_includes(includes, ratio_wrt_fid))
 
         for jj in range(noff_cols):
             axs[-1, -1 - jj].set_axis_off()
@@ -811,7 +818,7 @@ class PowerPlotter(object):
                 pass
             elif row == 0:
                 ax.legend(handles=ls, fontsize='large', loc="lower right")
-            elif row == 1 and p1d_kwargs:
+            elif row == 1 and previous_measurements:
                 ax.legend(handles=fs, fontsize='large', loc="lower right")
 
             do_set_xlabel = (
