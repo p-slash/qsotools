@@ -707,7 +707,7 @@ class PowerPlotter(object):
     def plot_grid_all(
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
-            ratio_wrt_fid=False, is_sb=False
+            ratio_wrt_fid=False, is_sb=False, kmin=5e-4
     ):
         nrows = int(np.ceil(self.nz / ncols))
         noff_cols = ncols * nrows - self.nz
@@ -734,6 +734,7 @@ class PowerPlotter(object):
             col = iz % ncols
             ax = axs[row, col]
             z = self.z_bins[iz]
+
             fs = previous_measurements.plot_all(z, ax)
             ls = []
 
@@ -764,7 +765,14 @@ class PowerPlotter(object):
                 )
 
             # kmax = rcoeff / mean_rkms[iz]
-            # ax.axvspan(kmax, 1, facecolor='#db7b2b', alpha=0.2)
+            k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
+            ax.axvline(k_nyq / 2, c='#db7b2b', alpha=0.5)
+            ax.axvspan(
+                k_nyq / 2, self.k_bins[-1], facecolor='#db7b2b', alpha=0.4)
+            ax.axvline(kmin, c='#0.5', alpha=0.5)
+            ax.axvspan(
+                self.k_bins[0], kmin, facecolor='0.5', alpha=0.4)
+
             do_set_ylim = ((
                 ax.get_subplotspec().is_last_row()
                 and ax.get_subplotspec().is_first_col()
@@ -775,13 +783,14 @@ class PowerPlotter(object):
                 j2 = min(j1 + ncols, self.nz)
                 pkpi_row = self.power_qmle[j1:j2] * kpi_factor
                 ekpi_row = self.error[j1:j2] * kpi_factor
+                w = (self.k_bins > kmin) & (self.k_bins < k_nyq / 2)
 
                 if is_sb:
                     ymin, ymax = -1.5, 4.5
                     use_yticks = np.arange(-1, 5)
                 elif not ratio_wrt_fid:
                     ymin, ymax = auto_logylimmer(
-                        self.k_bins, pkpi_row, ekpi_row)
+                        self.k_bins[w], pkpi_row[:, w], ekpi_row[:, w])
                     use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
                     if ymin < 0.002:
                         use_yticks = [1e-3] + use_yticks
