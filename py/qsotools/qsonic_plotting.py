@@ -123,6 +123,16 @@ class AttrFile():
         # cbar.set_label(cbarlbl, fontsize=18)
         cbar.ax.tick_params(labelsize=16)
 
+        meanl = np.mean(data['wave'])
+        ax.text(
+            0.06, 0.94, f"{meanl:.0f} A",
+            transform=ax.transAxes, fontsize=16,
+            verticalalignment='top', horizontalalignment='left',
+            color="#9f2305",
+            bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
+                  'alpha': 0.9, 'boxstyle': 'round', "lw": 2}
+        )
+
         if show:
             plt.show()
 
