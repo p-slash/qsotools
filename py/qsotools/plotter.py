@@ -748,20 +748,22 @@ class PowerPlotter(object):
             pkpi = self.power_qmle[iz] * kpi_factor
             ekpi = self.error[iz] * kpi_factor
 
+            w = self.error[iz] > 0
             ls.append(
                 ax.errorbar(
-                    self.k_bins, pkpi, ekpi,
+                    self.k_bins[w], pkpi[w], ekpi[w],
                     label=label, fmt=".-", alpha=0.8
                 )
             )
 
             for (opp, olbl) in other_measurements:
                 oiz = np.nonzero(np.isclose(opp.z_bins, z))[0][0]
-                okfactor = np.interp(opp.k_bins, self.k_bins, kpi_factor)
+                w = opp.error[iz] > 0
+                okfactor = np.interp(opp.k_bins[w], self.k_bins, kpi_factor)
                 ls.append(
                     ax.errorbar(
-                        opp.k_bins, opp.power_qmle[oiz] * okfactor,
-                        opp.error[iz] * okfactor, label=olbl, fmt=".-")
+                        opp.k_bins[w], opp.power_qmle[oiz][w] * okfactor,
+                        opp.error[iz][w] * okfactor, label=olbl, fmt=".-")
                 )
 
             # kmax = rcoeff / mean_rkms[iz]
@@ -884,7 +886,10 @@ class FisherPlotter(object):
 
     """
 
-    def __init__(self, filename, k_edges, nz, dz=0.2, z1=1.8, skiprows=1):
+    def __init__(
+            self, filename, k_edges, nz, dz=0.2, z1=1.8, skiprows=1,
+            is_cov=False
+    ):
         self.fisher = np.loadtxt(filename, skiprows=skiprows)
         self.k_edges = k_edges
         self.nz = nz
@@ -898,6 +903,9 @@ class FisherPlotter(object):
         except Exception as e:
             self.invfisher = None
             print(f"Cannot invert the Fisher matrix. {e}")
+
+        if is_cov:
+            self.fisher, self.invfisher = self.invfisher, self.fisher
 
     def _setTicks(self, ax):
         if self.nz:
@@ -966,7 +974,7 @@ class FisherPlotter(object):
         kwargs: ** for imshow
         """
         fig, ax = plt.subplots()
-        Ftxt = "F" if not inv else "F^{-1}"
+        Ftxt = "F" if not inv else "C"
 
         if self.invfisher is None and inv:
             print("Fisher is not invertable.")
@@ -1049,7 +1057,7 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is RdBu_r.
         kwargs: ** for imshow
         """
-        Ftxt = "F" if not inv else "F^{-1}"
+        Ftxt = "F" if not inv else "C"
 
         if self.invfisher is None and inv:
             print("Fisher is not invertable.")
@@ -1095,7 +1103,7 @@ class FisherPlotter(object):
         colormap : plt.cm, optional
             Colormap to use for scale. Default is RdBu_r.
         """
-        Ftxt = "F" if not inv else "F^{-1}"
+        Ftxt = "F" if not inv else "C"
 
         if self.invfisher is None and inv:
             print("Fisher is not invertable.")
@@ -1114,6 +1122,15 @@ class FisherPlotter(object):
             self.k_edges, kbyk_corr, cbarlbl, r"$k$ [s$\,$km$^{-1}$]",
             colormap, ticks, **kwargs)
 
+        z = self.z1 + self.dz * zb
+        ax.text(
+            0.06, 0.94, f"{z:.1f}",
+            transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
+            verticalalignment='top', horizontalalignment='left',
+            color="#9f2305",
+            bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
+                  'alpha': 0.5, 'boxstyle': 'round', "lw": 2}
+        )
         save_figure(outplot_fname)
         return ax
 
@@ -1143,7 +1160,7 @@ class FisherPlotter(object):
             Colormap to use for scale. Default is RdBu_r.
         kwargs: ** for imshow
         """
-        Ftxt = "F" if not inv else "F^{-1}"
+        Ftxt = "F" if not inv else "C"
 
         if self.invfisher is None and inv:
             print("Fisher is not invertable.")
@@ -1167,6 +1184,17 @@ class FisherPlotter(object):
         ax = self._plotOneBin(
             self.k_edges, kbyk_corr, cbarlbl, r"$k$ [s$\,$km$^{-1}$]",
             colormap, ticks, **kwargs)
+
+        z1 = self.z1 + self.dz * zb
+        z2 = z1 + self.dz
+        ax.text(
+            0.06, 0.94, f"{z1:.1f}x{z2:.1f}",
+            transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
+            verticalalignment='top', horizontalalignment='left',
+            color="#9f2305",
+            bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
+                  'alpha': 0.5, 'boxstyle': 'round', "lw": 2}
+        )
 
         ax.set_xscale("log")
         ax.set_yscale("log")
