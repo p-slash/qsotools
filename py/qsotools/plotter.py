@@ -769,7 +769,7 @@ class PowerPlotter(object):
             ax.axvline(k_nyq / 2, c='#db7b2b', alpha=0.5)
             ax.axvspan(
                 k_nyq / 2, self.k_bins[-1], facecolor='#db7b2b', alpha=0.4)
-            ax.axvline(kmin, c='#0.5', alpha=0.5)
+            ax.axvline(kmin, c='0.5', alpha=0.5)
             ax.axvspan(
                 self.k_bins[0], kmin, facecolor='0.5', alpha=0.4)
 
