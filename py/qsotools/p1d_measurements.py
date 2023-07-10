@@ -121,22 +121,24 @@ class P1DMeasurements():
             'p1d-measurements/karacayli23_desi-edrp-lyasb1subt'
             '-p1d-summary-results.txt')
 
-        karac_tbl = ascii.read(fname, format='fixed_width')
+        karac_tbl = np.array(ascii.read(fname))
 
         z = np.array(karac_tbl['z'], dtype=np.double)
-        z = np.unique(np.round(z, decimals=1))
-        nz = z.size
-        nk = len(karac_tbl) // nz
+        zbins = np.unique(np.round(z, decimals=1))
 
-        k = np.array(karac_tbl['k'], dtype=np.double).reshape((nz, nk))
-        p = np.array(karac_tbl['p_final'], dtype=np.double).reshape((nz, nk))
-        e = np.array(karac_tbl['e_total'], dtype=np.double).reshape((nz, nk))
+        karac_tbl['p_final'] *= karac_tbl['kc'] / np.pi
+        karac_tbl['e_total'] *= karac_tbl['kc'] / np.pi
+
+        wzlist = [np.isclose(z, zb) for zb in zbins]
+        k = [karac_tbl['kc'][wz] for wz in wzlist]
+        kppi = [karac_tbl['p_final'][wz] for wz in wzlist]
+        ekpi = [karac_tbl['e_total'][wz] for wz in wzlist]
 
         self.measurements[r'Karaçayli et al. (2023)'] = {
-            'z': z,
+            'z': zbins,
             'k': k,
-            'kppi': k * p / np.pi,
-            'ekpi': k * e / np.pi,
+            'kppi': kppi,
+            'ekpi': ekpi,
             'alpha': 0.5,
             'color': P1DMeasurements.colors[-1]
         }
