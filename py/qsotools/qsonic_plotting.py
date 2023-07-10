@@ -73,10 +73,16 @@ class AttrFile():
 
     def plot_one_cov(self, iwave, cmap='RdBu_r', show=True):
         data = self.varstats['data'][iwave]
-        w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
-              & (data['num_pixels'] >= self.varstats['MINNPIX']))
         vp = data['var_pipe']
         w0 = vp > 0
+
+        w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
+              & (data['num_pixels'] >= self.varstats['MINNPIX']))
+        if w2.sum() < 5:
+            print("Used extended cuts due to low statistics")
+            w2 = ((data['num_qso'] >= self.varstats['MINNQSO'] // 2)
+                  & (data['num_pixels'] >= self.varstats['MINNPIX'] // 2))
+
         w2 = w2[w0]
         vp = vp[w0]
         a10 = 10**(np.log10(vp[1]) - np.log10(vp[0]))
