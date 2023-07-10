@@ -30,7 +30,7 @@ class AttrFile():
 
         fattr.close()
 
-    def plot_varpipe_varobs(self, varstats, iwave, ax=None, show=True):
+    def plot_varpipe_varobs(self, iwave, ax=None, show=True):
         if ax is None:
             ax = plt.gca()
 
@@ -119,7 +119,7 @@ class AttrFile():
     @staticmethod
     def _parse_otherattrs(otherAttrs):
         if otherAttrs is None:
-            pass
+            otherAttrs = []
         elif isinstance(otherAttrs, AttrFile):
             otherAttrs = [otherAttrs]
         elif not isinstance(otherAttrs, list):
@@ -146,6 +146,7 @@ class AttrFile():
         ax.set_ylabel("Mean continuum")
         ax.set_xlabel("Rest-frame wavelength [A]")
         add_minor_grid(ax)
+        plt.legend()
         if show:
             plt.show()
 
@@ -166,10 +167,11 @@ class AttrFile():
         ax.set_ylabel(r"$\eta - 1$")
         ax.axhline(0, c='k')
         ax.set_xlabel("Wavelength [A]")
-        ax.set_ylim(0.03, 0.02)
+        ax.set_ylim(-0.03, 0.02)
         plt.ticklabel_format(
             style='sci', axis='y', scilimits=(0, 0), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
+        plt.legend()
 
         if show:
             plt.show()
@@ -190,6 +192,7 @@ class AttrFile():
         add_minor_grid(ax)
         ax.set_ylabel(r"$\sigma^2_\mathrm{LSS}$")
         ax.set_xlabel("Wavelength [A]")
+        plt.legend()
 
         if show:
             plt.show()
@@ -229,6 +232,7 @@ class AttrFile():
         plt.ticklabel_format(
             style='sci', axis='y', scilimits=(0, 0), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
+        plt.legend(ncol=2)
 
         if show:
             plt.show()
