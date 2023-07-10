@@ -35,7 +35,7 @@ class P1DMeasurements():
             mw_ps_metal_masked['e_k.P(k)/pi'], dtype=np.double
         ).reshape((nz, nk))
 
-        self.measurements['Walther et al. (2017)'] = {
+        self.measurements['Walther+2017'] = {
             'z': z,
             'k': k,
             'kppi': kppi,
@@ -72,7 +72,7 @@ class P1DMeasurements():
             np.sum(chab_syst_table**2, axis=1) + e**2
         ).reshape((nz, nk))
 
-        self.measurements['Chabanier et al. (2019)'] = {
+        self.measurements['Chabanier+2019'] = {
             'z': z,
             'k': k,
             'kppi': k * p / np.pi,
@@ -103,7 +103,7 @@ class P1DMeasurements():
         p = np.array(karac_tbl['P'], dtype=np.double).reshape((nz, nk))
         e = np.array(karac_tbl['e'], dtype=np.double).reshape((nz, nk))
 
-        self.measurements[r'Karaçayli et al. (2022)'] = {
+        self.measurements['Karaçayli+2022'] = {
             'z': z,
             'k': k,
             'kppi': k * p / np.pi,
@@ -134,7 +134,7 @@ class P1DMeasurements():
         kppi = [karac_tbl['p_final'][wz] for wz in wzlist]
         ekpi = [karac_tbl['e_total'][wz] for wz in wzlist]
 
-        self.measurements[r'Karaçayli et al. (2023)'] = {
+        self.measurements['Karaçayli+2023'] = {
             'z': zbins,
             'k': k,
             'kppi': kppi,
@@ -182,19 +182,3 @@ class P1DMeasurements():
             fs.append(self.plot_one(zplot, ax, key))
 
         return fs
-
-
-
-
-# z=[3.0, 4.2]
-# irsic_table = ascii.read(DATADIR+"/xq100_irsic2017_pk_xs_final.txt")
-# irsic_nk = 19
-# irsic_nz = 7
-
-# irsic_z = np.array(irsic_table['z'], dtype=np.double).reshape((irsic_nz,irsic_nk))
-# irsic_k = np.array(irsic_table['k'], dtype=np.double).reshape((irsic_nz,irsic_nk))
-# irsic_pa = np.array(irsic_table['P_a'], dtype=np.double).reshape((irsic_nz,irsic_nk))
-# irsic_estat = np.array(irsic_table['e_stat'], dtype=np.double).reshape((irsic_nz,irsic_nk))
-# irsic_esys = np.array(irsic_table['e_sys'], dtype=np.double).reshape((irsic_nz,irsic_nk))
-# irsic_err = np.sqrt(irsic_esys**2 + irsic_estat**2)
-# irsic_pf = np.array(irsic_table['P_F'], dtype=np.double).reshape((irsic_nz,irsic_nk))
