@@ -1,0 +1,64 @@
+#Computer Modern font
+font.family:  sans-serif
+font.style:   normal
+font.variant: normal
+font.weight:  normal
+font.stretch: normal
+font.size:    10.0
+
+#text.usetex : True
+text.latex.preamble : \usepackage{amsmath, amssymb} \usepackage{bm}
+
+#Line width and font size
+legend.fontsize : large
+axes.labelsize : 18
+xtick.labelsize : 16
+ytick.labelsize : 16
+
+#ticks in all axis, towards the interior
+xtick.top : True
+ytick.right : True
+xtick.direction : in
+ytick.direction : in
+
+#Tick size
+xtick.major.size : 7
+xtick.minor.size : 4
+ytick.major.size : 7
+ytick.minor.size : 4
+
+#Tick width
+xtick.major.width : 1
+xtick.minor.width : 1
+ytick.major.width : 1
+ytick.minor.width : 1
+
+#minor ticks
+xtick.minor.visible : True
+ytick.minor.visible : True
+
+#Tick padding
+
+#Label padding
+# axes.labelpad : 4 #Default=4
+
+#Errorbar capsize
+errorbar.capsize : 1.5
+# lines.markersize : 1.5
+# lines.markeredgewidth : 0.56 # Same as linewidth
+
+# Figure saving
+savefig.bbox : tight
+savefig.dpi: 150
+
+#Grid
+axes.grid.axis : both
+axes.grid : True
+
+# HIST
+hist.bins: 40
+
+# No frame on legend
+# legend.frameon : False
+
+# axes.prop_cycle : cycler('color', ['1b9e77','d95f02','7570b3','e7298a','66a61e','e6ab02','a6761d','666666'])
