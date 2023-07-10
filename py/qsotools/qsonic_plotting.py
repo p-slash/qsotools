@@ -71,7 +71,7 @@ class AttrFile():
         if show:
             plt.show()
 
-    def plot_one_cov(self, varstats, iwave, cmap='RdBu_r', show=True):
+    def plot_one_cov(self, iwave, cmap='RdBu_r', show=True):
         data = self.varstats['data'][iwave]
         w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
               & (data['num_pixels'] >= self.varstats['MINNPIX']))
@@ -240,3 +240,7 @@ class AttrFile():
     def plot_all_varpipe_varobs(self):
         for i in range(self.varstats['NWBINS']):
             self.plot_varpipe_varobs(i)
+
+    def plot_all_covariances(self):
+        for i in range(self.varstats['NWBINS']):
+            self.plot_one_cov(i)
