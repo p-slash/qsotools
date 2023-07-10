@@ -112,11 +112,44 @@ class P1DMeasurements():
             'color': P1DMeasurements.colors[-4]
         }
 
-    def __init__(self, karacayli=False, eboss=False, walther=False):
+    def load_karacayli_desi_edrp(self, load=True):
+        if not load:
+            return
+
+        fname = resource_filename(
+            'qsotools',
+            'p1d-measurements/karacayli23_desi-edrp-lyasb1subt'
+            '-p1d-summary-results.txt')
+
+        karac_tbl = ascii.read(fname, format='fixed_width')
+
+        z = np.array(karac_tbl['z'], dtype=np.double)
+        z = np.unique(np.round(z, decimals=1))
+        nz = z.size
+        nk = len(karac_tbl) // nz
+
+        k = np.array(karac_tbl['k'], dtype=np.double).reshape((nz, nk))
+        p = np.array(karac_tbl['p_final'], dtype=np.double).reshape((nz, nk))
+        e = np.array(karac_tbl['e_total'], dtype=np.double).reshape((nz, nk))
+
+        self.measurements[r'Karaçayli et al. (2023)'] = {
+            'z': z,
+            'k': k,
+            'kppi': k * p / np.pi,
+            'ekpi': k * e / np.pi,
+            'alpha': 0.5,
+            'color': P1DMeasurements.colors[-1]
+        }
+
+    def __init__(
+            self, karacayli=False, eboss=False, walther=False,
+            karacayli_desi_edrp=False
+    ):
         self.measurements = {}
         self.load_eboss(eboss)
         self.load_walther(walther)
         self.load_karacayli(karacayli)
+        self.load_karacayli_desi_edrp(karacayli_desi_edrp)
 
     def __bool__(self):
         return bool(self.measurements)
