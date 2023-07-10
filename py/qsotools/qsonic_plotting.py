@@ -1,8 +1,10 @@
+from pkg_resources import resource_filename
+
 import numpy as np
 import matplotlib.pyplot as plt
 import fitsio
 
-plt.style.use("qsotools.alluse")
+plt.style.use(resource_filename('qsotools', 'alluse.mplstyle'))
 
 
 def add_minor_grid(ax):
