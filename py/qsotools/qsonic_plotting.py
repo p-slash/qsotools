@@ -89,8 +89,9 @@ class AttrFile():
         matrix = data['cov_var_delta'][w0, :][:, w0] / np.outer(e, e)
         matrix[np.isnan(matrix)] = 0
 
-        plt.grid(False)
-        plt.pcolormesh(
+        fig, ax = plt.subplots()
+
+        im = ax.pcolormesh(
             vp_edges, vp_edges, matrix,
             cmap=cmap, shading='flat', vmin=-1, vmax=1)
 
@@ -101,8 +102,7 @@ class AttrFile():
             vp_edges, vp_edges, m2, shading='flat',
             alpha=0.2, cmap='Greys_r')
 
-        ax = plt.gca()
-        plt.grid(True)
+        ax.grid(True)
         ax.set_xscale("log")
         ax.set_yscale("log")
 
@@ -110,8 +110,12 @@ class AttrFile():
         ax.set_yticks(np.logspace(-4, 1, 6))
         ax.set_xlim(vp[vp > 0].min(), vp.max())
         ax.set_ylim(vp[vp > 0].min(), vp.max())
-        plt.xlabel("Pipeline variance")
-        plt.ylabel("Pipeline variance")
+        ax.set_xlabel("Pipeline variance")
+        ax.set_ylabel("Pipeline variance")
+
+        cbar = fig.colorbar(im, ticks=np.linspace(-1, 1, 6))
+        # cbar.set_label(cbarlbl, fontsize=18)
+        cbar.ax.tick_params(labelsize=16)
 
         if show:
             plt.show()
