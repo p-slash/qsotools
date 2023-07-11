@@ -13,6 +13,10 @@ def add_minor_grid(ax):
 
 
 class AttrFile():
+    @staticmethod
+    def variance_function(var_pipe, var_lss, eta):
+        return eta * var_pipe + var_lss
+
     def __init__(self, fname, name):
         self.fname = fname
         self.name = name
@@ -30,7 +34,7 @@ class AttrFile():
 
         fattr.close()
 
-    def plot_varpipe_varobs(self, iwave, ax=None, show=True):
+    def plot_varpipe_varobs(self, iwave, ax=None, plotfit=True, show=True):
         if ax is None:
             ax = plt.gca()
 
@@ -38,18 +42,34 @@ class AttrFile():
         w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
               & (data['num_pixels'] >= self.varstats['MINNPIX']))
         ax.errorbar(
-            data['var_pipe'][w2],
-            data['var_delta'][w2],
+            data['var_pipe'][w2], data['var_delta'][w2],
             yerr=np.sqrt(data['e_var_delta'][w2]),
-            fmt='.', alpha=1)
+            fmt='.', alpha=1, label="Nominal range")
 
-        w2 = (data['num_qso'] >= 10) & (data['num_pixels'] > 100) & (~w2)
+        # Plot extended range
+        w2 = ((data['num_qso'] >= self.varstats['MINNQSO'] // 2)
+              & (data['num_pixels'] >= self.varstats['MINNPIX']) // 2) & (~w2)
+        var_pipe = data['var_pipe'][w2]
         ax.errorbar(
-            data['var_pipe'][w2],
-            data['var_delta'][w2],
+            var_pipe, data['var_delta'][w2],
             yerr=np.sqrt(data['e_var_delta'][w2]),
-            fmt='.', alpha=1)
+            fmt='.', alpha=1, label="Extended range")
 
+        # Plot var_lss, eta fitting function
+        var_lss = self.varfunc[iwave]['var_lss']
+        e_var_lss = self.varfunc[iwave]['e_var_lss']
+        eta = self.varfunc[iwave]['eta']
+        e_eta = self.varfunc[iwave]['e_eta']
+        var_pipe = np.linspace(var_pipe.min(), var_pipe.max(), 1000)
+        yfit = AttrFile.variance_function(var_pipe, var_lss, eta)
+        ymin = AttrFile.variance_function(
+            var_pipe, var_lss - e_var_lss, eta - e_eta)
+        ymax = AttrFile.variance_function(
+            var_pipe, var_lss + e_var_lss, eta + e_eta)
+        ax.plot(var_pipe, yfit, 'k-', label="Fit")
+        ax.fill_between(var_pipe, ymin, ymax, alpha=0.3, c='grey')
+
+        # Add texts
         meanl = np.mean(data['wave'])
         ax = plt.gca()
         ax.text(
