@@ -47,27 +47,31 @@ class AttrFile():
             fmt='.', alpha=1, label="Nominal range")
 
         # Plot extended range
-        w2 = ((data['num_qso'] >= self.varstats['MINNQSO'] // 2)
-              & (data['num_pixels'] >= self.varstats['MINNPIX']) // 2) & (~w2)
-        var_pipe = data['var_pipe'][w2]
+        w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100) & (~w2)
         ax.errorbar(
-            var_pipe, data['var_delta'][w2],
+            data['var_pipe'][w2], data['var_delta'][w2],
             yerr=np.sqrt(data['e_var_delta'][w2]),
             fmt='.', alpha=1, label="Extended range")
 
         # Plot var_lss, eta fitting function
-        var_lss = self.varfunc[iwave]['var_lss']
-        e_var_lss = self.varfunc[iwave]['e_var_lss']
-        eta = self.varfunc[iwave]['eta']
-        e_eta = self.varfunc[iwave]['e_eta']
-        var_pipe = np.linspace(var_pipe.min(), var_pipe.max(), 1000)
-        yfit = AttrFile.variance_function(var_pipe, var_lss, eta)
-        ymin = AttrFile.variance_function(
-            var_pipe, var_lss - e_var_lss, eta - e_eta)
-        ymax = AttrFile.variance_function(
-            var_pipe, var_lss + e_var_lss, eta + e_eta)
-        ax.plot(var_pipe, yfit, 'k-', label="Fit")
-        ax.fill_between(var_pipe, ymin, ymax, alpha=0.3, c='grey')
+        if plotfit:
+            w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100)
+            var_pipe = data['var_pipe'][w2]
+            var_pipe = np.linspace(var_pipe.min(), var_pipe.max(), 1000)
+
+            var_lss = self.varfunc['var_lss'][iwave]
+            e_var_lss = self.varfunc['e_var_lss'][iwave]
+            eta = self.varfunc['eta'][iwave]
+            e_eta = self.varfunc['e_eta'][iwave]
+
+            yfit = AttrFile.variance_function(var_pipe, var_lss, eta)
+            ymin = AttrFile.variance_function(
+                var_pipe, var_lss - e_var_lss, eta - e_eta)
+            ymax = AttrFile.variance_function(
+                var_pipe, var_lss + e_var_lss, eta + e_eta)
+
+            ax.plot(var_pipe, yfit, 'k-', label="Fit")
+            ax.fill_between(var_pipe, ymin, ymax, alpha=0.5, fc='grey')
 
         # Add texts
         meanl = np.mean(data['wave'])
@@ -87,6 +91,7 @@ class AttrFile():
         ax.set_ylabel("Observed variance")
 
         add_minor_grid(ax)
+        ax.legend(loc="lower right")
 
         if show:
             plt.show()
@@ -186,7 +191,7 @@ class AttrFile():
         ax.set_ylabel("Mean continuum")
         ax.set_xlabel("Rest-frame wavelength [A]")
         add_minor_grid(ax)
-        plt.legend()
+        ax.legend()
         if show:
             plt.show()
 
@@ -211,7 +216,7 @@ class AttrFile():
         plt.ticklabel_format(
             style='sci', axis='y', scilimits=(0, 0), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
-        plt.legend()
+        ax.legend()
 
         if show:
             plt.show()
@@ -232,7 +237,7 @@ class AttrFile():
         add_minor_grid(ax)
         ax.set_ylabel(r"$\sigma^2_\mathrm{LSS}$")
         ax.set_xlabel("Wavelength [A]")
-        plt.legend()
+        ax.legend()
 
         if show:
             plt.show()
@@ -272,7 +277,7 @@ class AttrFile():
         plt.ticklabel_format(
             style='sci', axis='y', scilimits=(0, 0), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
-        plt.legend(ncol=2)
+        ax.legend(ncol=2)
 
         if show:
             plt.show()
