@@ -43,14 +43,14 @@ class AttrFile():
               & (data['num_pixels'] >= self.varstats['MINNPIX']))
         ax.errorbar(
             data['var_pipe'][w2], data['var_delta'][w2],
-            yerr=np.sqrt(data['e_var_delta'][w2]),
+            yerr=data['e_var_delta'][w2],
             fmt='.', alpha=1, label="Nominal range")
 
         # Plot extended range
         w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100) & (~w2)
         ax.errorbar(
             data['var_pipe'][w2], data['var_delta'][w2],
-            yerr=np.sqrt(data['e_var_delta'][w2]),
+            yerr=data['e_var_delta'][w2],
             fmt='.', alpha=1, label="Extended range")
 
         # Plot var_lss, eta fitting function
