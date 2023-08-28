@@ -57,7 +57,10 @@ class AttrFile():
         if plotfit:
             w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100)
             var_pipe = data['var_pipe'][w2]
-            var_pipe = np.linspace(var_pipe.min(), var_pipe.max(), 1000)
+            var_pipe = var_pipe[var_pipe > 0]
+            var_pipe = np.logspace(
+                np.log10(var_pipe.min()), np.log10(var_pipe.max()),
+                100)
 
             var_lss = self.varfunc['var_lss'][iwave]
             e_var_lss = self.varfunc['e_var_lss'][iwave]
@@ -71,7 +74,7 @@ class AttrFile():
                 var_pipe, var_lss + e_var_lss, eta + e_eta)
 
             ax.plot(var_pipe, yfit, 'k-', label="Fit")
-            ax.fill_between(var_pipe, ymin, ymax, alpha=0.5, fc='grey')
+            ax.fill_between(var_pipe, ymin, ymax, alpha=0.6, fc='grey')
 
         # Add texts
         meanl = np.mean(data['wave'])
@@ -103,7 +106,9 @@ class AttrFile():
             ax = plt.gca()
 
         var_lss = self.varfunc['var_lss'][iwave]
+        e_var_lss = self.varfunc['e_var_lss'][iwave]
         eta = self.varfunc['eta'][iwave]
+        e_eta = self.varfunc['e_eta'][iwave]
         data = self.varstats['data'][iwave]
 
         w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
@@ -133,11 +138,26 @@ class AttrFile():
             yerr=data['e_var_delta'][w2] / yfit,
             fmt='.', alpha=1, label="Extended range")
 
+        # Plot shaded tilt
+        w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100)
+        var_pipe = data['var_pipe'][w2]
+        var_pipe = var_pipe[var_pipe > 0]
+        var_pipe = np.logspace(
+            np.log10(var_pipe.min()), np.log10(var_pipe.max()),
+            100)
+
+        yfit = AttrFile.variance_function(var_pipe, var_lss, eta)
+        ymin = AttrFile.variance_function(
+            var_pipe, var_lss - e_var_lss, eta - e_eta) / yfit
+        ymax = AttrFile.variance_function(
+            var_pipe, var_lss + e_var_lss, eta + e_eta) / yfit
+        ax.fill_between(var_pipe, ymin, ymax, alpha=0.6, fc='grey')
+
         # Add texts
         meanl = np.mean(data['wave'])
         ax = plt.gca()
         ax.text(
-            0.86, 0.94, f"{meanl:.0f} A",
+            0.76, 0.94, f"{meanl:.0f} A",
             transform=ax.transAxes, fontsize=16,
             verticalalignment='top', horizontalalignment='left',
             color="#9f2305",
