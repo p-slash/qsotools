@@ -97,7 +97,7 @@ class AttrFile():
             plt.show()
 
     def plot_varpipe_varobs_ratio(
-            self, iwave, ax=None, show=True, print_chi2=True
+            self, iwave, ax=None, show=True, print_chi2=True, ylim=(0.9, 1.2)
     ):
         if ax is None:
             ax = plt.gca()
@@ -137,7 +137,7 @@ class AttrFile():
         meanl = np.mean(data['wave'])
         ax = plt.gca()
         ax.text(
-            0.06, 0.94, f"{meanl:.0f} A",
+            0.86, 0.94, f"{meanl:.0f} A",
             transform=ax.transAxes, fontsize=16,
             verticalalignment='top', horizontalalignment='left',
             color="#9f2305",
@@ -149,9 +149,13 @@ class AttrFile():
         ax.set_yscale("linear")
         ax.set_xlabel("Pipeline variance")
         ax.set_ylabel("Observed variance / Model")
+        ax.axhline(1, c='k')
 
         add_minor_grid(ax)
-        ax.legend(loc="lower right")
+        ax.legend(loc="lower right", ncol=2)
+
+        if isinstance(ylim, tuple):
+            ax.set_ylim(*ylim)
 
         if show:
             plt.show()
