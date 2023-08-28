@@ -96,6 +96,66 @@ class AttrFile():
         if show:
             plt.show()
 
+    def plot_varpipe_varobs_ratio(
+            self, iwave, ax=None, show=True, print_chi2=True
+    ):
+        if ax is None:
+            ax = plt.gca()
+
+        var_lss = self.varfunc['var_lss'][iwave]
+        eta = self.varfunc['eta'][iwave]
+        data = self.varstats['data'][iwave]
+
+        w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
+              & (data['num_pixels'] >= self.varstats['MINNPIX']))
+        var_pipe = data['var_pipe'][w2]
+        var_obs = data['var_delta'][w2]
+        e_var_obs = data['e_var_delta'][w2]
+        yfit = AttrFile.variance_function(var_pipe, var_lss, eta)
+        ax.errorbar(
+            var_pipe, var_obs / yfit, yerr=e_var_obs / yfit,
+            fmt='.', alpha=1, label="Nominal range")
+
+        if print_chi2:
+            d = var_obs - yfit
+            chi2 = np.sum((var_obs - yfit)**2 / e_var_obs**2)
+            print(f"Diagonal chi2 / dof: {chi2:.2f} / {d.size}")
+            invcov = np.linalg.inv(data['cov_var_delta'][w2, :][:, w2])
+            chi2 = np.dot(d, invcov.dot(d))
+            print(f"Invcov chi2 / dof: {chi2:.2f} / {d.size}")
+
+        # Plot extended range
+        w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100) & (~w2)
+        var_pipe = data['var_pipe'][w2]
+        yfit = AttrFile.variance_function(var_pipe, var_lss, eta)
+        ax.errorbar(
+            var_pipe, data['var_delta'][w2] / yfit,
+            yerr=data['e_var_delta'][w2] / yfit,
+            fmt='.', alpha=1, label="Extended range")
+
+        # Add texts
+        meanl = np.mean(data['wave'])
+        ax = plt.gca()
+        ax.text(
+            0.06, 0.94, f"{meanl:.0f} A",
+            transform=ax.transAxes, fontsize=16,
+            verticalalignment='top', horizontalalignment='left',
+            color="#9f2305",
+            bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
+                  'alpha': 0.5, 'boxstyle': 'round', "lw": 2}
+        )
+
+        ax.set_xscale("log")
+        ax.set_yscale("linear")
+        ax.set_xlabel("Pipeline variance")
+        ax.set_ylabel("Observed variance / Model")
+
+        add_minor_grid(ax)
+        ax.legend(loc="lower right")
+
+        if show:
+            plt.show()
+
     def plot_one_cov(self, iwave, cmap='RdBu_r', show=True):
         data = self.varstats['data'][iwave]
         vp = data['var_pipe']
@@ -285,6 +345,10 @@ class AttrFile():
     def plot_all_varpipe_varobs(self):
         for i in range(self.varstats['NWBINS']):
             self.plot_varpipe_varobs(i)
+
+    def plot_all_varpipe_varobs_ratio(self):
+        for i in range(self.varstats['NWBINS']):
+            self.plot_varpipe_varobs_ratio(i)
 
     def plot_all_covariances(self):
         for i in range(self.varstats['NWBINS']):
