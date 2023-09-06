@@ -127,7 +127,7 @@ class AttrFile():
             print(f"Diagonal chi2 / dof: {chi2:.2f} / {d.size}")
             invcov = np.linalg.inv(data['cov_var_delta'][w2, :][:, w2])
             chi2 = np.dot(d, invcov.dot(d))
-            print(f"Invcov chi2 / dof: {chi2:.2f} / {d.size}")
+            print(f"Invcov chi2 / dof: {chi2:.2f} / ({d.size} - 2)")
 
         # Plot extended range
         w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100) & (~w2)
