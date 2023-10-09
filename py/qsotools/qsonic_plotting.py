@@ -107,14 +107,14 @@ class AttrFile():
               & (data['num_pixels'] >= self.varstats['MINNPIX']))
         ax.errorbar(
             data['var_pipe'][w2], data['mean_delta'][w2],
-            yerr=np.sqrt(data['var_delta'][w2]),
+            yerr=np.sqrt(data['var_delta'][w2] / data['num_pixels'][w2]),
             fmt='.', alpha=1, label="Nominal range")
 
         # Plot extended range
         w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100) & (~w2)
         ax.errorbar(
             data['var_pipe'][w2], data['mean_delta'][w2],
-            yerr=np.sqrt(data['var_delta'][w2]),
+            yerr=np.sqrt(data['var_delta'][w2] / data['num_pixels'][w2]),
             fmt='.', alpha=1, label="Extended range")
 
         # Add texts
@@ -132,6 +132,7 @@ class AttrFile():
         ax.set_yscale("linear")
         ax.set_xlabel("Pipeline variance")
         ax.set_ylabel("Mean delta")
+        ax.axhline(0, c='k')
 
         add_minor_grid(ax)
         ax.legend(loc="lower right")
@@ -417,10 +418,10 @@ class AttrFile():
         for i in range(self.varstats['NWBINS']):
             self.plot_one_cov(i)
 
-    def plot_all_varpipe_meandelta(self, inone=True, show=True):
+    def plot_all_varpipe_meandelta(self, inone=False, show=True):
         if not inone:
             for i in range(self.varstats['NWBINS']):
-                self.plot_varpipe_varobs_ratio(i)
+                self.plot_varpipe_meandelta(i)
             return
 
         ax = plt.gca()
@@ -431,13 +432,14 @@ class AttrFile():
             w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100)
             ax.errorbar(
                 data['var_pipe'][w2], data['mean_delta'][w2],
-                yerr=np.sqrt(data['var_delta'][w2]),
-                fmt='.', alpha=1, label=f"{meanl:0.f}")
+                yerr=np.sqrt(data['var_delta'][w2] / data['num_pixels'][w2]),
+                fmt='.', alpha=1, label=f"{meanl:.0f}")
 
         ax.set_xscale("log")
         ax.set_yscale("linear")
         ax.set_xlabel("Pipeline variance")
         ax.set_ylabel("Mean delta")
+        ax.axhline(0, c='k')
 
         add_minor_grid(ax)
         ax.legend(loc="lower right")
