@@ -78,7 +78,6 @@ class AttrFile():
 
         # Add texts
         meanl = np.mean(data['wave'])
-        ax = plt.gca()
         ax.text(
             0.06, 0.94, f"{meanl:.0f} A",
             transform=ax.transAxes, fontsize=16,
@@ -92,6 +91,47 @@ class AttrFile():
         ax.set_yscale("log")
         ax.set_xlabel("Pipeline variance")
         ax.set_ylabel("Observed variance")
+
+        add_minor_grid(ax)
+        ax.legend(loc="lower right")
+
+        if show:
+            plt.show()
+
+    def plot_varpipe_meandelta(self, iwave, ax=None, show=True):
+        if ax is None:
+            ax = plt.gca()
+
+        data = self.varstats['data'][iwave]
+        w2 = ((data['num_qso'] >= self.varstats['MINNQSO'])
+              & (data['num_pixels'] >= self.varstats['MINNPIX']))
+        ax.errorbar(
+            data['var_pipe'][w2], data['mean_delta'][w2],
+            yerr=np.sqrt(data['var_delta'][w2]),
+            fmt='.', alpha=1, label="Nominal range")
+
+        # Plot extended range
+        w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100) & (~w2)
+        ax.errorbar(
+            data['var_pipe'][w2], data['mean_delta'][w2],
+            yerr=np.sqrt(data['var_delta'][w2]),
+            fmt='.', alpha=1, label="Extended range")
+
+        # Add texts
+        meanl = np.mean(data['wave'])
+        ax.text(
+            0.06, 0.94, f"{meanl:.0f} A",
+            transform=ax.transAxes, fontsize=16,
+            verticalalignment='top', horizontalalignment='left',
+            color="#9f2305",
+            bbox={'facecolor': 'white', 'pad': 0.3, "ec": "#9f2305",
+                  'alpha': 0.5, 'boxstyle': 'round', "lw": 2}
+        )
+
+        ax.set_xscale("log")
+        ax.set_yscale("linear")
+        ax.set_xlabel("Pipeline variance")
+        ax.set_ylabel("Mean delta")
 
         add_minor_grid(ax)
         ax.legend(loc="lower right")
@@ -155,7 +195,6 @@ class AttrFile():
 
         # Add texts
         meanl = np.mean(data['wave'])
-        ax = plt.gca()
         ax.text(
             0.76, 0.94, f"{meanl:.0f} A",
             transform=ax.transAxes, fontsize=16,
@@ -377,3 +416,31 @@ class AttrFile():
     def plot_all_covariances(self):
         for i in range(self.varstats['NWBINS']):
             self.plot_one_cov(i)
+
+    def plot_all_varpipe_meandelta(self, inone=True, show=True):
+        if not inone:
+            for i in range(self.varstats['NWBINS']):
+                self.plot_varpipe_varobs_ratio(i)
+            return
+
+        ax = plt.gca()
+        for iwave in range(self.varstats['NWBINS']):
+            data = self.varstats['data'][iwave]
+            meanl = np.mean(data['wave'])
+
+            w2 = (data['num_qso'] >= 10) & (data['num_pixels'] >= 100)
+            ax.errorbar(
+                data['var_pipe'][w2], data['mean_delta'][w2],
+                yerr=np.sqrt(data['var_delta'][w2]),
+                fmt='.', alpha=1, label=f"{meanl:0.f}")
+
+        ax.set_xscale("log")
+        ax.set_yscale("linear")
+        ax.set_xlabel("Pipeline variance")
+        ax.set_ylabel("Mean delta")
+
+        add_minor_grid(ax)
+        ax.legend(loc="lower right")
+
+        if show:
+            plt.show()
