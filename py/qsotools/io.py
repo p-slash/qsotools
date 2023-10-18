@@ -466,6 +466,13 @@ class Spectrum:
             x for x in np.hsplit(self.reso_kms, sp_indx)[1:-1]
             if 0 not in x.shape]
 
+        if self.weight is not None:
+            weight_chunks = [
+            x for x in np.hsplit(self.weight, sp_indx)[1:-1]
+            if 0 not in x.shape]
+        else:
+            weight_chunks = [None for _ in range(len(wave_chunks))]
+
         split_qsos = []
         for i in range(len(wave_chunks)):
             wave = wave_chunks[i]
@@ -475,7 +482,8 @@ class Spectrum:
 
             tmp_qso = Spectrum(
                 wave, flux, error, self.z_qso,
-                self.specres, self.dv, self.coord, reso_kms)
+                self.specres, self.dv, self.coord, reso_kms,
+                weight_chunks[i])
 
             if tmp_qso.s2n > 0 and wave.size > min_nopix:
                 split_qsos.append(tmp_qso)
