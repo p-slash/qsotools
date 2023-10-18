@@ -4,7 +4,7 @@ import logging
 from multiprocessing import Pool
 
 import numpy as np
-from numba import jit
+from numba import njit
 from astropy.table import Table
 
 import qsotools.io as qio
@@ -12,7 +12,7 @@ import qsotools.fiducial as fid
 import qsotools.utils as qutil
 
 
-@jit("i8(f8[:], i8, f8)", nopython=True)
+@njit("i8(f8[:], i8, f8)")
 def _findVMaxj(arr, j1, rmax):
     for j in range(j1, arr.size):
         if arr[j] > rmax:
@@ -21,7 +21,7 @@ def _findVMaxj(arr, j1, rmax):
     return arr.size
 
 
-@jit("f8[:](f8[:], f8[:], f8[:], f8[:])", nopython=True)
+@njit("f8[:](f8[:], f8[:], f8[:], f8[:])")
 def _getXi1D(v_arr, flux, ivar, r_edges):
     # 1d array to store results
     # first N : Xi_1d , second N : Weights
