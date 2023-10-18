@@ -3,7 +3,7 @@ import warnings
 from scipy.optimize import curve_fit, OptimizeWarning
 from scipy.special import erf
 from scipy.interpolate import RectBivariateSpline
-from numba import jit
+from numba import njit
 
 warnings.simplefilter("error", OptimizeWarning)
 
@@ -196,14 +196,14 @@ UVES_MFLUX_PARAMS = 0.46741625, 4.3688714, 0.21242962
 XQ100_MFLUX_PARAMS = 2., 0.94134713, -1.45586003
 
 
-@jit
+@njit
 def meanFluxFG08(z):
     tau = 0.001845 * np.power(1. + z, 3.924)
 
     return np.exp(-tau)
 
 
-@jit
+@njit
 def evaluateBecker13MeanFlux(z, tau0, beta, C, z0=BECKER13_parameters[-1]):
     x0 = (1 + z) / (1 + z0)
 
