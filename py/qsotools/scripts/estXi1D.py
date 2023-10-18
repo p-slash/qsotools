@@ -43,10 +43,10 @@ def _getXi1D(v_arr, flux, ivar, r_edges):
         sub_w1d = ivar[i] * ivar[vrange]
 
         sp_indx = np.searchsorted(r_edges, vdiff)
-        bin_res[:Nbins] += np.bincount(sp_indx, weights=sub_xi1d,
-                                       minlength=r_edges.size + 1)[1:-1]
-        bin_res[Nbins:] += np.bincount(sp_indx, weights=sub_w1d,
-                                       minlength=r_edges.size + 1)[1:-1]
+        bin_res[:Nbins] += np.bincount(
+            sp_indx, weights=sub_xi1d, minlength=r_edges.size + 1)[1:-1]
+        bin_res[Nbins:] += np.bincount(
+            sp_indx, weights=sub_w1d, minlength=r_edges.size + 1)[1:-1]
 
     return bin_res
 
@@ -90,11 +90,11 @@ class Xi1DEstimator(object):
         self.mean_resolution[z_bin_no] += np.sum(qso.reso_kms[w])
         self.counts_meanreso[z_bin_no] += np.sum(w)
 
-        ivar = self.getIVAR(qso)
+        weight = qso.weight
         # Weighted deltas
-        wflux = qso.flux * ivar
+        wflux = qso.flux * weight
 
-        binres = _getXi1D(v_arr, wflux, ivar, self.r_edges)
+        binres = _getXi1D(v_arr, wflux, weight, self.r_edges)
         self.xi1d[z_bin_no] += binres[:self.args.nrbins]
         self.counts[z_bin_no] += binres[self.args.nrbins:]
 
@@ -131,12 +131,10 @@ def main():
     parser.add_argument("--nsubsamples", type=int, default=100,
                         help="Number of subsamples if input is not Picca.")
     parser.add_argument(
-        "--dr", help="Default: %(default)s km/s", type=float, default=70.0)
+        "--dr", help="Bin spacing in km/s", type=float, default=70.0)
     parser.add_argument(
-        "--nrbins", help="Default: %(default)s", type=int, default=60)
-    parser.add_argument(
-        "--smooth-noise-sigmaA", type=float, default=20.,
-        help="Gaussian sigma in A to smooth pipeline noise estimates.")
+        "--nrbins", help="Number of bins", type=int, default=100)
+
     # parser.add_argument("--project-out", action="store_true", \
     #     help="Projects out mean and slope modes.")
     parser.add_argument("--nproc", type=int, default=1)
