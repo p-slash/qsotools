@@ -227,7 +227,8 @@ class Spectrum:
         return self.flux.size
 
     def __init__(
-            self, wave, flux, error, z_qso, specres, dv, coord, reso_kms=None
+            self, wave, flux, error, z_qso, specres, dv, coord, reso_kms=None,
+            weight=None
     ):
         self.wave = wave
         self.flux = flux
@@ -254,6 +255,7 @@ class Spectrum:
         self.z_dlas = None
         self.nhi_dlas = None
         self.cont = None
+        self.weight = weight
 
     def smoothNoise(self, sigma_A=20., pad_size=25, esigma=3.5):
         # Isolate masked pixels as they have high noise
@@ -1711,8 +1713,10 @@ class PiccaFile():
         self.no_spectra = 0
         self.fitsfile = fitsio.FITS(fname, rw, clobber=clobber)
     
-    def writeSpectrum(self, tid, wave, delta, error, specres, z_qso, ra, dec, \
-        rmat=None, islinbin=False, oversampling=1):
+    def writeSpectrum(
+            self, tid, wave, delta, error, specres, z_qso, ra, dec,
+            rmat=None, islinbin=False, oversampling=1
+    ):
         if rmat is not None:
             ndiags = rmat.shape[1]
         else:
@@ -1756,6 +1760,7 @@ class PiccaFile():
         delta = data[delta_keys.intersection(colnames).pop()]
         error = 1 / np.sqrt(data['IVAR'] + 1e-16)
         error[data['IVAR'] < 1e-4] = 0
+        weight = data['WEIGHT']
 
         specres = fid.LIGHT_SPEED / hdr['MEANRESO'] / fid.ONE_SIGMA_2_FWHM
         if 'DLL' in hdr.keys():
@@ -1771,7 +1776,7 @@ class PiccaFile():
         qso = Spectrum(
             wave, delta, error, hdr['Z'], specres, dv,
             {'RA': hdr['RA'], 'DEC': hdr['DEC']},
-            reso_rkms)
+            reso_rkms, weight)
 
         return qso
 
