@@ -90,7 +90,7 @@ class Xi1DEstimator(object):
         self.mean_resolution[z_bin_no] += np.sum(qso.reso_kms[w])
         self.counts_meanreso[z_bin_no] += np.sum(w)
 
-        weight = qso.weight
+        weight = qso.weight.astype('f8')
         # Weighted deltas
         wflux = qso.flux * weight
 
