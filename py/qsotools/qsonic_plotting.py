@@ -24,7 +24,10 @@ class AttrFile():
 
         self.cont = fattr['CONT'].read()
         self.stacked_flux = fattr['STACKED_FLUX'].read()
-        self.varfunc = fattr['VAR_FUNC'].read()
+        if 'VAR_FUNC-fit' in fattr:
+            self.varfunc = fattr['VAR_FUNC-fit'].read()
+        else:
+            self.varfunc = fattr['VAR_FUNC'].read()
 
         hdr = dict(fattr['VAR_STATS'].read_header())
         varstats = fattr['VAR_STATS'].read().reshape(
