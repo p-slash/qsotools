@@ -60,12 +60,12 @@ def resample(wave, flux, error, new_dv_or_edge, keep_empty_bins=False):
     if error is None:  # No error array is given
         binned_flux, bin_edges, binnumber = binned_statistic(
             wave, flux, statistic='mean', bins=new_wave_edges)
-        empty_bins = np.zeros_like(binned_flux[0], dtype=np.bool)
+        empty_bins = np.zeros_like(binned_flux[0], dtype=bool)
     elif not error.any():  # error array is all zero
         binned_flux, bin_edges, binnumber = binned_statistic(
             wave, flux, statistic='mean', bins=new_wave_edges)
         binned_error = np.zeros_like(binned_flux)
-        empty_bins = np.zeros_like(binned_flux[0], dtype=np.bool)
+        empty_bins = np.zeros_like(binned_flux[0], dtype=bool)
     else:
         error = np.power(error, -2)
         flux *= error
