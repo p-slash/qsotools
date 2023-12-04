@@ -199,7 +199,7 @@ def _genRNDDec(RNST, N, dec1_deg, dec2_deg):
 
 
 # Returns metadata array and number of pixels
-def getMetadata(args):
+def getMetadata(args, rng):
     # The METADATA HDU contains a binary table
     # with (at least) RA, DEC, Z, TARGETID
     meta_dt = np.dtype(QQFile.meta_dt.descr + [('PIXNUM', 'i4')])
@@ -227,14 +227,12 @@ def getMetadata(args):
         logging.info("Generating random metadata.")
         metadata = np.zeros(args.nmocks, dtype=meta_dt)
         metadata['MOCKID'] = np.arange(args.nmocks)
-        # Use the same seed for all process to generate the same metadata
-        RNST = np.random.default_rng(args.seed)
         # Generate coords in degrees
-        metadata['RA'] = RNST.random(args.nmocks) * 360.
-        # metadata['DEC'] = (RNST.random(args.nmocks)-0.5) * 180.
+        metadata['RA'] = rng.random(args.nmocks) * 360.
+        # metadata['DEC'] = (rng.random(args.nmocks)-0.5) * 180.
 
         dec1, dec2 = (-25., 85.) if args.desi_dec else (-90., 90.)
-        metadata['DEC'] = _genRNDDec(RNST, args.nmocks, dec1, dec2)
+        metadata['DEC'] = _genRNDDec(rng, args.nmocks, dec1, dec2)
 
         if args.fixed_zqso:
             metadata['Z'] = args.fixed_zqso
@@ -246,7 +244,7 @@ def getMetadata(args):
             GenZ = lm.RedshiftGenerator(
                 args.invcdf_nz, args.z_quasar_min, args.z_quasar_max,
                 args.use_analytic_cdf)
-            metadata['Z'] = GenZ.generate(RNST, args.nmocks)
+            metadata['Z'] = GenZ.generate(rng, args.nmocks)
 
     logging.info(f"Number of nside for heal pixels: {args.hp_nside}")
     if args.hp_nside:
@@ -380,11 +378,10 @@ class MockGenerator(object):
         else:
             self.mean_flux_function = lm.lognMeanFluxGH
 
-    def generate_wfe_hpx(self, ipix, mockids, n_one_iter=100):
-        """New seed is seed + healpix no"""
+    def generate_wfe_hpx(self, seed, mockids, n_one_iter=100):
         nmocks = mockids.size
         lya_m = lm.LyaMocks(
-            self.args.seed + ipix,
+            seed,
             N_CELLS=2**self.args.log2ngrid,
             DV_KMS=self.args.griddv,
             GAUSSIAN_MOCKS=self.args.gauss,
@@ -528,7 +525,7 @@ class MockGenerator(object):
         return np.concatenate(new_data_dlas)
 
     def __call__(self, ipix_meta):
-        ipix, meta1 = ipix_meta
+        ipix, seed, meta1 = ipix_meta
         nmocks = meta1['MOCKID'].size
         z_qso = meta1['Z'][:, None]
 
@@ -536,7 +533,7 @@ class MockGenerator(object):
             return [], nmocks
 
         wave, fluxes, errors, data_dlas = self.generate_wfe_hpx(
-            ipix, meta1['MOCKID'])
+            seed, meta1['MOCKID'])
 
         data_dlas = self.trim_dlas(data_dlas, meta1['MOCKID'], meta1['Z'])
 
@@ -584,7 +581,8 @@ def main():
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
 
-    metadata, npixels = getMetadata(args)
+    rng = np.random.default_rng(args.seed)
+    metadata, npixels = getMetadata(args, rng)
 
     if args.save_qqfile:
         args.sigma_per_pixel = 0
@@ -613,12 +611,14 @@ def main():
         f"Length of split metadata {len(split_meta)} vs npixels {npixels}.")
     pcounter = Progress(metadata.size)
 
+    seeds = rng.choice(2**32, size=u_pix.size, replace=False)
+
     filename_list = []
     master_dla_catalog = []
     with Pool(processes=args.nproc) as pool:
         imap_it = pool.imap(
             MockGenerator(args, dla_sampler),
-            zip(u_pix, split_meta)
+            zip(u_pix, seeds, split_meta)
         )
         for fname, nmocks, data_dla in imap_it:
             filename_list.extend(fname)
