@@ -1689,15 +1689,11 @@ class QQFile():
         ):
             self.metadata[mcol] = metahdu[fcol].read()
 
-        def read_xcols(xcol, l1):
-            if xcol in colnames:
-                xres = metahdu[xcol].read()
-                l1.append(xcol)
-            return xres, l1
-
         l1 = ['RA', 'DEC', 'Z', 'MOCKID']
         for xcol in ['COADD_EXPTIME', 'FLUX_R', 'TSNR2_LRG']:
-            self.metadata[xcol], l1 = read_xcols(xcol, l1)
+            if xcol in colnames:
+                self.metadata[xcol] = metahdu[xcol].read()
+                l1.append(xcol)
 
         self.nqso = self.metadata.size
 
