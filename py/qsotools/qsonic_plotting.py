@@ -3,8 +3,66 @@ from pkg_resources import resource_filename
 import numpy as np
 import matplotlib.pyplot as plt
 import fitsio
+from scipy.interpolate import CubicSpline
 
 plt.style.use(resource_filename('qsotools', 'alluse.mplstyle'))
+
+DESI_WLIMITS = {'B': [3600., 5800.], 'R': [5760., 7620.], 'Z': [7520., 9824.]}
+
+
+def plot_many_attrs_eta_varlss(
+        listListAttrs, ncols=4, colsize=6, rowsize=5,
+        markAmpRegions=True, plotEta=True
+):
+    mainAttr = listListAttrs[0]
+    namplifiers = len(mainAttr)
+
+    nrows = int(np.ceil(namplifiers / ncols))
+
+    fig, axs = plt.subplots(
+        nrows, ncols,
+        sharex='all', sharey='none',
+        gridspec_kw={'hspace': 0.12, 'wspace': 0.2},
+        figsize=(colsize * ncols, rowsize * nrows)
+    )
+
+    noff_cols = ncols * nrows - namplifiers
+    for jj in range(noff_cols):
+        axs[-1, -1 - jj].set_axis_off()
+
+    if plotEta:
+        fnc = AttrFile.plot_eta
+        scilimits = (-2, 2)
+    else:
+        fnc = AttrFile.plot_varlss
+        scilimits = (0, 0)
+
+    for iz in range(namplifiers):
+        row = int(iz / ncols)
+        col = iz % ncols
+        ax = axs[row, col]
+        fnc(mainAttr[iz],
+            otherAttrs=[_[iz] for _ in listListAttrs[1:]],
+            ax=ax, show=False)
+
+        if col != 0:
+            ax.set_ylabel("")
+
+        if row != nrows - 1:
+            ax.set_xlabel("")
+
+        if markAmpRegions:
+            b_line = np.sum(DESI_WLIMITS['B']) / 2.
+            ax.axvline(b_line, ls='--', c='k')
+            ax.axvspan(
+                DESI_WLIMITS['R'][0], DESI_WLIMITS['B'][1],
+                fc='k', alpha=0.5
+            )
+
+        ax.autoscale()
+        ax.ticklabel_format(
+            style='sci', axis='y', scilimits=scilimits, useMathText=True)
+        ax.yaxis.get_offset_text().set_fontsize(16)
 
 
 def add_minor_grid(ax):
@@ -322,7 +380,7 @@ class AttrFile():
         if show:
             plt.show()
 
-    def plot_eta(self, otherAttrs=None, ax=None, show=True):
+    def plot_eta(self, otherAttrs=None, ax=None, show=True, plotSpline=False):
         if ax is None:
             ax = plt.gca()
 
@@ -334,6 +392,16 @@ class AttrFile():
             ax.errorbar(
                 varfunc['lambda'], varfunc['eta'] - 1, varfunc['e_eta'],
                 fmt='.-', label=f.name)
+
+        if plotSpline:
+            for i, f in enumerate(fattr):
+                varfunc = f.varfunc
+                spl = CubicSpline(varfunc['lambda'], varfunc['eta'])
+                x = np.linspace(
+                    varfunc['lambda'][0] - 60., varfunc['lambda'][-1] + 60.,
+                    100
+                )
+                plt.plot(x, spl(x), '--', c=plt.cmap.tab10[i])
 
         add_minor_grid(ax)
         ax.set_ylabel(r"$\eta - 1$")
