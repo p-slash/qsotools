@@ -12,7 +12,7 @@ DESI_WLIMITS = {'B': [3600., 5800.], 'R': [5760., 7620.], 'Z': [7520., 9824.]}
 
 def plot_many_attrs_eta_varlss(
         listListAttrs, ncols=4, colsize=6, rowsize=5,
-        markAmpRegions=True, plotEta=True
+        markAmpRegions=True, plotEta=True, plotSpline=True
 ):
     mainAttr = listListAttrs[0]
     namplifiers = len(mainAttr)
@@ -31,19 +31,18 @@ def plot_many_attrs_eta_varlss(
         axs[-1, -1 - jj].set_axis_off()
 
     if plotEta:
-        fnc = AttrFile.plot_eta
+        plotFnc = AttrFile.plot_eta
         scilimits = (-2, 2)
     else:
-        fnc = AttrFile.plot_varlss
+        plotFnc = AttrFile.plot_varlss
         scilimits = (0, 0)
 
     for iz in range(namplifiers):
         row = int(iz / ncols)
         col = iz % ncols
         ax = axs[row, col]
-        fnc(mainAttr[iz],
-            otherAttrs=[_[iz] for _ in listListAttrs[1:]],
-            ax=ax, show=False)
+        plotFnc(mainAttr[iz], otherAttrs=[_[iz] for _ in listListAttrs[1:]],
+                ax=ax, show=False, plotSpline=plotSpline)
 
         if col != 0:
             ax.set_ylabel("")
@@ -386,12 +385,13 @@ class AttrFile():
 
         other_attrs = AttrFile._parse_otherattrs(otherAttrs)
         fattr = [self] + other_attrs
+        fmt = '.' if plotSpline else '.-'
 
-        for f in fattr:
+        for i, f in enumerate(fattr):
             varfunc = f.varfunc
             ax.errorbar(
                 varfunc['lambda'], varfunc['eta'] - 1, varfunc['e_eta'],
-                fmt='.-', label=f.name)
+                fmt=fmt, label=f.name, c=plt.cm.tab10(i))
 
         if plotSpline:
             for i, f in enumerate(fattr):
@@ -401,7 +401,7 @@ class AttrFile():
                     varfunc['lambda'][0] - 60., varfunc['lambda'][-1] + 60.,
                     100
                 )
-                plt.plot(x, spl(x), '--', c=plt.cmap.tab10[i])
+                ax.plot(x, spl(x) - 1, '-', c=plt.cm.tab10(i), alpha=0.7)
 
         add_minor_grid(ax)
         ax.set_ylabel(r"$\eta - 1$")
@@ -416,18 +416,29 @@ class AttrFile():
         if show:
             plt.show()
 
-    def plot_varlss(self, otherAttrs=None, ax=None, show=True):
+    def plot_varlss(self, otherAttrs=None, ax=None, show=True, plotSpline=False):
         if ax is None:
             ax = plt.gca()
 
         other_attrs = AttrFile._parse_otherattrs(otherAttrs)
         fattr = [self] + other_attrs
+        fmt = '.' if plotSpline else '.-'
 
-        for f in fattr:
+        for i, f in enumerate(fattr):
             varfunc = f.varfunc
             ax.errorbar(
                 varfunc['lambda'], varfunc['var_lss'], varfunc['e_var_lss'],
-                fmt='.-', label=f.name)
+                fmt=fmt, label=f.name, c=plt.cm.tab10(i))
+
+        if plotSpline:
+            for i, f in enumerate(fattr):
+                varfunc = f.varfunc
+                spl = CubicSpline(varfunc['lambda'], varfunc['var_lss'])
+                x = np.linspace(
+                    varfunc['lambda'][0] - 60., varfunc['lambda'][-1] + 60.,
+                    100
+                )
+                ax.plot(x, spl(x), '-', c=plt.cm.tab10(i), alpha=0.7)
 
         add_minor_grid(ax)
         ax.set_ylabel(r"$\sigma^2_\mathrm{LSS}$")
