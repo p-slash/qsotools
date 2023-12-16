@@ -32,7 +32,7 @@ def plot_many_attrs_eta_varlss(
 
     if plotEta:
         plotFnc = AttrFile.plot_eta
-        scilimits = (-2, 2)
+        scilimits = (-2, -2)
     else:
         plotFnc = AttrFile.plot_varlss
         scilimits = (0, 0)
