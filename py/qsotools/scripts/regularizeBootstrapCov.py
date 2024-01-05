@@ -33,7 +33,9 @@ def mcdonald_eval_fix(boot_cov, qmle_cov, use_boot_base_evecs=True):
         # 1) Use bootstrap evecs
         evals_boot, evecs_boot = np.linalg.eigh(boot_cov)
 
-        s_cov_qmle_bootevecs = np.diag(evecs_boot.T @ qmle_cov @ evecs_boot)
+        # s_cov_qmle_bootevecs = np.diag(evecs_boot.T @ qmle_cov @ evecs_boot)
+        s_cov_qmle_bootevecs = np.array(
+            [v.T.dot(qmle_cov.dot(v)) for v in evecs_boot.T])
 
         small_vals = evals_boot < s_cov_qmle_bootevecs
         evals_boot[small_vals] = s_cov_qmle_bootevecs[small_vals]
