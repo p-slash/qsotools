@@ -1,0 +1,165 @@
+import numpy as np
+from scipy.interpolate import CubicSpline
+
+import qsotools.fiducial as qfid
+
+
+def invertDampSvd(fisher, jump=8.):
+    svd = np.linalg.svd(fisher, compute_uv=False)
+    # x = svd[0] * target_rcond - svd[-1]
+    ratios_svd = np.exp(np.diff(-np.log(svd)))
+
+    jj = 0
+    for _ in ratios_svd[::-1]:
+        if _ > jump:
+            jj += 1
+        else:
+            break
+
+    if jj == 0:
+        return np.linalg.inv(fisher)
+
+    x = svd[svd.size - jj]
+    print("Damp", x)
+
+    di = np.diag_indices(fisher.shape[0])
+    newf = fisher.dot(fisher)
+    newf[di] += x
+
+    inv = np.linalg.inv(newf)
+    return (fisher.dot(inv) + inv.dot(fisher)) / 2
+
+
+class QmleSimulator():
+    """docstring for QmleSimulator"""
+
+    def __init__(
+            self, zmed=2.4, dlambda=0.8, sigma=0.5, nklin=50, nklog=0,
+            nfft=2**20
+    ):
+        self.dlambda = dlambda
+        self.noise = sigma
+        self.k_edges, self.k_centers = qfid.formBins(
+            nklin, nklog, 0.5e-3, 0.1, 0, klast=-1)
+        self.nkbins = self.k_centers.size
+
+        w1 = (1 + zmed - 0.08) * qfid.LYA_WAVELENGTH
+        w2 = (1 + zmed + 0.08) * qfid.LYA_WAVELENGTH
+        self.nwave = int((w2 - w1) / dlambda) + 1
+        self.wave = np.linspace(w1, w1 + (self.nwave - 1) * dlambda, self.nwave)
+
+        self.z = self.wave.mean() / qfid.LYA_WAVELENGTH - 1
+        self.dv = qfid.LIGHT_SPEED * dlambda / (1 + self.z) / qfid.LYA_WAVELENGTH
+        self.R_kms = 0.8 * self.dv
+
+        self.varr = qfid.LIGHT_SPEED * np.log(self.wave / qfid.LYA_WAVELENGTH)
+        self.dv_matrix = np.abs(self.varr[:, np.newaxis] - self.varr[np.newaxis, :])
+
+        self.nfft = nfft
+        self.vfft = np.arange(self.nfft // 2) * 5.
+        self.kfft = 2. * np.pi * np.fft.rfftfreq(self.nfft, d=5.)
+
+        self.sfid_mat = None
+        self.cov_mat = None
+        self.inv_cov_mat = None
+        self.qk_matrices = None
+
+        self.dk = None
+        self.bk = None
+        self.fisher = None
+        self.invfisher = None
+
+    def getWindowFncK(self):
+        kR2 = self.kfft**2 * self.R_kms**2
+        return np.sinc(self.kfft * self.dv / 2 / np.pi)**2 * np.exp(-kR2)
+
+    def getSfidMatrix(self):
+        pfid = qfid.evaluatePD13Lorentz(
+            (self.kfft, self.z), *qfid.PDW_FIT_PARAMETERS)
+        pfid *= self.getWindowFncK()
+        pfid[0] = 0
+        xi = np.fft.irfft(pfid)[:self.nfft // 2] / self.dv
+
+        self.sfid_mat = CubicSpline(self.vfft, xi)(self.dv_matrix)
+
+        return self.sfid_mat
+
+    def getCovarianceMatrix(self):
+        if self.sfid_mat is None:
+            self.getSfidMatrix()
+
+        self.cov_mat = self.sfid_mat.copy()
+        di = np.diag_indices(self.nwave)
+        self.cov_mat[di] += self.noise**2
+
+        return self.cov_mat
+
+    def getInverseCovarianceMatrix(self, cont_order=-1):
+        self.inv_cov_mat = np.linalg.inv(self.getCovarianceMatrix())
+
+        if cont_order < 0:
+            return self.inv_cov_mat
+
+        template_matrix = np.vander(
+            np.log(self.wave / qfid.LYA_WAVELENGTH), cont_order + 1)
+        U, s, _ = np.linalg.svd(template_matrix, full_matrices=False)
+
+        # Remove small singular valued vectors
+        w = s > 1e-12
+        U = U[:, w]  # shape = (self.size, cont_order + 1)
+        Y = self.inv_cov_mat @ U
+        # Woodbury formula. Note that U and Y are not square matrices.
+        self.inv_cov_mat -= Y @ np.linalg.inv(U.T @ Y) @ Y.T
+
+        return self.inv_cov_mat
+
+    def getQkMatrices(self):
+        self.qk_matrices = []
+        window = self.getWindowFncK()
+        for k in range(self.nkbins):
+            qkw = np.zeros(self.kfft.size)
+            i1, i2 = np.searchsorted(
+                self.kfft, [self.k_edges[k], self.k_edges[k + 1]])
+            qkw[i1:i2] = window[i1:i2]
+            qkw = np.fft.irfft(qkw)[:self.nfft // 2] / self.dv
+
+            self.qk_matrices.append(
+                CubicSpline(self.vfft, qkw)(self.dv_matrix))
+
+        return self.qk_matrices
+
+    def simulate(self, cont_order=-1):
+        self.sfid_mat = self.getSfidMatrix()
+        self.inv_cov_mat = self.getInverseCovarianceMatrix(cont_order)
+        self.qk_matrices = self.getQkMatrices()
+
+        # Weight
+        for _ in range(self.nkbins):
+            self.qk_matrices[_] = self.inv_cov_mat.dot(self.qk_matrices[_])
+
+        # Fisher matrix calculation
+        self.fisher = np.empty((self.nkbins, self.nkbins))
+        for ki in range(self.nkbins):
+            self.fisher[ki, ki:] = np.fromiter(
+                (np.vdot(self.qk_matrices[ki], q.T) for q in self.qk_matrices[ki:]),
+                dtype=float,
+                count=self.nkbins - ki)
+            self.fisher[ki + 1:, ki] = self.fisher[ki, ki + 1:]
+
+        # Estimate dk
+        weighted_sfid = self.sfid_mat.dot(self.inv_cov_mat)
+        dk = np.fromiter(
+            (np.vdot(q, weighted_sfid) for q in self.qk_matrices),
+            dtype=float,
+            count=self.nkbins)
+
+        Noise = self.inv_cov_mat * self.noise**2
+        bk = np.fromiter(
+            (np.vdot(q, Noise) for q in self.qk_matrices),
+            dtype=float,
+            count=self.nkbins)
+        self.invfisher = invertDampSvd(self.fisher)
+        self.dk = self.invfisher.dot(dk)
+        self.bk = self.invfisher.dot(bk)
+
+        return self.dk, self.bk, self.fisher
