@@ -321,7 +321,7 @@ class PowerPlotter(object):
         # Reading file into an ascii table
         self._readDBTFile(filename)
         self.fisher = np.diag(1 / self.error.ravel()**2)
-        print(f"There are {self.nz:d} redshift bins and {self.nz:d} k bins.")
+        print(f"There are {self.nz:d} redshift bins and {self.nk:d} k bins.")
 
     def setFisher(self, fisher):
         self.fisher = fisher
@@ -1014,7 +1014,7 @@ class FisherPlotter(object):
         ax.set_xlim(xmax=x_corners[-1])
         ax.set_ylim(ymax=x_corners[-1])
 
-        cbar = fig.colorbar(im, ticks=np.linspace(-1, 1, 6))
+        cbar = fig.colorbar(im)  # ticks=np.linspace(-1, 1, 6)
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
         cbar.ax.tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
