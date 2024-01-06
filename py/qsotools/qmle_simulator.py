@@ -65,7 +65,7 @@ class QmleSimulator():
             dklin=5e-4, dklog=0.01, nfft=2**20
     ):
         self.dlambda = dlambda
-        self.noise = sigma
+        self.noise_amp = sigma
         self.k_edges, self.k_centers = qfid.formBins(
             nklin, nklog, dklin, dklog, 0, klast=-1)
         self.nkbins = self.k_centers.size
@@ -87,6 +87,7 @@ class QmleSimulator():
         self.kfft = 2. * np.pi * np.fft.rfftfreq(self.nfft, d=10.)
 
         self.sfid_mat = None
+        self.noise_vec = None
         self.cov_mat = None
         self.inv_cov_mat = None
         self.qk_matrices = None
@@ -129,11 +130,12 @@ class QmleSimulator():
             self.getSfidMatrix()
 
         self.cov_mat = self.sfid_mat.copy()
-        self.cov_mat[np.diag_indices(self.nwave)] += self.noise**2
 
+        self.noise_vec = np.ones(self.nwave) * self.noise_amp**2
         if self._random_mask_idx is not None:
-            for j in self._random_mask_idx:
-                self.cov_mat[j, j] = 1e16
+            self.noise_vec[self._random_mask_idx] = 1e16
+
+        self.cov_mat[np.diag_indices(self.nwave)] += self.noise_vec
 
         return self.cov_mat
 
@@ -200,7 +202,7 @@ class QmleSimulator():
                 dtype=float,
                 count=self.nkbins)
 
-            Noise = self.inv_cov_mat * self.noise**2
+            Noise = (self.inv_cov_mat * self.noise_vec).T
             self.bk += np.fromiter(
                 (np.vdot(_, Noise) for _ in wqk_matrices),
                 dtype=float,
