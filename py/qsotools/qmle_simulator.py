@@ -96,6 +96,19 @@ class QmleSimulator():
         self.fisher = None
         self.invfisher = None
 
+        self._random_mask_idx = None
+
+    def setRandomMasking(self, npix):
+        if npix <= 0:
+            self._random_mask_idx = None
+
+        if (npix > self.nwave / 2):
+            print("Warning masking more than half")
+
+        self._random_mask_idx = np.random.default_rng().choice(
+            self.nwave, size=npix, replace=False)
+        self._random_mask_idx.sort()
+
     def getWindowFncK(self):
         kR2 = self.kfft**2 * self.R_kms**2
         return np.sinc(self.kfft * self.dv / 2 / np.pi)**2 * np.exp(-kR2)
@@ -116,8 +129,11 @@ class QmleSimulator():
             self.getSfidMatrix()
 
         self.cov_mat = self.sfid_mat.copy()
-        di = np.diag_indices(self.nwave)
-        self.cov_mat[di] += self.noise**2
+        self.cov_mat[np.diag_indices(self.nwave)] += self.noise**2
+
+        if self._random_mask_idx is not None:
+            for j in self._random_mask_idx:
+                self.cov_mat[j, j] = 1e16
 
         return self.cov_mat
 
@@ -155,38 +171,46 @@ class QmleSimulator():
 
         return self.qk_matrices
 
-    def simulate(self, cont_order=-1):
+    def simulate(self, cont_order=-1, random_masking_npix=0, nqso=1):
         self.sfid_mat = self.getSfidMatrix()
-        self.inv_cov_mat = self.getInverseCovarianceMatrix(cont_order)
-        self.qk_matrices = self.getQkMatrices()
+        qk_matrices = self.getQkMatrices()
 
-        # Weight
-        for _ in range(self.nkbins):
-            self.qk_matrices[_] = self.inv_cov_mat.dot(self.qk_matrices[_])
+        self.fisher = np.zeros((self.nkbins, self.nkbins))
+        self.dk = np.zeros(self.nkbins)
+        self.bk = np.zeros(self.nkbins)
 
-        # Fisher matrix calculation
-        self.fisher = np.empty((self.nkbins, self.nkbins))
-        for ki in range(self.nkbins):
-            self.fisher[ki, ki:] = np.fromiter(
-                (np.vdot(self.qk_matrices[ki], q.T) for q in self.qk_matrices[ki:]),
+        for _ in range(nqso):
+            self.setRandomMasking(random_masking_npix)
+            self.inv_cov_mat = self.getInverseCovarianceMatrix(cont_order)
+
+            # Weight
+            wqk_matrices = [self.inv_cov_mat.dot(_) for _ in qk_matrices]
+
+            # Fisher matrix calculation
+            for ki in range(self.nkbins):
+                self.fisher[ki, ki:] += np.fromiter(
+                    (np.vdot(wqk_matrices[ki], _.T) for _ in wqk_matrices[ki:]),
+                    dtype=float,
+                    count=self.nkbins - ki)
+
+            # Estimate dk
+            weighted_sfid = self.sfid_mat.dot(self.inv_cov_mat)
+            self.dk += np.fromiter(
+                (np.vdot(_, weighted_sfid) for _ in wqk_matrices),
                 dtype=float,
-                count=self.nkbins - ki)
-            self.fisher[ki + 1:, ki] = self.fisher[ki, ki + 1:]
+                count=self.nkbins)
 
-        # Estimate dk
-        weighted_sfid = self.sfid_mat.dot(self.inv_cov_mat)
-        dk = np.fromiter(
-            (np.vdot(q, weighted_sfid) for q in self.qk_matrices),
-            dtype=float,
-            count=self.nkbins)
+            Noise = self.inv_cov_mat * self.noise**2
+            self.bk += np.fromiter(
+                (np.vdot(_, Noise) for _ in wqk_matrices),
+                dtype=float,
+                count=self.nkbins)
 
-        Noise = self.inv_cov_mat * self.noise**2
-        bk = np.fromiter(
-            (np.vdot(q, Noise) for q in self.qk_matrices),
-            dtype=float,
-            count=self.nkbins)
+        self.fisher += self.fisher.T
+        self.fisher[np.diag_indices(self.nkbins)] /= 2
+
         self.invfisher = invertDampSvd(self.fisher)
-        self.dk = self.invfisher.dot(dk)
-        self.bk = self.invfisher.dot(bk)
+        self.dk = self.invfisher.dot(self.dk)
+        self.bk = self.invfisher.dot(self.bk)
 
         return self.dk, self.bk, self.fisher
