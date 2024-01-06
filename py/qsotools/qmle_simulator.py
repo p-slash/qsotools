@@ -4,10 +4,10 @@ from scipy.interpolate import CubicSpline
 import qsotools.fiducial as qfid
 
 
-def invertDampSvd(fisher, jump=8.):
-    svd = np.linalg.svd(fisher, compute_uv=False)
-    # x = svd[0] * target_rcond - svd[-1]
-    ratios_svd = np.exp(np.diff(-np.log(svd)))
+def findSvdJump(M, svd=None, jump=8.):
+    if svd is None:
+        svd = np.linalg.svd(M, compute_uv=False)
+    ratios_svd = svd[:-1] / svd[1:]
 
     jj = 0
     for _ in ratios_svd[::-1]:
@@ -16,11 +16,15 @@ def invertDampSvd(fisher, jump=8.):
         else:
             break
 
+    return jj, svd[-jj]
+
+
+def invertDampSvd(fisher, jump=8.):
+    jj, x = findSvdJump(fisher, None, jump)
+
     if jj == 0:
         return np.linalg.inv(fisher)
-
-    x = svd[svd.size - jj]
-    print("Damp", x)
+    print("Damp:", x)
 
     di = np.diag_indices(fisher.shape[0])
     newf = fisher.dot(fisher)
@@ -28,6 +32,23 @@ def invertDampSvd(fisher, jump=8.):
 
     inv = np.linalg.inv(newf)
     return (fisher.dot(inv) + inv.dot(fisher)) / 2
+
+
+def invertRegularizedCorrCoeff(S, target_cond=50.):
+    V = np.sqrt(S.diagonal())
+    V = np.outer(V, V)
+    R = S / V
+    eigvals = np.linalg.eigvalsh(R)
+    delta = max(0, (eigvals[-1] - target_cond * eigvals[0]) / (target_cond - 1))
+
+    if delta == 0:
+        return np.linalg.inv(S)
+
+    di = np.diag_indices(S.shape[0])
+    R[di] += delta
+    R /= 1 + delta
+
+    return np.linalg.inv(R) / V
 
 
 class QmleSimulator():
@@ -95,7 +116,8 @@ class QmleSimulator():
         return self.cov_mat
 
     def getInverseCovarianceMatrix(self, cont_order=-1):
-        self.inv_cov_mat = np.linalg.inv(self.getCovarianceMatrix())
+        self.inv_cov_mat = invertRegularizedCorrCoeff(
+            self.getCovarianceMatrix())
 
         if cont_order < 0:
             return self.inv_cov_mat
