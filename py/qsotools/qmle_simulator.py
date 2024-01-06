@@ -38,7 +38,7 @@ def invertSymDamped(S, damp):
     return (inv + inv.T) / 2
 
 
-def invertRegularizedCorrCoeff(S, target_cond=50.):
+def invertRegularizedCorrCoeff(S, target_cond=100.):
     V = np.sqrt(S.diagonal())
     V = np.outer(V, V)
     R = S / V
@@ -102,7 +102,7 @@ class QmleSimulator():
 
     def getSfidMatrix(self):
         pfid = qfid.evaluatePD13Lorentz(
-            (self.kfft, self.z), *qfid.PDW_FIT_PARAMETERS)
+            (self.kfft, self.z), *qfid.DESI_EDR_PARAMETERS)
         pfid *= self.getWindowFncK()
         pfid[0] = 0
         xi = np.fft.irfft(pfid)[:self.nfft // 2] / self.dv

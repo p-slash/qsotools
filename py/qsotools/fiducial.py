@@ -54,6 +54,10 @@ PDW_FIT_PARAMETERS_0BETA = (
 PD13_PIVOT_K = 0.009
 PD13_PIVOT_Z = 3.0
 
+DESI_EDR_PARAMETERS = (
+    7.63089e-02, -2.52054e+00, -1.27968e-01,
+    3.67469e+00, 2.85951e-01, 7.33473e+02)
+
 
 def evaluatePD13Lorentz(X, A, n, alpha, B, beta, lmd):
     k, z = X
