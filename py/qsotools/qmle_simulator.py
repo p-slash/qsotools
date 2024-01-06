@@ -26,12 +26,16 @@ def invertDampSvd(fisher, jump=8.):
         return np.linalg.inv(fisher)
     print("Damp:", x)
 
-    di = np.diag_indices(fisher.shape[0])
-    newf = fisher.dot(fisher)
-    newf[di] += x
+    return invertSymDamped(fisher, x)
 
-    inv = np.linalg.inv(newf)
-    return (fisher.dot(inv) + inv.dot(fisher)) / 2
+
+def invertSymDamped(S, damp):
+    di = np.diag_indices(S.shape[0])
+    newf = S.dot(S)
+    newf[di] += damp
+
+    inv = np.linalg.inv(newf).dot(S)
+    return (inv + inv.T) / 2
 
 
 def invertRegularizedCorrCoeff(S, target_cond=50.):
@@ -44,28 +48,30 @@ def invertRegularizedCorrCoeff(S, target_cond=50.):
     if delta == 0:
         return np.linalg.inv(S)
 
-    di = np.diag_indices(S.shape[0])
-    R[di] += delta
-    R /= 1 + delta
+    print("Damp:", delta)
+#     di = np.diag_indices(S.shape[0])
+#     R[di] += delta
+#     R /= 1 + delta
+#     R = np.linalg.inv(R)
 
-    return np.linalg.inv(R) / V
+    return invertSymDamped(R, delta) / V
 
 
 class QmleSimulator():
     """docstring for QmleSimulator"""
 
     def __init__(
-            self, zmed=2.4, dlambda=0.8, sigma=0.5, nklin=50, nklog=0,
-            nfft=2**20
+            self, zmed=2.4, dlambda=0.8, sigma=0.5, nklin=60, nklog=25,
+            dklin=5e-4, dklog=0.01, nfft=2**20
     ):
         self.dlambda = dlambda
         self.noise = sigma
         self.k_edges, self.k_centers = qfid.formBins(
-            nklin, nklog, 0.5e-3, 0.1, 0, klast=-1)
+            nklin, nklog, dklin, dklog, 0, klast=-1)
         self.nkbins = self.k_centers.size
 
-        w1 = (1 + zmed - 0.08) * qfid.LYA_WAVELENGTH
-        w2 = (1 + zmed + 0.08) * qfid.LYA_WAVELENGTH
+        w1 = (1 + zmed - 0.1) * qfid.LYA_WAVELENGTH
+        w2 = (1 + zmed + 0.1) * qfid.LYA_WAVELENGTH
         self.nwave = int((w2 - w1) / dlambda) + 1
         self.wave = np.linspace(w1, w1 + (self.nwave - 1) * dlambda, self.nwave)
 
@@ -77,8 +83,8 @@ class QmleSimulator():
         self.dv_matrix = np.abs(self.varr[:, np.newaxis] - self.varr[np.newaxis, :])
 
         self.nfft = nfft
-        self.vfft = np.arange(self.nfft // 2) * 5.
-        self.kfft = 2. * np.pi * np.fft.rfftfreq(self.nfft, d=5.)
+        self.vfft = np.arange(self.nfft // 2) * 10.
+        self.kfft = 2. * np.pi * np.fft.rfftfreq(self.nfft, d=10.)
 
         self.sfid_mat = None
         self.cov_mat = None
@@ -116,8 +122,7 @@ class QmleSimulator():
         return self.cov_mat
 
     def getInverseCovarianceMatrix(self, cont_order=-1):
-        self.inv_cov_mat = invertRegularizedCorrCoeff(
-            self.getCovarianceMatrix())
+        self.inv_cov_mat = np.linalg.inv(self.getCovarianceMatrix())
 
         if cont_order < 0:
             return self.inv_cov_mat
@@ -127,7 +132,7 @@ class QmleSimulator():
         U, s, _ = np.linalg.svd(template_matrix, full_matrices=False)
 
         # Remove small singular valued vectors
-        w = s > 1e-12
+        w = s > 1e-6
         U = U[:, w]  # shape = (self.size, cont_order + 1)
         Y = self.inv_cov_mat @ U
         # Woodbury formula. Note that U and Y are not square matrices.
