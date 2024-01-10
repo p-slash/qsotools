@@ -205,7 +205,7 @@ def getMetadata(args, rng):
 
     if args.master_file:
         logging.info(f"Reading master file: {args.master_file}")
-        master_file = QQFile(args.master_file)
+        master_file = QQFile(args.master_file, clobber=False)
         master_file.readMetadata()
         master_file.close()
 

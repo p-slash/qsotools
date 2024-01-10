@@ -1687,22 +1687,14 @@ class QQFile():
 
         columns_to_read, colmap = QQFile.getColList(
             self.fitsfile[key].get_colnames())
-        self.metadata = self.fitsfile[key].read(columns=columns_to_read)
-        self.nqso = self.metadata.size
+        metadata = self.fitsfile[key].read(columns=columns_to_read)
+        self.nqso = metadata.size
 
         if colmap:
-            self.metadata = nlrf.rename_fields(self.metadata, colmap)
+            metadata = nlrf.rename_fields(metadata, colmap)
 
-        list_app_fields = list(
-            set(QQFile.meta_dt.names) - set(self.metadata.dtype.names))
-        if list_app_fields:
-            app_dtype = np.dtype(
-                [(_, QQFile.meta_dt[_]) for _ in list_app_fields])
-            self.metadata = nlrf.merge_arrays(
-                (self.metadata, np.zeros(self.nqso, dtype=app_dtype)),
-                fill_value=0, usemask=False, flatten=True)
-
-        self.metadata = self.metadata.astype(QQFile.meta_dt)
+        self.metadata = np.empty(self.nqso, dtype=QQFile.meta_dt)
+        nlrf.assign_fields_by_name(self.metadata, metadata)
 
     def close(self):
         self.fitsfile.close()
