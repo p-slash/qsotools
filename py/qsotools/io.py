@@ -6,6 +6,7 @@ from itertools import groupby
 import logging
 
 import numpy as np
+import numpy.lib.recfunctions as nplrf
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 from scipy.stats import (
@@ -1599,8 +1600,42 @@ class QQFile():
     """
     meta_dt = np.dtype([
         ('RA', 'f8'), ('DEC', 'f8'), ('Z', 'f8'), ('MOCKID', 'i8'),
-        ('COADD_EXPTIME', 'f8'), ('FLUX_R', 'f8'), ('TSNR2_LRG', 'f8')
+        ('PIXNUM', 'i4'), ('COADD_EXPTIME', 'f8'), ('FLUX_R', 'f8'),
+        ('TSNR2_LRG', 'f8')
     ])
+
+    @staticmethod
+    def getColList(colnames):
+        l1 = ['Z']
+        colmap = {}
+
+        if 'TARGET_RA' in colnames:
+            l1.append('TARGET_RA')
+            colmap['TARGET_RA'] = 'RA'
+        else:
+            l1.append('RA')
+
+        if 'TARGET_DEC' in colnames:
+            l1.append('TARGET_DEC')
+            colmap['TARGET_DEC'] = 'DEC'
+        else:
+            l1.append('DEC')
+
+        if 'TARGETID' in colnames:
+            l1.append('TARGETID')
+            colmap['TARGETID'] = 'MOCKID'
+        else:
+            l1.append('MOCKID')
+
+        # Check must-have columns are present
+        if not all(elem in colnames for elem in l1):
+            raise Exception("Missing metadata info: TARGETID, RA, DEC or Z.")
+
+        l1.extend(
+            set(['COADD_EXPTIME', 'FLUX_R', 'TSNR2_LRG']).intersection(colnames)
+        )
+
+        return l1, colmap
 
     def __init__(self, fname, rw='r', clobber=True):
         self.fname = fname
@@ -1639,65 +1674,34 @@ class QQFile():
         self.fluxes = self.fitsfile['TRANSMISSION'].read().T
         self.close()
 
-    def getColList(colnames):
-        l1 = []
-
-        def add_colname(radec, l1):
-            if f'TARGET_{radec}' in colnames:
-                l1.append(f'TARGET_{radec}')
-            elif radec in colnames:
-                l1.append(radec)
-            else:
-                raise Exception(f"Missing metadata info: {radec}")
-
-            return l1
-
-        l1 = add_colname('RA', l1)
-        l1 = add_colname('DEC', l1)
-        l1.append('Z')
-
-        # Check must-have columns are present
-        if not all(elem in colnames for elem in l1):
-            raise Exception("Missing metadata info: RA, DEC or Z.")
-        if 'MOCKID' in colnames:
-            l1.append('MOCKID')
-        elif 'TARGETID' in colnames:
-            l1.append('TARGETID')
-        else:
-            raise Exception("Missing metadata info: MOCKID or TARGETID.")
-
-        return l1
-
     def readMetadata(self):
         extnames = [hdu.get_extname() for hdu in self.fitsfile]
-        if 'METADATA' in extnames:
-            metadata_str = 'METADATA'
-        elif 'QSO_CAT' in extnames:
-            metadata_str = 'QSO_CAT'
-        else:
-            metadata_str = 1
+        known_extnames = set(['METADATA', 'QSO_CAT', 'ZCATALOG'])
+        key = known_extnames.intersection(extnames)
+        if not key:
+            key = 1
             logging.warning(
                 "Metadata not found by hduname. Using extension 1.")
+        else:
+            key = key.pop()
 
-        metahdu = self.fitsfile[metadata_str]
-        colnames = metahdu.get_colnames()
-
-        self.metadata = np.zeros(metahdu.get_nrows(), dtype=QQFile.meta_dt)
-
-        for mcol, fcol in zip(
-            ['RA', 'DEC', 'Z', 'MOCKID'], QQFile.getColList(colnames)
-        ):
-            self.metadata[mcol] = metahdu[fcol].read()
-
-        l1 = ['RA', 'DEC', 'Z', 'MOCKID']
-        for xcol in ['COADD_EXPTIME', 'FLUX_R', 'TSNR2_LRG']:
-            if xcol in colnames:
-                self.metadata[xcol] = metahdu[xcol].read()
-                l1.append(xcol)
-
+        columns_to_read, colmap = QQFile.getColList(
+            self.fitsfile[key].get_colnames())
+        self.metadata = self.fitsfile[key].read(columns=columns_to_read)
         self.nqso = self.metadata.size
 
-        return l1
+        if colmap:
+            self.metadata = nlrf.rename_fields(self.metadata, colmap)
+
+        list_app_fields = list(
+            set(QQFile.meta_dt.names) - set(self.metadata.dtype.names))
+        if list_app_fields:
+            app_dtype = np.dtype(
+                [(_, QQFile.meta_dt[_]) for _ in list_app_fields])
+            self.metadata = nlrf.append_fields(
+                self.metadata, list_app_fields,
+                np.zeros(self.nqso, dtype=app_dtype),
+                fill_value=0, usemask=False)
 
     def close(self):
         self.fitsfile.close()

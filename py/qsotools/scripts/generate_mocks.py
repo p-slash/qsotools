@@ -202,13 +202,11 @@ def _genRNDDec(RNST, N, dec1_deg, dec2_deg):
 def getMetadata(args, rng):
     # The METADATA HDU contains a binary table
     # with (at least) RA, DEC, Z, TARGETID
-    meta_dt = np.dtype(QQFile.meta_dt.descr + [('PIXNUM', 'i4')])
 
-    dt_list = list(QQFile.meta_dt.names)
     if args.master_file:
         logging.info(f"Reading master file: {args.master_file}")
         master_file = QQFile(args.master_file)
-        l1 = master_file.readMetadata()
+        master_file.readMetadata()
         master_file.close()
 
         # Remove low redshift quasars
@@ -218,14 +216,12 @@ def getMetadata(args, rng):
         args.nmocks = master_file.metadata.size
 
         # Add pixnum field to metadata
-        metadata = np.zeros(args.nmocks, dtype=meta_dt)
-        for mcol in list(set(l1) & set(dt_list)):
-            metadata[mcol] = master_file.metadata[mcol]
+        metadata = master_file.metadata
 
         logging.info(f"Number of mocks to generate: {args.nmocks}")
     else:
         logging.info("Generating random metadata.")
-        metadata = np.zeros(args.nmocks, dtype=meta_dt)
+        metadata = np.zeros(args.nmocks, dtype=QQFile.meta_dt)
         metadata['MOCKID'] = np.arange(args.nmocks)
         # Generate coords in degrees
         metadata['RA'] = rng.random(args.nmocks) * 360.
@@ -579,7 +575,10 @@ def main():
     # Create/Check directory
     os_makedirs(args.OutputDir, exist_ok=True)
 
-    logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO)
+    logging.basicConfig(
+        format='%(asctime)s - %(levelname)s: %(message)s',
+        datefmt='%Y/%m/%d %I:%M:%S %p',
+        level=logging.DEBUG if args.debug else logging.INFO)
 
     rng = np.random.default_rng(args.seed)
     metadata, npixels = getMetadata(args, rng)
