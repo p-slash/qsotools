@@ -1599,9 +1599,9 @@ class QQFile():
     4  DLA          BinTableHDU      17 1864R x 4C [long, double, double, double]
     """
     meta_dt = np.dtype([
-        ('RA', 'f8'), ('DEC', 'f8'), ('Z', 'f8'), ('MOCKID', 'i8'),
-        ('PIXNUM', 'i4'), ('COADD_EXPTIME', 'f8'), ('FLUX_R', 'f8'),
-        ('TSNR2_LRG', 'f8')
+        ('RA', '<f8'), ('DEC', '<f8'), ('Z', '<f8'), ('MOCKID', '<i8'),
+        ('PIXNUM', '<i4'), ('COADD_EXPTIME', '<f8'), ('FLUX_R', '<f8'),
+        ('TSNR2_LRG', '<f8')
     ])
 
     @staticmethod
@@ -1701,6 +1701,8 @@ class QQFile():
             self.metadata = nlrf.merge_arrays(
                 (self.metadata, np.zeros(self.nqso, dtype=app_dtype)),
                 fill_value=0, usemask=False, flatten=True)
+
+        self.metadata = self.metadata.astype(QQFile.meta_dt)
 
     def close(self):
         self.fitsfile.close()
