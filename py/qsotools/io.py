@@ -1698,9 +1698,8 @@ class QQFile():
         if list_app_fields:
             app_dtype = np.dtype(
                 [(_, QQFile.meta_dt[_]) for _ in list_app_fields])
-            self.metadata = nlrf.append_fields(
-                self.metadata, list_app_fields,
-                np.zeros(self.nqso, dtype=app_dtype),
+            self.metadata = nlrf.merge_arrays(
+                (self.metadata, np.zeros(self.nqso, dtype=app_dtype)),
                 fill_value=0, usemask=False)
 
     def close(self):
