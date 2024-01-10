@@ -6,7 +6,7 @@ from itertools import groupby
 import logging
 
 import numpy as np
-import numpy.lib.recfunctions as nplrf
+import numpy.lib.recfunctions as nlrf
 from scipy.stats import binned_statistic
 from scipy.interpolate import interp1d
 from scipy.stats import (
