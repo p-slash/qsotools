@@ -1700,7 +1700,7 @@ class QQFile():
                 [(_, QQFile.meta_dt[_]) for _ in list_app_fields])
             self.metadata = nlrf.merge_arrays(
                 (self.metadata, np.zeros(self.nqso, dtype=app_dtype)),
-                fill_value=0, usemask=False)
+                fill_value=0, usemask=False, flatten=True)
 
     def close(self):
         self.fitsfile.close()
