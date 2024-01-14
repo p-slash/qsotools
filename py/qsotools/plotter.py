@@ -284,12 +284,14 @@ class PowerPlotter(object):
 
         # Find out what kind of table we are reading
         if 'ThetaP' in power_table.colnames:
-            # If it is QE result file
-            thetap = np.array(power_table['ThetaP'], dtype=np.double)
-            self.power_fid = np.array(power_table['Pfid'], dtype=np.double)
+            self.thetap = np.array(
+                power_table['ThetaP'], dtype=np.double
+            ).reshape((self.nz, self.nk))
 
-            self.power_qmle = np.reshape(
-                self.power_fid + thetap, (self.nz, self.nk))
+            self.power_fid = np.array(
+                power_table['Pfid'], dtype=np.double
+            ).reshape((self.nz, self.nk))
+
             self.error = np.array(
                 power_table['ErrorP'], dtype=np.double
             ).reshape((self.nz, self.nk))
@@ -297,14 +299,17 @@ class PowerPlotter(object):
             self.power_qmle_full = np.array(
                 power_table['d'], dtype=np.double
             ).reshape((self.nz, self.nk))
+
             self.power_qmle_noise = np.array(
                 power_table['b'], dtype=np.double
             ).reshape((self.nz, self.nk))
+
             self.power_qmle_fid = np.array(
                 power_table['t'], dtype=np.double
             ).reshape((self.nz, self.nk))
 
-            self.power_fid = self.power_fid.reshape((self.nz, self.nk))
+            self.power_qmle = self.power_fid + self.thetap
+
         elif 'P-FFT' in power_table.colnames:
             # If it is FFT estimate file
             self.power_qmle = np.array(
@@ -323,6 +328,12 @@ class PowerPlotter(object):
         self.fisher = np.diag(1 / self.error.ravel()**2)
         print(f"There are {self.nz:d} redshift bins and {self.nk:d} k bins.")
 
+    def useNoFidEstimate(self):
+        self.power_qmle = self.power_qmle_full - self.power_qmle_noise
+
+    def useFiducialEstimate(self):
+        self.power_qmle = self.power_fid + self.thetap
+
     def setFisher(self, fisher):
         self.fisher = fisher
 
@@ -338,10 +349,9 @@ class PowerPlotter(object):
         # z | k1 | k2 | kc | Pfid | ThetaP | Pest | ErrorP | d | b | t
         k1 = np.tile(self.k_edges[:-1], self.nz)
         k2 = np.tile(self.k_edges[1:], self.nz)
-        thetap = np.ravel(self.power_qmle - self.power_fid)
         power_table = Table([
             self.zarray, k1, k2, self.karray,
-            self.power_fid.ravel(), thetap,
+            self.power_fid.ravel(), self.thetap,
             self.power_qmle.ravel(), self.error.ravel(),
             self.power_qmle_full.ravel(), self.power_qmle_noise.ravel(),
             self.power_qmle_fid.ravel()
@@ -899,13 +909,22 @@ class FisherPlotter(object):
         self.zlabels = ["%.1f" % z for z in z1 + np.arange(nz) * dz]
 
         try:
-            self.invfisher = np.linalg.inv(self.fisher)
+            self.invfisher = self._invert()
         except Exception as e:
             self.invfisher = None
             print(f"Cannot invert the Fisher matrix. {e}")
 
         if is_cov:
             self.fisher, self.invfisher = self.invfisher, self.fisher
+
+    def _invert(self):
+        newf = self.fisher.copy()
+        di = np.diag_indices(self.fisher.shape[0])
+        w = newf[di] == 0
+        newf[di] = np.where(w, 1, newf[di])
+        newf = np.linalg.inv(newf)
+        newf[di] = np.where(w, 0, newf[di])
+        return newf
 
     def _setTicks(self, ax):
         if self.nz:
