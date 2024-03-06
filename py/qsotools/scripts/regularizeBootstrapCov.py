@@ -62,6 +62,8 @@ def main():
     parser.add_argument(
         "--qmle-fisher", help="Fisher matrix from QMLE.", required=True)
     parser.add_argument(
+        "--qmle-cov", help="Covariance matrix from QMLE.", required=True)
+    parser.add_argument(
         "--qmle-sparcity-cut", default=0.001, type=float,
         help="Sparsity pattern to cut using QMLE Fisher matrix.")
     parser.add_argument("--use-qmle-evecs", action="store_true")
@@ -75,7 +77,9 @@ def main():
     bootstrap_covariance = np.loadtxt(args.boot_cov)
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
-    qmle_covariance, qmle_zero_idx = safe_inverse(qmle_fisher)
+    qmle_zero_idx = np.where(qmle_fisher.diagonal() == 0)[0]
+    qmle_covariance = np.loadtxt(args.qmle_cov, skiprows=1)
+
     normalized_qmle_cov = normalize(qmle_covariance)
     normalized_qmle_fisher = normalize(qmle_fisher)
 
@@ -106,8 +110,13 @@ def main():
             break
 
     for idx in qmle_zero_idx:
-        bootstrap_covariance[idx, idx] = 0
+        bootstrap_covariance[idx, :] = 0
+        bootstrap_covariance[:, idx] = 0
 
     basis_txt = "qmle" if args.use_qmle_evecs else "boot"
-    finalfname = f"{args.fbase}regularized-bootstrap-cov-{basis_txt}-evecs.txt"
-    np.savetxt(f"{outdir}/{finalfname}", bootstrap_covariance)
+    finalfname = (
+        f"{args.fbase}regularized-bootstrap-cov-"
+        f"s{args.qmle_sparcity_cut:4f}-{basis_txt}-evecs.txt")
+    np.savetxt(
+        f"{outdir}/{finalfname}", bootstrap_covariance,
+        header=f"{qmle_covariance.shape[0]} {qmle_covariance.shape[0]}")
