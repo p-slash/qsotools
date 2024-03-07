@@ -74,7 +74,7 @@ def main():
     args = parser.parse_args()
 
     outdir = ospath_dir(args.boot_cov)
-    bootstrap_covariance = np.loadtxt(args.boot_cov)
+    bootstrap_covariance = np.loadtxt(args.boot_cov, skiprows=1)
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
     qmle_zero_idx = np.where(qmle_fisher.diagonal() == 0)[0]
