@@ -678,7 +678,7 @@ class PowerPlotter(object):
             invcov = self.fisher
 
         d = (self.power_qmle - self.power_true).ravel()
-        to_remove = np.zeros_like(d, dtype=bool)
+        to_remove = np.isclose(self.error.ravel(), 0)
 
         if kmax is not None and np.all(kmax > 0):
             to_remove |= (self.karray > kmax)
@@ -693,7 +693,7 @@ class PowerPlotter(object):
             invcov = np.delete(invcov, to_remove, axis=1)
             d = np.delete(d, to_remove, axis=0)
 
-        return d @ invcov @ d, d.size
+        return d.dot(invcov.dot(d)), d.size
 
     @staticmethod
     def _parse_includes(includes, ratio_wrt_fid):
