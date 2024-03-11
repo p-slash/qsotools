@@ -861,6 +861,7 @@ class PowerPlotter(object):
             ax.tick_params(direction='in', which='minor', length=4, width=1)
 
         save_figure(outplot_fname)
+        return axs
 
 
 class FisherPlotter(object):
