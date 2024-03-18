@@ -66,14 +66,14 @@ class DesiPlotter():
     ):
         idx = np.nonzero(targetid == self.catalog['TARGETID'])[0]
         cat1 = self.catalog[idx]
-        print(cat1)
+        zqso = cat1['Z'][0] + shift_z
+
         if self.is_mock:
             program = "dark"
             survey = "mock"
         else:
-            program = cat1['PROGRAM']
-            survey = cat1['SURVEY']
-        zqso = cat1['Z'] + shift_z
+            program = cat1['PROGRAM'][0]
+            survey = cat1['SURVEY'][0]
 
         specobj = self.readerFunction(cat1)[0]
         if plot_ivar:
