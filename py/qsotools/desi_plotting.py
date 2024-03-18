@@ -31,7 +31,8 @@ def getMaxFlux(specobj, wave_c, dwave):
     ymax = -1
     for arm, wave in specobj.wave.items():
         w = np.abs(wave_c - wave) < dwave
-        ymax = max(ymax, specobj.flux[arm][w].max())
+        if any(w):
+            ymax = max(ymax, specobj.flux[arm][w].max())
 
     return ymax
 
@@ -63,8 +64,9 @@ class DesiPlotter():
             emlines=EMISSION_LINES, regions=REGIONS,
             plot_ivar=False, figsize=(13, 5)
     ):
-        idx = np.nonzero(targetid == self.catalog['TARGETID'])[0][0]
+        idx = np.nonzero(targetid == self.catalog['TARGETID'])[0]
         cat1 = self.catalog[idx]
+        print(cat1)
         if self.is_mock:
             program = "dark"
             survey = "mock"
@@ -73,7 +75,7 @@ class DesiPlotter():
             survey = cat1['SURVEY']
         zqso = cat1['Z'] + shift_z
 
-        specobj = self.readerFunction(cat1)
+        specobj = self.readerFunction(cat1)[0]
         if plot_ivar:
             specobj._flux = specobj.ivar
         if coadd:
