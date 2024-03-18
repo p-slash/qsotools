@@ -76,10 +76,12 @@ class DesiPlotter():
             survey = cat1['SURVEY'][0]
 
         specobj = self.readerFunction(cat1)[0]
-        if plot_ivar:
-            specobj._flux = specobj.ivar
+
         if coadd:
             specobj.simple_coadd()
+
+        if plot_ivar:
+            specobj.flux = specobj.ivar
 
         if smoothing_kernel > 0:
             for arm, f in specobj.flux.items():
