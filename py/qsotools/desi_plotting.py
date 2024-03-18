@@ -59,6 +59,17 @@ class DesiPlotter():
             spectrumdir, ['B', 'R', 'Z'], is_mock, skip_resomat=True,
             read_true_continuum=is_mock, is_tile=is_tile)
 
+    def readSpectrum(self, targetid, coadd=False):
+        idx = np.nonzero(targetid == self.catalog['TARGETID'])[0]
+
+        cat1 = self.catalog[idx]
+        specobj = self.readerFunction(cat1)[0]
+
+        if coadd:
+            specobj.simple_coadd()
+
+        return specobj
+
     def plot_spectrum_v3(
             self, targetid, coadd=False, smoothing_kernel=0, shift_z=0,
             emlines=EMISSION_LINES, regions=REGIONS,
