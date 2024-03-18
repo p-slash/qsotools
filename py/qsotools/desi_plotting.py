@@ -65,8 +65,12 @@ class DesiPlotter():
     ):
         idx = np.nonzero(targetid == self.catalog['TARGETID'])[0][0]
         cat1 = self.catalog[idx]
-        program = cat1['PROGRAM']
-        survey = cat1['SURVEY']
+        if self.is_mock:
+            program = "dark"
+            survey = "mock"
+        else:
+            program = cat1['PROGRAM']
+            survey = cat1['SURVEY']
         zqso = cat1['Z'] + shift_z
 
         specobj = self.readerFunction(cat1)
