@@ -1033,13 +1033,14 @@ class FisherPlotter(object):
 
         im = ax.pcolormesh(x_corners, x_corners, data,
                            cmap=cmap, shading='flat', **kwargs)
-        if x_corners[-1] / x_corners[0] > 10:
+        lims = max(x_corners[0], x_corners[1] / 2), x_corners[-1]
+        if x_corners[-1] / lims[0] > 10:
             ax.set_xscale("log")
             ax.set_yscale("log")
 
         ax.invert_yaxis()
-        # ax.set_xlim(xmax=x_corners[-1])
-        # ax.set_ylim(ymax=x_corners[-1])
+        ax.set_xlim(*lims)
+        ax.set_ylim(*lims)
 
         cbar = fig.colorbar(im)  # ticks=np.linspace(-1, 1, 6)
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
