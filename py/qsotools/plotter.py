@@ -957,7 +957,7 @@ class FisherPlotter(object):
             ax.xaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
             ax.yaxis.set_tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
-    def _setScale(self, matrix, scale, Ftxt='F', Fsub='\\alpha'):
+    def _setScale(self, matrix, scale, kwargs, Ftxt='F', Fsub='\\alpha'):
         if scale == "norm":
             cbarlbl = r"$%s_{%s%s'}/\sqrt{%s_{%s%s}%s_{%s'%s'}}$" \
                 % (Ftxt, Fsub, Fsub, Ftxt, Fsub, Fsub, Ftxt, Fsub, Fsub)
@@ -966,6 +966,10 @@ class FisherPlotter(object):
             norm = np.outer(fk_v, fk_v)
             grid = matrix / norm
             colormap = plt.cm.seismic
+            if 'vmin' not in kwargs:
+                kwargs['vmin'] = -1
+            if 'vmax' not in kwargs:
+                kwargs['vmax'] = 1
         elif scale == "log":
             cbarlbl = r"$\log %s_{%s%s'}$" % (Ftxt, Fsub, Fsub)
 
@@ -976,7 +980,7 @@ class FisherPlotter(object):
             grid = matrix
             colormap = plt.cm.BuGn
 
-        return grid, cbarlbl, colormap
+        return grid, cbarlbl, colormap, kwargs
 
     def plotAll(self, scale="norm", outplot_fname=None, inv=False, **kwargs):
         """Plot the entire Fisher matrix or its inverse.
@@ -1004,7 +1008,8 @@ class FisherPlotter(object):
         else:
             tmp = self.fisher
 
-        grid, cbarlbl, colormap = self._setScale(tmp, scale, Ftxt)
+        grid, cbarlbl, colormap, kwargs = self._setScale(
+            tmp, scale, kwargs, Ftxt)
 
         im = ax.imshow(grid, cmap=colormap, origin='upper',
                        extent=[0, self.fisher.shape[0],
@@ -1016,6 +1021,7 @@ class FisherPlotter(object):
         ax.grid(color='k', alpha=0.3)
 
         cbar = fig.colorbar(im)
+        cbar.ax.set_ylim([np.round(np.min(grid), decimals=2), 1])
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
 
         save_figure(outplot_fname)
@@ -1031,11 +1037,14 @@ class FisherPlotter(object):
             ax.set_xscale("log")
             ax.set_yscale("log")
 
-        ax.set_xlim(xmax=x_corners[-1])
-        ax.set_ylim(ymax=x_corners[-1])
+        ax.invert_yaxis()
+        # ax.set_xlim(xmax=x_corners[-1])
+        # ax.set_ylim(ymax=x_corners[-1])
 
         cbar = fig.colorbar(im)  # ticks=np.linspace(-1, 1, 6)
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
+        cbar.ax.set_ylim([
+            min(-0.1, np.round(np.min(data), decimals=2)), 1])
         cbar.ax.tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
         ax.grid(color='k', alpha=0.3)
@@ -1055,7 +1064,7 @@ class FisherPlotter(object):
 
     def plotKBin(
             self, kb, scale="norm", ticks=None, inv=False, outplot_fname=None,
-            colormap=plt.cm.RdBu_r, **kwargs
+            colormap='seismic', **kwargs
     ):
         """Plot Fisher matrix for a given k bin, i.e. redshift correlations.
 
@@ -1087,7 +1096,8 @@ class FisherPlotter(object):
         else:
             tmp = self.fisher
 
-        grid, cbarlbl, _ = self._setScale(tmp, scale, Ftxt, Fsub='z')
+        grid, cbarlbl, _, kwargs = self._setScale(
+            tmp, scale, kwargs, Ftxt, Fsub='z')
 
         zbyz_corr = grid[kb::self.nk, :]
         zbyz_corr = zbyz_corr[:, kb::self.nk]
@@ -1102,7 +1112,7 @@ class FisherPlotter(object):
 
     def plotZBin(
             self, zb, scale="norm", ticks=None, inv=False, outplot_fname=None,
-            colormap=plt.cm.RdBu_r, **kwargs
+            colormap='seismic', **kwargs
     ):
         """Plot Fisher matrix for a given z bin, i.e. k correlations.
 
@@ -1133,7 +1143,8 @@ class FisherPlotter(object):
         else:
             tmp = self.fisher
 
-        grid, cbarlbl, _ = self._setScale(tmp, scale, Ftxt, Fsub='k')
+        grid, cbarlbl, _, kwargs = self._setScale(
+            tmp, scale, kwargs, Ftxt, Fsub='k')
 
         kbyk_corr = grid[self.nk * zb:self.nk * (zb + 1), :]
         kbyk_corr = kbyk_corr[:, self.nk * zb:self.nk * (zb + 1)]
@@ -1156,7 +1167,7 @@ class FisherPlotter(object):
 
     def plotKCrossZbin(
             self, zb, scale="norm", ticks=None, inv=False, outplot_fname=None,
-            colormap=plt.cm.RdBu_r, **kwargs
+            colormap='seismic', **kwargs
     ):
         """Plot Fisher matrix for a given (z, z+1) pair, i.e. k correlations
         cross z bins.
@@ -1190,7 +1201,8 @@ class FisherPlotter(object):
         else:
             tmp = self.fisher
 
-        grid, cbarlbl, _ = self._setScale(tmp, scale, Ftxt, Fsub='k')
+        grid, cbarlbl, _, kwargs = self._setScale(
+            tmp, scale, kwargs, Ftxt, Fsub='k')
 
         next_z_bin = zb + 1
         if next_z_bin >= self.nz:
