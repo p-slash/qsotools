@@ -322,6 +322,15 @@ class PowerPlotter(object):
 
         self.power_true = self.power_fid
 
+        if power_table.meta['comments'][-4].startswith("Damped"):
+            self.is_damped = bool(
+                power_table.meta['comments'][-4].split(' ')[1])
+            self.damping_constant = float(
+                power_table.meta['comments'][-3].split(' ')[-1])
+        else:
+            self.is_damped = False
+            self.damping_constant = 0
+
     def __init__(self, filename):
         # Reading file into an ascii table
         self._readDBTFile(filename)
@@ -1033,12 +1042,13 @@ class FisherPlotter(object):
 
         im = ax.pcolormesh(x_corners, x_corners, data,
                            cmap=cmap, shading='flat', **kwargs)
+
         lims = max(x_corners[0], x_corners[1] / 2), x_corners[-1]
+
         if x_corners[-1] / lims[0] > 10:
             ax.set_xscale("log")
             ax.set_yscale("log")
 
-        ax.invert_yaxis()
         ax.set_xlim(*lims)
         ax.set_ylim(*lims)
 
@@ -1061,6 +1071,7 @@ class FisherPlotter(object):
             ax.set_xticks(ticks)
             ax.set_yticks(ticks)
 
+        ax.invert_yaxis()
         return ax
 
     def plotKBin(
@@ -1156,7 +1167,7 @@ class FisherPlotter(object):
 
         z = self.z1 + self.dz * zb
         ax.text(
-            0.06, 0.94, f"{z:.1f}",
+            0.80, 0.94, f"{z:.1f}",
             transform=ax.transAxes, fontsize=TICK_LBL_FONT_SIZE,
             verticalalignment='top', horizontalalignment='left',
             color="#9f2305",
