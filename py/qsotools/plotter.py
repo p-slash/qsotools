@@ -1030,7 +1030,7 @@ class FisherPlotter(object):
         ax.grid(color='k', alpha=0.3)
 
         cbar = fig.colorbar(im)
-        cbar.ax.set_ylim([np.round(np.min(grid), decimals=2), 1])
+        cbar.ax.set_ylim([np.round(np.nanmin(grid), decimals=2), 1])
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
 
         save_figure(outplot_fname)
@@ -1055,7 +1055,7 @@ class FisherPlotter(object):
         cbar = fig.colorbar(im)  # ticks=np.linspace(-1, 1, 6)
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
         cbar.ax.set_ylim([
-            min(-0.1, np.round(np.min(data), decimals=2)), 1])
+            min(-0.1, np.round(np.nanmin(data), decimals=2)), 1])
         cbar.ax.tick_params(labelsize=TICK_LBL_FONT_SIZE)
 
         ax.grid(color='k', alpha=0.3)
