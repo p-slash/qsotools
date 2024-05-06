@@ -64,7 +64,7 @@ def main():
     parser.add_argument("--fbase", default="")
     args = parser.parse_args()
 
-    outdir = ospath_dir(args.boot_cov)
+    outdir = ospath_dir(args.boot_matrix)
     bootstrap_matrix = np.loadtxt(args.boot_matrix, skiprows=1)
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
