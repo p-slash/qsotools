@@ -28,29 +28,20 @@ def safe_inverse(matrix):
 #              QMLE evecs also works, chi2 slightly below mean dof
 
 
-def mcdonald_eval_fix(boot_cov, qmle_cov, use_boot_base_evecs=True):
-    if use_boot_base_evecs:
-        # 1) Use bootstrap evecs
-        evals_boot, evecs_boot = np.linalg.eigh(boot_cov)
+def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
+    evals, evecs = np.linalg.eigh(boot_mat)
 
-        # s_cov_qmle_bootevecs = np.diag(evecs_boot.T @ qmle_cov @ evecs_boot)
-        s_cov_qmle_bootevecs = np.array(
-            [v.T.dot(qmle_cov.dot(v)) for v in evecs_boot.T])
+    other_svals = np.array([v.dot(qmle_mat.dot(v)) for v in evecs.T])
 
-        small_vals = evals_boot < s_cov_qmle_bootevecs
-        evals_boot[small_vals] = s_cov_qmle_bootevecs[small_vals]
-        newcov = evecs_boot @ np.diag(evals_boot) @ evecs_boot.T
+    if reg_in_cov:
+        w = evals < other_svals
     else:
-        # 2) Use QMLE evecs
-        evals_qmle, evecs_qmle = np.linalg.eigh(qmle_cov)
+        w = evals > other_svals
 
-        s_cov_boot_qmleevecs = np.diag(evecs_qmle.T @ boot_cov @ evecs_qmle)
+    evals[w] = other_svals[w]
+    newmatrix = evecs @ np.diag(evals) @ evecs.T
 
-        small_vals = evals_qmle < s_cov_boot_qmleevecs
-        evals_qmle[small_vals] = s_cov_boot_qmleevecs[small_vals]
-        newcov = evecs_qmle @ np.diag(evals_qmle) @ evecs_qmle.T
-
-    return newcov
+    return newmatrix
 
 
 def main():
@@ -58,7 +49,8 @@ def main():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        "--boot-cov", help="Covariance from bootstrap file.", required=True)
+        "--boot-matrix", help="Covariance or Fisher from bootstrap file.",
+        required=True)
     parser.add_argument(
         "--qmle-fisher", help="Fisher matrix from QMLE.", required=True)
     parser.add_argument(
@@ -66,7 +58,6 @@ def main():
     parser.add_argument(
         "--qmle-sparcity-cut", default=0.001, type=float,
         help="Sparsity pattern to cut using QMLE Fisher matrix.")
-    parser.add_argument("--use-qmle-evecs", action="store_true")
     parser.add_argument("--iterations", type=int, default=500,
                         help="Number of iterations")
     parser.add_argument("--reg-in-cov", action="store_true")
@@ -74,7 +65,7 @@ def main():
     args = parser.parse_args()
 
     outdir = ospath_dir(args.boot_cov)
-    bootstrap_covariance = np.loadtxt(args.boot_cov, skiprows=1)
+    bootstrap_matrix = np.loadtxt(args.boot_matrix, skiprows=1)
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
     qmle_zero_idx = np.where(qmle_fisher.diagonal() == 0)[0]
@@ -85,6 +76,8 @@ def main():
 
     matrix_to_use_for_sparsity = (
         normalized_qmle_cov if args.reg_in_cov else normalized_qmle_fisher)
+    matrix_to_use_for_input_qmle = (
+        qmle_covariance if args.reg_in_cov else qmle_fisher)
 
     if args.qmle_sparcity_cut > 0:
         qmle_sparcity = np.abs(
@@ -94,29 +87,26 @@ def main():
 
     for it in range(args.iterations):
         print(f"Iteration {it}.")
-        if args.reg_in_cov:
-            newcov = bootstrap_covariance * qmle_sparcity
-        else:
-            boostrap_fisher, _ = safe_inverse(bootstrap_covariance)
-            newcov, _ = safe_inverse(boostrap_fisher * qmle_sparcity)
 
-        newcov = mcdonald_eval_fix(
-            newcov, qmle_covariance, not args.use_qmle_evecs)
-        diff = np.abs(newcov - bootstrap_covariance)
-        bootstrap_covariance = newcov
+        newmatrix = mcdonald_eval_fix(
+            bootstrap_matrix * qmle_sparcity,
+            matrix_to_use_for_input_qmle, args.reg_in_cov)
 
-        if np.all(diff < 1e-8):
+        if np.allclose(bootstrap_matrix, newmatrix):
             print("Converged.")
+            bootstrap_matrix = newmatrix
             break
 
-    for idx in qmle_zero_idx:
-        bootstrap_covariance[idx, :] = 0
-        bootstrap_covariance[:, idx] = 0
+        bootstrap_matrix = newmatrix
 
-    basis_txt = "qmle" if args.use_qmle_evecs else "boot"
+    for idx in qmle_zero_idx:
+        bootstrap_matrix[idx, :] = 0
+        bootstrap_matrix[:, idx] = 0
+
+    covfis_txt = "cov" if args.reg_in_cov else "fisher"
     finalfname = (
-        f"{args.fbase}regularized-bootstrap-cov-"
-        f"s{args.qmle_sparcity_cut:4f}-{basis_txt}-evecs.txt")
+        f"{args.fbase}regularized-bootstrap-{covfis_txt}-"
+        f"s{args.qmle_sparcity_cut:4f}-boot-evecs.txt")
     np.savetxt(
-        f"{outdir}/{finalfname}", bootstrap_covariance,
+        f"{outdir}/{finalfname}", bootstrap_matrix,
         header=f"{qmle_covariance.shape[0]} {qmle_covariance.shape[0]}")
