@@ -9,6 +9,7 @@ from scipy.interpolate import RectBivariateSpline
 from astropy.io import ascii
 from astropy.table import Table
 
+from qsotools.fiducial import LIGHT_SPEED, LYA_WAVELENGTH
 from qsotools.p1d_measurements import P1DMeasurements
 
 TICK_LBL_FONT_SIZE = 18
@@ -1245,3 +1246,80 @@ class FisherPlotter(object):
 
         save_figure(outplot_fname)
         return ax
+
+
+class QmleOutput():
+    def __init__(self, path_fname_base):
+        self.power = PowerPlotter(
+            f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
+        self.nz = self.power.nz
+        self.nk = self.power.nk
+        self.k_bins = self.power.k_bins
+        self.z_bins = self.power.z_bins
+
+        self.fisher_qmle = FisherPlotter(
+            f"{path_fname_base}_it1_fisher_matrix.txt",
+            k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
+
+        self.fisher_boot = FisherPlotter(
+            f"{path_fname_base}_regularized-bootstrap-fisher-s0.000000-boot-evecs.txt",
+            k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
+
+        self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
+        self.setChi2()
+
+    def setChi2(self, alpha_knyq=0.75):
+        self.chi2_qmle = self.power.getChiSquare(
+            fisher=self.fisher_qmle.fisher, kmin=None,
+            kmax=alpha_knyq * np.pi / self.dvarr)
+        self.chi2_boot = self.power.getChiSquare(
+            fisher=self.fisher_boot.fisher, kmin=None,
+            kmax=alpha_knyq * np.pi / self.dvarr)
+
+    def setBootError(self):
+        self.power.error = np.sqrt(
+            self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
+
+    def addOthersAverage(self, others):
+        n = len(others)
+        for other in others:
+            self.power.power_qmle += other.power.power_qmle
+            self.power.thetap += other.power.thetap
+            self.power.power_qmle_full += other.power.power_qmle_full
+            self.power.power_qmle_noise += other.power.power_qmle_noise
+            self.power.power_qmle_fid += other.power.power_qmle_fid
+            self.fisher_qmle.invfisher += other.fisher_qmle.invfisher
+            self.fisher_boot.invfisher += other.fisher_boot.invfisher
+
+        self.power.power_qmle /= n
+        self.power.thetap /= n
+        self.power.power_qmle_full /= n
+        self.power.power_qmle_noise /= n
+        self.power.power_qmle_fid /= n
+
+        self.fisher_qmle.invfisher /= n**2
+        self.fisher_boot.invfisher /= n**2
+        self.fisher_qmle.fisher = self.fisher_qmle.invfisher
+        self.fisher_boot.fisher = self.fisher_boot.invfisher
+        self.fisher_qmle.invfisher = self.fisher_qmle._invert()
+        self.fisher_boot.invfisher = self.fisher_boot._invert()
+
+        self.power.error = np.sqrt(
+            self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
+
+    def plotBootErrVsQmleErr(self, cmap=plt.cm.turbo):
+        booterr = np.sqrt(
+            self.fisher_boot.invfisher.diagonal())
+        qmleerr = np.sqrt(
+            self.fisher_qmle.invfisher.diagonal())
+
+        ratio = booterr / (qmleerr + 1e-15)
+        ratio = ratio.reshape(self.nz, self.nk)
+
+        colors = cmap(np.linspace(0, 1, self.nz))
+        for iz in range(self.nz):
+            w = ~np.isclose(ratio, 0)
+            plt.semilogx(
+                self.k_bins[w], ratio[iz][w], '-', c=colors[iz],
+                label=f"{self.z_bins[iz]:.1f}")
+        plt.legend()
