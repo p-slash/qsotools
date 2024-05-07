@@ -1281,7 +1281,7 @@ class QmleOutput():
             self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
 
     def addOthersAverage(self, others):
-        n = len(others)
+        n = len(others) + 1
         for other in others:
             self.power.power_qmle += other.power.power_qmle
             self.power.thetap += other.power.thetap
@@ -1298,11 +1298,16 @@ class QmleOutput():
         self.power.power_qmle_fid /= n
 
         self.fisher_qmle.invfisher /= n**2
-        self.fisher_boot.invfisher /= n**2
         self.fisher_qmle.fisher = self.fisher_qmle.invfisher
-        self.fisher_boot.fisher = self.fisher_boot.invfisher
         self.fisher_qmle.invfisher = self.fisher_qmle._invert()
+        self.fisher_qmle.fisher, self.fisher_qmle.invfisher = \
+            self.fisher_qmle.invfisher, self.fisher_qmle.fisher
+
+        self.fisher_boot.invfisher /= n**2
+        self.fisher_boot.fisher = self.fisher_boot.invfisher
         self.fisher_boot.invfisher = self.fisher_boot._invert()
+        self.fisher_boot.fisher, self.fisher_boot.invfisher = \
+            self.fisher_boot.invfisher, self.fisher_boot.fisher
 
         self.power.error = np.sqrt(
             self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
@@ -1318,8 +1323,12 @@ class QmleOutput():
 
         colors = cmap(np.linspace(0, 1, self.nz))
         for iz in range(self.nz):
-            w = ~np.isclose(ratio, 0)
+            w = ~np.isclose(ratio[iz], 0)
             plt.semilogx(
                 self.k_bins[w], ratio[iz][w], '-', c=colors[iz],
                 label=f"{self.z_bins[iz]:.1f}")
-        plt.legend()
+
+        plt.legend(ncol=3)
+        plt.xlabel(r"$k$ [s km$^{-1}$]")
+        plt.xlim(auto_logxlimmer(self.k_bins))
+        plt.ylabel(r"$\sigma_\mathrm{boot} / \sigma_\mathrm{qmle}$")
