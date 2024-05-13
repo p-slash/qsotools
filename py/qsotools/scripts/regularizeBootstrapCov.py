@@ -60,12 +60,6 @@ def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     boot_mat = replace_zero_diags(boot_mat)[0]
     qmle_mat, wzero, di = replace_zero_diags(qmle_mat)
 
-    boot_mat = smooth_matrix(boot_mat, qmle_mat, reg_in_cov)
-    # prevent leakage to zero elements
-    boot_mat[wzero, :] = 0
-    boot_mat[:, wzero] = 0
-    boot_mat[di] = np.where(wzero, 1, boot_mat[di])
-
     evals, evecs = np.linalg.eigh(boot_mat)
 
     other_svals = np.array([v.dot(qmle_mat.dot(v)) for v in evecs.T])
@@ -120,6 +114,12 @@ def main():
     matrix_to_use_for_input_qmle = (
         qmle_covariance if args.reg_in_cov else qmle_fisher)
 
+    bootstrap_matrix = smooth_matrix(
+        bootstrap_matrix, matrix_to_use_for_input_qmle, args.reg_in_cov)
+    # prevent leakage to zero elements
+    bootstrap_matrix[qmle_zero_idx, :] = 0
+    bootstrap_matrix[:, qmle_zero_idx] = 0
+
     if args.qmle_sparcity_cut > 0:
         qmle_sparcity = np.abs(
             matrix_to_use_for_sparsity) > args.qmle_sparcity_cut
@@ -140,9 +140,8 @@ def main():
 
         bootstrap_matrix = newmatrix
 
-    for idx in qmle_zero_idx:
-        bootstrap_matrix[idx, :] = 0
-        bootstrap_matrix[:, idx] = 0
+    bootstrap_matrix[qmle_zero_idx, :] = 0
+    bootstrap_matrix[:, qmle_zero_idx] = 0
 
     covfis_txt = "cov" if args.reg_in_cov else "fisher"
     finalfname = (
