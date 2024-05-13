@@ -1,12 +1,15 @@
 import argparse
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from os.path import dirname as ospath_dir
 
 
-def normalize(matrix):
-    fk_v = matrix.diagonal()
-    norm = np.sqrt(np.outer(fk_v, fk_v))
-    norm[norm == 0] = 1
+def normalize(matrix, return_norm=False):
+    fk_v = np.sqrt(matrix.diagonal())
+    fk_v[fk_v == 0] = 1
+    norm = np.outer(fk_v, fk_v)
+    if return_norm:
+        return matrix / norm, norm
     return matrix / norm
 
 
@@ -36,10 +39,20 @@ def safe_inverse(matrix):
 #              QMLE evecs also works, chi2 slightly below mean dof
 
 
+def smooth_matrix(boot_mat, qmle_mat, sigma=2.0):
+    rboot, normboot = normalize(boot_mat, return_norm=True)
+    rqmle = normalize(qmle_mat)
+    rnew = normalize(
+        gaussian_filter(rboot - rqmle, sigma) + rqmle
+    )
+    return normboot * rnew
+
+
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     boot_mat, wzero, di = replace_zero_diags(boot_mat)
     qmle_mat = replace_zero_diags(qmle_mat)[0]
 
+    boot_mat = smooth_matrix(boot_mat, qmle_mat)
     evals, evecs = np.linalg.eigh(boot_mat)
 
     other_svals = np.array([v.dot(qmle_mat.dot(v)) for v in evecs.T])
