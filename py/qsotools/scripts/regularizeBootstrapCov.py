@@ -57,8 +57,8 @@ def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=1.5):
 
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
-    boot_mat, wzero, di = replace_zero_diags(boot_mat)
-    qmle_mat = replace_zero_diags(qmle_mat)[0]
+    boot_mat = replace_zero_diags(boot_mat)[0]
+    qmle_mat, wzero, di = replace_zero_diags(qmle_mat)
 
     boot_mat = smooth_matrix(boot_mat, qmle_mat, reg_in_cov)
     # prevent leakage to zero elements
@@ -133,7 +133,7 @@ def main():
             bootstrap_matrix * qmle_sparcity,
             matrix_to_use_for_input_qmle, args.reg_in_cov)
 
-        if np.allclose(bootstrap_matrix, newmatrix):
+        if np.allclose(0, bootstrap_matrix - newmatrix, rtol=1e-3):
             print("Converged.")
             bootstrap_matrix = newmatrix
             break
