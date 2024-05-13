@@ -10,6 +10,14 @@ def normalize(matrix):
     return matrix / norm
 
 
+def replace_zero_diags(matrix):
+    newmatrix = matrix.copy()
+    di = np.diag_indices(matrix.shape[0])
+    w = matrix[di] == 0
+    newmatrix[di] = np.where(w, 1, matrix[di])
+    return newmatrix, w, di
+
+
 def safe_inverse(matrix):
     invmatrix = matrix.copy()
 
@@ -29,6 +37,9 @@ def safe_inverse(matrix):
 
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
+    boot_mat, wzero, di = replace_zero_diags(boot_mat)
+    qmle_mat = replace_zero_diags(qmle_mat)[0]
+
     evals, evecs = np.linalg.eigh(boot_mat)
 
     other_svals = np.array([v.dot(qmle_mat.dot(v)) for v in evecs.T])
@@ -38,8 +49,12 @@ def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     else:
         w = evals > other_svals
 
+    print(f"Changed {w.sum()} modes.")
+
     evals[w] = other_svals[w]
     newmatrix = evecs @ np.diag(evals) @ evecs.T
+
+    newmatrix[di] = np.where(wzero, 0, newmatrix[di])
 
     return newmatrix
 
