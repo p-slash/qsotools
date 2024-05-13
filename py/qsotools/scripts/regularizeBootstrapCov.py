@@ -58,7 +58,7 @@ def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=1.5):
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     boot_mat = replace_zero_diags(boot_mat)[0]
-    qmle_mat, wzero, di = replace_zero_diags(qmle_mat)
+    qmle_mat, wzero, _ = replace_zero_diags(qmle_mat)
 
     evals, evecs = np.linalg.eigh(boot_mat)
 
@@ -74,7 +74,8 @@ def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     evals[w] = other_svals[w]
     newmatrix = evecs @ np.diag(evals) @ evecs.T
 
-    newmatrix[di] = np.where(wzero, 0, newmatrix[di])
+    newmatrix[wzero, :] = 0
+    newmatrix[:, wzero] = 0
 
     return newmatrix
 
@@ -140,13 +141,10 @@ def main():
 
         bootstrap_matrix = newmatrix
 
-    bootstrap_matrix[qmle_zero_idx, :] = 0
-    bootstrap_matrix[:, qmle_zero_idx] = 0
-
     covfis_txt = "cov" if args.reg_in_cov else "fisher"
     finalfname = (
         f"{args.fbase}regularized-bootstrap-{covfis_txt}-"
-        f"s{args.qmle_sparcity_cut:4f}-boot-evecs.txt")
+        f"s{args.qmle_sparcity_cut:.3f}-boot-evecs.txt")
     np.savetxt(
         f"{outdir}/{finalfname}", bootstrap_matrix,
         header=f"{qmle_covariance.shape[0]} {qmle_covariance.shape[0]}")
