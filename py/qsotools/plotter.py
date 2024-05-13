@@ -1248,7 +1248,7 @@ class FisherPlotter(object):
 
 
 class QmleOutput():
-    def __init__(self, path_fname_base):
+    def __init__(self, path_fname_base, sparse="s0.000000"):
         self.power = PowerPlotter(
             f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
         self.nz = self.power.nz
@@ -1261,7 +1261,7 @@ class QmleOutput():
             k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
 
         self.fisher_boot = FisherPlotter(
-            f"{path_fname_base}_regularized-bootstrap-fisher-s0.000000-boot-evecs.txt",
+            f"{path_fname_base}_regularized-bootstrap-fisher-{sparse}-boot-evecs.txt",
             k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
 
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
