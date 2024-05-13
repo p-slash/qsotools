@@ -4,12 +4,12 @@ from scipy.ndimage import gaussian_filter
 from os.path import dirname as ospath_dir
 
 
-def normalize(matrix, return_norm=False):
+def normalize(matrix, return_vector=False):
     fk_v = np.sqrt(matrix.diagonal())
     fk_v[fk_v == 0] = 1
     norm = np.outer(fk_v, fk_v)
-    if return_norm:
-        return matrix / norm, norm
+    if return_vector:
+        return matrix / norm, fk_v
     return matrix / norm
 
 
@@ -39,20 +39,33 @@ def safe_inverse(matrix):
 #              QMLE evecs also works, chi2 slightly below mean dof
 
 
-def smooth_matrix(boot_mat, qmle_mat, sigma=2.0):
-    rboot, normboot = normalize(boot_mat, return_norm=True)
-    rqmle = normalize(qmle_mat)
+def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=1.5):
+    rboot, vboot = normalize(boot_mat, return_vector=True)
+    rqmle, vqmle = normalize(qmle_mat, return_vector=True)
     rnew = normalize(
         gaussian_filter(rboot - rqmle, sigma) + rqmle
     )
-    return normboot * rnew
+
+    if reg_in_cov:
+        v = np.fmax(vboot, vqmle)
+    else:
+        v = np.fmin(vboot, vqmle)
+
+    v = gaussian_filter(v / vqmle, sigma) * vqmle
+
+    return np.outer(v, v) * rnew
 
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     boot_mat, wzero, di = replace_zero_diags(boot_mat)
     qmle_mat = replace_zero_diags(qmle_mat)[0]
 
-    boot_mat = smooth_matrix(boot_mat, qmle_mat)
+    boot_mat = smooth_matrix(boot_mat, qmle_mat, reg_in_cov)
+    # prevent leakage to zero elements
+    boot_mat[wzero, :] = 0
+    boot_mat[:, wzero] = 0
+    boot_mat[di] = np.where(wzero, 1, boot_mat[di])
+
     evals, evecs = np.linalg.eigh(boot_mat)
 
     other_svals = np.array([v.dot(qmle_mat.dot(v)) for v in evecs.T])
