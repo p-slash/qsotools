@@ -1007,7 +1007,6 @@ class FisherPlotter(object):
             Plot the inverse instead.
         kwargs: ** for imshow
         """
-        fig, ax = plt.subplots()
         Ftxt = "F" if not inv else "C"
 
         if self.invfisher is None and inv:
@@ -1021,16 +1020,16 @@ class FisherPlotter(object):
         grid, cbarlbl, colormap, kwargs = self._setScale(
             tmp, scale, kwargs, Ftxt)
 
-        im = ax.imshow(grid, cmap=colormap, origin='upper',
-                       extent=[0, self.fisher.shape[0],
-                               self.fisher.shape[0], 0],
-                       **kwargs)
+        im = plt.imshow(grid, cmap=colormap, origin='upper',
+                        extent=[0, self.fisher.shape[0],
+                                self.fisher.shape[0], 0],
+                        **kwargs)
 
-        self._setTicks(ax)
+        self._setTicks(plt.gca())
 
-        ax.grid(color='k', alpha=0.3)
+        plt.grid(color='k', alpha=0.3)
 
-        cbar = fig.colorbar(im)
+        cbar = plt.colorbar(im)
         cbar.ax.set_ylim([np.round(np.nanmin(grid), decimals=2), 1])
         cbar.set_label(cbarlbl, fontsize=AXIS_LBL_FONT_SIZE)
 
