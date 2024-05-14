@@ -6,15 +6,15 @@ from os.path import dirname as ospath_dir
 
 def normalize(matrix, return_vector=False):
     fk_v = matrix.diagonal().copy()
-    w = fk_v <= 0
+    w = fk_v == 0
     fk_v[w] = 1
     fk_v = np.sqrt(fk_v)
-    norm = np.outer(fk_v, fk_v)
 
-    R = matrix / norm
+    R = matrix / np.outer(fk_v, fk_v)
     R[w, :] = 0
     R[:, w] = 0
     if return_vector:
+        fk_v[w] = 0
         return R, fk_v
     return R
 
@@ -45,7 +45,7 @@ def safe_inverse(matrix):
 #              QMLE evecs also works, chi2 slightly below mean dof
 
 
-def smooth_matrix(boot_mat, qmle_mat, sigma=1.5):
+def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=1.5):
     rboot, vboot = normalize(boot_mat, return_vector=True)
     rqmle, vqmle = normalize(qmle_mat, return_vector=True)
     rnew = normalize(
@@ -54,9 +54,14 @@ def smooth_matrix(boot_mat, qmle_mat, sigma=1.5):
     rnew += rnew.T
     rnew /= 2
 
-    v = gaussian_filter(vboot / vqmle, sigma) * vqmle
+    # if reg_in_cov:
+    #     v = np.fmax(vboot, vqmle)
+    # else:
+    #     v = np.fmin(vboot, vqmle)
 
-    return np.outer(v, v) * rnew
+    # v = gaussian_filter(v / vqmle, sigma) * vqmle
+
+    return np.outer(vboot, vboot) * rnew
 
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
@@ -119,7 +124,7 @@ def main():
         qmle_covariance if args.reg_in_cov else qmle_fisher)
 
     bootstrap_matrix = smooth_matrix(
-        bootstrap_matrix, matrix_to_use_for_input_qmle)
+        bootstrap_matrix, matrix_to_use_for_input_qmle, args.reg_in_cov)
     # prevent leakage to zero elements
     bootstrap_matrix[qmle_zero_idx, :] = 0
     bootstrap_matrix[:, qmle_zero_idx] = 0
