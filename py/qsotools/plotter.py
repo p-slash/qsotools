@@ -1248,7 +1248,7 @@ class FisherPlotter(object):
 
 
 class QmleOutput():
-    def __init__(self, path_fname_base, sparse="s0.000000"):
+    def __init__(self, path_fname_base, sparse="s0.000"):
         self.power = PowerPlotter(
             f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
         self.nz = self.power.nz
@@ -1310,6 +1310,8 @@ class QmleOutput():
 
         self.power.error = np.sqrt(
             self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
+
+        self.setChi2()
 
     def plotBootErrVsQmleErr(self, cmap=plt.cm.turbo):
         booterr = np.sqrt(
