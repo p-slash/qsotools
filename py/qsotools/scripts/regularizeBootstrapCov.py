@@ -5,7 +5,7 @@ from os.path import dirname as ospath_dir
 
 
 def normalize(matrix, return_vector=False):
-    fk_v = matrix.diagonal()
+    fk_v = matrix.diagonal().copy()
     w = fk_v <= 0
     fk_v[w] = 1
     fk_v = np.sqrt(fk_v)
