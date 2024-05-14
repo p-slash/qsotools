@@ -107,7 +107,7 @@ def main():
     parser.add_argument(
         "--qmle-cov", help="Covariance matrix from QMLE.", required=True)
     parser.add_argument(
-        "--nz", help="Number of redshift bins", dtype=int, required=True)
+        "--nz", help="Number of redshift bins", type=int, required=True)
     parser.add_argument(
         "--qmle-sparcity-cut", default=0.001, type=float,
         help="Sparsity pattern to cut using QMLE Fisher matrix.")
