@@ -1267,13 +1267,16 @@ class QmleOutput():
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
         self.setChi2()
 
-    def setChi2(self, alpha_knyq=0.75):
+    def setChi2(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
+        kmax = alpha_knyq * np.pi / self.dvarr
+        w = (zmin <= self.power.zarray) & (self.power.zarray < zmax)
+        kmax[~w] = 0
         self.chi2_qmle = self.power.getChiSquare(
-            fisher=self.fisher_qmle.fisher, kmin=None,
-            kmax=alpha_knyq * np.pi / self.dvarr)
+            fisher=self.fisher_qmle.fisher, kmin=kmin,
+            kmax=kmax)
         self.chi2_boot = self.power.getChiSquare(
-            fisher=self.fisher_boot.fisher, kmin=None,
-            kmax=alpha_knyq * np.pi / self.dvarr)
+            fisher=self.fisher_boot.fisher, kmin=kmin,
+            kmax=kmax)
 
     def setBootError(self):
         self.power.error = np.sqrt(
