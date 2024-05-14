@@ -45,7 +45,7 @@ def safe_inverse(matrix):
 #              QMLE evecs also works, chi2 slightly below mean dof
 
 
-def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=1.5):
+def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=2.0):
     rboot, vboot = normalize(boot_mat, return_vector=True)
     rqmle, vqmle = normalize(qmle_mat, return_vector=True)
     rnew = normalize(
