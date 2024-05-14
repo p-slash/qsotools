@@ -61,7 +61,7 @@ def smooth_matrix(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
 
     w = vqmle == 0
     vqmle[w] = 1
-    eta = np.reshape(v / vqmle - 1, nz, vqmle.size // nz)
+    eta = np.reshape(v / vqmle - 1, (nz, vqmle.size // nz))
     eta = gaussian_filter1d(eta, sigma=0.5, axis=0)
     for i in range(eta.shape[0]):
         eta[i] = gaussian_filter1d(eta[i], sigma=eta[i].std() / 0.025)
