@@ -134,7 +134,8 @@ def main():
         qmle_covariance if args.reg_in_cov else qmle_fisher)
 
     bootstrap_matrix = smooth_matrix(
-        bootstrap_matrix, matrix_to_use_for_input_qmle, args.reg_in_cov)
+        bootstrap_matrix, matrix_to_use_for_input_qmle, args.nz,
+        args.reg_in_cov)
     # prevent leakage to zero elements
     bootstrap_matrix[qmle_zero_idx, :] = 0
     bootstrap_matrix[:, qmle_zero_idx] = 0
