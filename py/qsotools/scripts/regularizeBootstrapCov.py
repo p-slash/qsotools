@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, gaussian_filter1d
 from os.path import dirname as ospath_dir
 
 
@@ -45,7 +45,7 @@ def safe_inverse(matrix):
 #              QMLE evecs also works, chi2 slightly below mean dof
 
 
-def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=2.0):
+def smooth_matrix(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
     rboot, vboot = normalize(boot_mat, return_vector=True)
     rqmle, vqmle = normalize(qmle_mat, return_vector=True)
     rnew = normalize(
@@ -54,14 +54,21 @@ def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=2.0):
     rnew += rnew.T
     rnew /= 2
 
-    # if reg_in_cov:
-    #     v = np.fmax(vboot, vqmle)
-    # else:
-    #     v = np.fmin(vboot, vqmle)
+    if reg_in_cov:
+        v = np.fmax(vboot, vqmle)
+    else:
+        v = np.fmin(vboot, vqmle)
 
-    # v = gaussian_filter(v / vqmle, sigma) * vqmle
+    w = vqmle == 0
+    vqmle[w] = 1
+    eta = np.reshape(v / vqmle - 1, nz, vqmle.size // nz)
+    eta = gaussian_filter1d(eta, sigma=0.5, axis=0)
+    for i in range(eta.shape[0]):
+        eta[i] = gaussian_filter1d(eta[i], sigma=eta[i].std() / 0.025)
+    v = (1 + eta).ravel() * vqmle
+    v[w] = 0
 
-    return np.outer(vboot, vboot) * rnew
+    return np.outer(v, v) * rnew
 
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
@@ -100,6 +107,8 @@ def main():
     parser.add_argument(
         "--qmle-cov", help="Covariance matrix from QMLE.", required=True)
     parser.add_argument(
+        "--nz", help="Number of redshift bins", required=True)
+    parser.add_argument(
         "--qmle-sparcity-cut", default=0.001, type=float,
         help="Sparsity pattern to cut using QMLE Fisher matrix.")
     parser.add_argument("--iterations", type=int, default=500,
@@ -110,6 +119,7 @@ def main():
 
     outdir = ospath_dir(args.boot_matrix)
     bootstrap_matrix = np.loadtxt(args.boot_matrix, skiprows=1)
+    assert bootstrap_matrix.shape[0] % args.nz == 0
 
     qmle_fisher = np.loadtxt(args.qmle_fisher, skiprows=1)
     qmle_zero_idx = np.where(qmle_fisher.diagonal() == 0)[0]
