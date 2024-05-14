@@ -5,18 +5,24 @@ from os.path import dirname as ospath_dir
 
 
 def normalize(matrix, return_vector=False):
-    fk_v = np.sqrt(matrix.diagonal())
-    fk_v[fk_v == 0] = 1
+    fk_v = matrix.diagonal()
+    w = fk_v <= 0
+    fk_v[w] = 1
+    fk_v = np.sqrt(fk_v)
     norm = np.outer(fk_v, fk_v)
+
+    R = matrix / norm
+    R[w, :] = 0
+    R[:, w] = 0
     if return_vector:
-        return matrix / norm, fk_v
-    return matrix / norm
+        return R, fk_v
+    return R
 
 
 def replace_zero_diags(matrix):
     newmatrix = matrix.copy()
     di = np.diag_indices(matrix.shape[0])
-    w = matrix[di] == 0
+    w = matrix[di] <= 0
     newmatrix[di] = np.where(w, 1, matrix[di])
     return newmatrix, w, di
 
@@ -45,6 +51,8 @@ def smooth_matrix(boot_mat, qmle_mat, reg_in_cov, sigma=1.5):
     rnew = normalize(
         gaussian_filter(rboot - rqmle, sigma) + rqmle
     )
+    rnew += rnew.T
+    rnew /= 2
 
     if reg_in_cov:
         v = np.fmax(vboot, vqmle)
@@ -134,7 +142,7 @@ def main():
             bootstrap_matrix * qmle_sparcity,
             matrix_to_use_for_input_qmle, args.reg_in_cov)
 
-        if np.allclose(0, bootstrap_matrix - newmatrix, rtol=1e-3):
+        if np.allclose(0, bootstrap_matrix - newmatrix):
             print("Converged.")
             bootstrap_matrix = newmatrix
             break
