@@ -1283,29 +1283,31 @@ class QmleOutput():
             self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
 
     def addOthersAverage(self, others):
-        n = len(others) + 1
-        elems = [
-            self.power.power_qmle, self.ower.thetap,
-            self.power.power_qmle_full, self.power.power_qmle_noise,
-            self.power.power_qmle_fid
-        ]
+        self.power.power_qmle = self.fisher_qmle.fisher.dot(
+            self.power.power_qmle.ravel())
+        self.power.thetap = self.fisher_qmle.fisher.dot(
+            self.power.thetap.ravel())
+        self.power.power_qmle_full = self.fisher_qmle.fisher.dot(
+            self.power.power_qmle_full.ravel())
+        self.power.power_qmle_noise = self.fisher_qmle.fisher.dot(
+            self.power.power_qmle_noise.ravel())
+        self.power.power_qmle_fid = self.fisher_qmle.fisher.dot(
+            self.power.power_qmle_fid.ravel())
 
-        for elem in elems:
-            elem = self.fisher_qmle.fisher.dot(elem)
         self.fisher_boot.invfisher = self.fisher_qmle.fisher.dot(
             self.fisher_boot.invfisher).dot(self.fisher_qmle.fisher)
 
         for other in others:
             self.power.power_qmle += other.fisher_qmle.fisher.dot(
-                other.power.power_qmle)
+                other.power.power_qmle.ravel())
             self.power.thetap += other.fisher_qmle.fisher.dot(
-                other.power.thetap)
+                other.power.thetap.ravel())
             self.power.power_qmle_full += other.fisher_qmle.fisher.dot(
-                other.power.power_qmle_full)
+                other.power.power_qmle_full.ravel())
             self.power.power_qmle_noise += other.fisher_qmle.fisher.dot(
-                other.power.power_qmle_noise)
+                other.power.power_qmle_noise.ravel())
             self.power.power_qmle_fid += other.fisher_qmle.fisher.dot(
-                other.power.power_qmle_fid)
+                other.power.power_qmle_fid.ravel())
 
             self.fisher_qmle.fisher += other.fisher_qmle.fisher
 
@@ -1313,8 +1315,16 @@ class QmleOutput():
                 other.fisher_boot.invfisher).dot(other.fisher_qmle.fisher)
 
         self.fisher_qmle.invfisher = self.fisher_qmle._invert()
-        for elem in elems:
-            elem = self.fisher_qmle.invfisher.dot(elem)
+        self.power.power_qmle = self.fisher_qmle.invfisher.dot(
+            self.power.power_qmle).reshape(self.nz, self.nk)
+        self.power.thetap = self.fisher_qmle.invfisher.dot(
+            self.power.thetap).reshape(self.nz, self.nk)
+        self.power.power_qmle_full = self.fisher_qmle.invfisher.dot(
+            self.power.power_qmle_full).reshape(self.nz, self.nk)
+        self.power.power_qmle_noise = self.fisher_qmle.invfisher.dot(
+            self.power.power_qmle_noise).reshape(self.nz, self.nk)
+        self.power.power_qmle_fid = self.fisher_qmle.invfisher.dot(
+            self.power.power_qmle_fid).reshape(self.nz, self.nk)
 
         self.fisher_boot.invfisher = self.fisher_qmle.invfisher.dot(
             self.fisher_boot.invfisher).dot(self.fisher_qmle.invfisher)
