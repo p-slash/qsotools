@@ -331,6 +331,7 @@ class PowerPlotter(object):
         else:
             self.is_damped = False
             self.damping_constant = 0
+        self.power_table = np.array(power_table)
 
     def __init__(self, filename):
         # Reading file into an ascii table
@@ -727,7 +728,7 @@ class PowerPlotter(object):
     def plot_grid_all(
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
-            ratio_wrt_fid=False, is_sb=False, kmin=5e-4
+            ratio_wrt_fid=False, is_sb=False, kmin=5e-4, fit_deg=-1,
     ):
         nrows = int(np.ceil(self.nz / ncols))
         noff_cols = ncols * nrows - self.nz
@@ -775,6 +776,14 @@ class PowerPlotter(object):
                     label=label, fmt=".-", alpha=0.8
                 )
             )
+
+            if fit_deg > -1:
+                lnk = np.log(self.k_bins / 0.01)
+                X = np.polyfit(
+                    lnk[w] / 0.01, pkpi[w] - 1, deg=fit_deg,
+                    w=1 / ekpi[w])
+                print(self.z_bins[iz], "Fit: ", X)
+                ax.semilogx(self.k_bins, 1 + np.polyval(X, lnk), 'r--')
 
             for (opp, olbl) in other_measurements:
                 oiz = np.nonzero(np.isclose(opp.z_bins, z))[0][0]
@@ -1277,6 +1286,12 @@ class QmleOutput():
         self.chi2_boot = self.power.getChiSquare(
             fisher=self.fisher_boot.fisher, kmin=kmin,
             kmax=kmax)
+
+    def convert2Undamped(self):
+        self.power.thetap = self.fisher_qmle.invfisher.dot(
+            self.power.power_table['Fd'] - self.power.power_table['Fb']
+            - self.power.power_table['Ft']).reshape(self.nz, self.nk)
+        self.power.power_qmle = self.power.thetap + self.power.power_fid
 
     def setBootError(self):
         self.power.error = np.sqrt(
