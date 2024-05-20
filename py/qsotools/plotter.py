@@ -1284,28 +1284,40 @@ class QmleOutput():
 
     def addOthersAverage(self, others):
         n = len(others) + 1
+        elems = [
+            self.power.power_qmle, self.ower.thetap,
+            self.power.power_qmle_full, self.power.power_qmle_noise,
+            self.power.power_qmle_fid
+        ]
+
+        for elem in elems:
+            elem = self.fisher_qmle.fisher.dot(elem)
+        self.fisher_boot.invfisher = self.fisher_qmle.fisher.dot(
+            self.fisher_boot.invfisher).dot(self.fisher_qmle.fisher)
+
         for other in others:
-            self.power.power_qmle += other.power.power_qmle
-            self.power.thetap += other.power.thetap
-            self.power.power_qmle_full += other.power.power_qmle_full
-            self.power.power_qmle_noise += other.power.power_qmle_noise
-            self.power.power_qmle_fid += other.power.power_qmle_fid
-            self.fisher_qmle.invfisher += other.fisher_qmle.invfisher
-            self.fisher_boot.invfisher += other.fisher_boot.invfisher
+            self.power.power_qmle += other.fisher_qmle.fisher.dot(
+                other.power.power_qmle)
+            self.power.thetap += other.fisher_qmle.fisher.dot(
+                other.power.thetap)
+            self.power.power_qmle_full += other.fisher_qmle.fisher.dot(
+                other.power.power_qmle_full)
+            self.power.power_qmle_noise += other.fisher_qmle.fisher.dot(
+                other.power.power_qmle_noise)
+            self.power.power_qmle_fid += other.fisher_qmle.fisher.dot(
+                other.power.power_qmle_fid)
 
-        self.power.power_qmle /= n
-        self.power.thetap /= n
-        self.power.power_qmle_full /= n
-        self.power.power_qmle_noise /= n
-        self.power.power_qmle_fid /= n
+            self.fisher_qmle.fisher += other.fisher_qmle.fisher
 
-        self.fisher_qmle.invfisher /= n**2
-        self.fisher_qmle.fisher = self.fisher_qmle.invfisher
+            self.fisher_boot.invfisher += other.fisher_qmle.fisher.dot(
+                other.fisher_boot.invfisher).dot(other.fisher_qmle.fisher)
+
         self.fisher_qmle.invfisher = self.fisher_qmle._invert()
-        self.fisher_qmle.fisher, self.fisher_qmle.invfisher = \
-            self.fisher_qmle.invfisher, self.fisher_qmle.fisher
+        for elem in elems:
+            elem = self.fisher_qmle.invfisher.dot(elem)
 
-        self.fisher_boot.invfisher /= n**2
+        self.fisher_boot.invfisher = self.fisher_qmle.invfisher.dot(
+            self.fisher_boot.invfisher).dot(self.fisher_qmle.invfisher)
         self.fisher_boot.fisher = self.fisher_boot.invfisher
         self.fisher_boot.invfisher = self.fisher_boot._invert()
         self.fisher_boot.fisher, self.fisher_boot.invfisher = \
