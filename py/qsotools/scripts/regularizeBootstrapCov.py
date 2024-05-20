@@ -95,20 +95,20 @@ def smooth_matrix_3(boot_mat, qmle_mat, nz, sigma=2.0):
     rboot = boot_mat / np.outer(vqmle, vqmle)
     vqmle[w] = 0
     rdiff = rboot - rqmle
+    rdiff_smooth = gaussian_filter(rdiff, sigma)
 
+    # Special care for first half redshift bins on the main and first diagonal
     nk = boot_mat.shape[0] // nz
-    nz2 = nz // 2
+    nz2 = nz // 2 + 1
     for i in range(nz2):
-        for j in range(nz2):
-            mode = 'constant' if np.abs(j - i) > 1 else 'reflect'
-            box = rdiff[i * nk:(i + 1) * nk, j * nk:(j + 1) * nk]
-            w1 = box.diagonal() != 0
-            smooth_box = gaussian_filter(box[w1, :][:, w1], sigma, mode=mode)
-            box[w1, :][:, w1] = smooth_box
+        for j in range(max(0, i - 1), i + 2):
+            s = np.s_[i * nk:(i + 1) * nk, j * nk:(j + 1) * nk]
+            rdiff_smooth[s] = 0
+            box = rdiff[s]
+            n1 = np.sum(box.diagonal() != 0)
+            rdiff_smooth[s][:n1, :n1] = gaussian_filter(box[:n1, :n1], sigma)
 
-    rdiff[nz2 * nk:, nz2 * nk:] = gaussian_filter(
-        rdiff[nz2 * nk:, nz2 * nk:], sigma)
-    rnew = rqmle + rdiff
+    rnew = rqmle + rdiff_smooth
     rnew[w, :] = 0
     rnew[:, w] = 0
     rnew += rnew.T
