@@ -54,11 +54,11 @@ def smooth_matrix(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
     rnew += rnew.T
     rnew /= 2
 
-    if reg_in_cov:
-        v = np.fmax(vboot, vqmle)
-    else:
-        v = np.fmin(vboot, vqmle)
-
+    # if reg_in_cov:
+    #     v = np.fmax(vboot, vqmle)
+    # else:
+    #     v = np.fmin(vboot, vqmle)
+    v = vboot.copy()
     w = vqmle == 0
     vqmle[w] = 1
     v[w] = 1
