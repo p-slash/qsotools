@@ -48,9 +48,13 @@ def safe_inverse(matrix):
 def smooth_matrix(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
     rboot, vboot = normalize(boot_mat, return_vector=True)
     rqmle, vqmle = normalize(qmle_mat, return_vector=True)
-    rnew = normalize(
-        gaussian_filter(rboot - rqmle, sigma) + rqmle
-    )
+    w = vqmle == 0
+
+    rnew = gaussian_filter(rboot - rqmle, sigma)
+    rnew[w, :] = 0
+    rnew[:, w] = 0
+
+    rnew = normalize(rnew + rqmle)
     rnew += rnew.T
     rnew /= 2
 
@@ -59,7 +63,6 @@ def smooth_matrix(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
     # else:
     #     v = np.fmin(vboot, vqmle)
     v = vboot.copy()
-    w = vqmle == 0
     vqmle[w] = 1
     v[w] = 1
     eta = np.reshape(v / vqmle - 1, (nz, vqmle.size // nz))
@@ -70,6 +73,48 @@ def smooth_matrix(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
     v[w] = 0
 
     return np.outer(v, v) * rnew
+
+
+def smooth_matrix_2(boot_mat, qmle_mat, nz, reg_in_cov, sigma=2.0):
+    rqmle, vqmle = normalize(qmle_mat, return_vector=True)
+    w = vqmle == 0
+    vqmle[w] = 1
+    rboot = boot_mat / np.outer(vqmle, vqmle)
+    vqmle[w] = 0
+    rnew = rqmle + gaussian_filter(rboot - rqmle, sigma)
+    rnew[w, :] = 0
+    rnew[:, w] = 0
+
+    return np.outer(vqmle, vqmle) * rnew
+
+
+def smooth_matrix_3(boot_mat, qmle_mat, nz, sigma=2.0):
+    rqmle, vqmle = normalize(qmle_mat, return_vector=True)
+    w = vqmle == 0
+    vqmle[w] = 1
+    rboot = boot_mat / np.outer(vqmle, vqmle)
+    vqmle[w] = 0
+    rdiff = rboot - rqmle
+
+    nk = boot_mat.shape[0] // nz
+    nz2 = nz // 2
+    for i in range(nz2):
+        for j in range(nz2):
+            mode = 'constant' if np.abs(j - i) > 1 else 'reflect'
+            box = rdiff[i * nk:(i + 1) * nk, j * nk:(j + 1) * nk]
+            w1 = box.diagonal() != 0
+            smooth_box = gaussian_filter(box[w1, :][:, w1], sigma, mode=mode)
+            box[w1, :][:, w1] = smooth_box
+
+    rdiff[nz2 * nk:, nz2 * nk:] = gaussian_filter(
+        rdiff[nz2 * nk:, nz2 * nk:], sigma)
+    rnew = rqmle + rdiff
+    rnew[w, :] = 0
+    rnew[:, w] = 0
+    rnew += rnew.T
+    rnew /= 2
+
+    return np.outer(vqmle, vqmle) * rnew
 
 
 def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
@@ -134,9 +179,8 @@ def main():
     matrix_to_use_for_input_qmle = (
         qmle_covariance if args.reg_in_cov else qmle_fisher)
 
-    bootstrap_matrix = smooth_matrix(
-        bootstrap_matrix, matrix_to_use_for_input_qmle, args.nz,
-        args.reg_in_cov)
+    bootstrap_matrix = smooth_matrix_3(
+        bootstrap_matrix, matrix_to_use_for_input_qmle, args.nz)
     # prevent leakage to zero elements
     bootstrap_matrix[qmle_zero_idx, :] = 0
     bootstrap_matrix[:, qmle_zero_idx] = 0
