@@ -1288,7 +1288,7 @@ class QmleOutput():
             kmax=kmax)
 
     def convert2Undamped(self):
-        self.power.thetap = self.fisher_qmle.invfisher.dot(
+        self.power.thetap = 0.5 * self.fisher_qmle.invfisher.dot(
             self.power.power_table['Fd'] - self.power.power_table['Fb']
             - self.power.power_table['Ft']).reshape(self.nz, self.nk)
         self.power.power_qmle = self.power.thetap + self.power.power_fid
