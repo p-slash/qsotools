@@ -780,7 +780,7 @@ class PowerPlotter(object):
             if fit_deg > -1:
                 lnk = np.log(self.k_bins / 0.01)
                 X = np.polyfit(
-                    lnk[w] / 0.01, pkpi[w] - 1, deg=fit_deg,
+                    lnk[w], pkpi[w] - 1, deg=fit_deg,
                     w=1 / ekpi[w])
                 print(self.z_bins[iz], "Fit: ", X)
                 ax.semilogx(self.k_bins, 1 + np.polyval(X, lnk), 'r--')
