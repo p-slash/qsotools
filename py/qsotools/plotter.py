@@ -1256,6 +1256,10 @@ class FisherPlotter(object):
         return ax
 
 
+def _nppolyval(x, p):
+    return np.polyval(p, x)
+
+
 class QmleOutput():
     def __init__(self, path_fname_base, sparse="s0.000"):
         self.power = PowerPlotter(
@@ -1373,3 +1377,34 @@ class QmleOutput():
         plt.xlabel(r"$k$ [s km$^{-1}$]")
         plt.xlim(auto_logxlimmer(self.k_bins))
         plt.ylabel(r"$\sigma_\mathrm{boot} / \sigma_\mathrm{qmle}$")
+
+    def fitPolyPerBins(self, kmin=0, alpha_knyq=0.75):
+        from scipy.optimize import curve_fit
+        from functools import partial
+
+        lnk = np.log(self.k_bins / 0.01)
+        dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.z_bins)
+        ratios = self.power.power_qmle / self.power.power_fid - 1
+
+        coeff_func_pairs = []
+
+        for i, z in enumerate(self.z_bins):
+            kmax = alpha_knyq * np.pi / dvarr[i]
+            w = (kmin <= self.k_bins) & (self.k_bins < kmax)
+            ratio = ratios[i][w]
+            cov = self.fisher_boot.invfisher[
+                i * self.nk:(i + 1) * self.nk, i * self.nk:(i + 1) * self.nk
+            ][w, :][:, w]
+
+            popt, pcov = curve_fit(
+                _nppolyval, lnk[w], ratio, p0=np.zeros(3), sigma=cov,
+                absolute_sigma=True, bounds=(-1e-2, 1e-2))
+
+            coeff_func_pairs.append(
+                ((popt, pcov), partial(_nppolyval, popt)))
+
+        return coeff_func_pairs
+
+
+
+
