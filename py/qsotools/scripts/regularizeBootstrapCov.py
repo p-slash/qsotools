@@ -141,6 +141,33 @@ def mcdonald_eval_fix(boot_mat, qmle_mat, reg_in_cov):
     return newmatrix
 
 
+def posdefDifference(boot_mat, qmle_covariance, reg_in_cov):
+    results = np.zeros_like(boot_mat)
+    qmle_nonzero_idx = qmle_covariance.diagonal() != 0
+    boot_mat = boot_mat[qmle_nonzero_idx, :][:, qmle_nonzero_idx]
+    qmle_covariance = qmle_covariance[qmle_nonzero_idx, :][:, qmle_nonzero_idx]
+
+    if not reg_in_cov:
+        boot_mat = np.linalg.inv(boot_mat)
+
+    diff_mat = boot_mat - qmle_covariance
+    evals, evecs = np.linalg.eigh(diff_mat)
+    print("Forcing semi-pos-def modes:", np.sum(evals < 0))
+    evals[evals < 0] = 0
+    diff_mat = evecs @ np.diag(evals) @ evecs.T
+    boot_mat = qmle_covariance + diff_mat
+
+    if not reg_in_cov:
+        boot_mat = np.linalg.inv(boot_mat)
+
+    qmle_nonzero_idx = np.nonzero(qmle_nonzero_idx)[0]
+    for i in range(boot_mat.shape[0]):
+        for j in range(boot_mat.shape[1]):
+            results[qmle_nonzero_idx[i], qmle_nonzero_idx[j]] = boot_mat[i, j]
+
+    return results
+
+
 def main():
     # Arguments passed to run the script
     parser = argparse.ArgumentParser(
@@ -160,6 +187,9 @@ def main():
     parser.add_argument("--iterations", type=int, default=500,
                         help="Number of iterations")
     parser.add_argument("--reg-in-cov", action="store_true")
+    parser.add_argument(
+        "--force-posdef-diff", action="store_true",
+        help="Forces semi-positive definite difference between QMLE.")
     parser.add_argument("--fbase", default="")
     args = parser.parse_args()
 
@@ -205,10 +235,15 @@ def main():
 
         bootstrap_matrix = newmatrix
 
+    if args.force_posdef_diff:
+        bootstrap_matrix = posdefDifference(
+            bootstrap_matrix, qmle_covariance, qmle_zero_idx, args.reg_in_cov)
+
     covfis_txt = "cov" if args.reg_in_cov else "fisher"
     finalfname = (
         f"{args.fbase}regularized-bootstrap-{covfis_txt}-"
         f"s{args.qmle_sparcity_cut:.3f}-boot-evecs.txt")
     np.savetxt(
         f"{outdir}/{finalfname}", bootstrap_matrix,
+        fmt='%.8e',
         header=f"{qmle_covariance.shape[0]} {qmle_covariance.shape[0]}")
