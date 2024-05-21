@@ -1256,8 +1256,8 @@ class FisherPlotter(object):
         return ax
 
 
-def _nppolyval(x, p):
-    return np.polyval(p, x)
+def _nppoly2val(k, p0, p1, p2):
+    return np.polyval([p0, p1, p2], np.log(k / 0.01))
 
 
 class QmleOutput():
@@ -1382,7 +1382,6 @@ class QmleOutput():
         from scipy.optimize import curve_fit
         from functools import partial
 
-        lnk = np.log(self.k_bins / 0.01)
         dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.z_bins)
         ratios = self.power.power_qmle / self.power.power_fid - 1
 
@@ -1397,11 +1396,11 @@ class QmleOutput():
             ][w, :][:, w]
 
             popt, pcov = curve_fit(
-                _nppolyval, lnk[w], ratio, p0=np.zeros(3), sigma=cov,
+                _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
                 absolute_sigma=True, bounds=(-1e-2, 1e-2))
 
             coeff_func_pairs.append(
-                ((popt, pcov), partial(_nppolyval, popt)))
+                ((popt, pcov), partial(_nppoly2val, popt)))
 
         return coeff_func_pairs
 
