@@ -1397,7 +1397,7 @@ class QmleOutput():
 
             popt, pcov = curve_fit(
                 _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
-                absolute_sigma=True, bounds=(-1e-2, 1e-2))
+                absolute_sigma=True)
 
             coeff_func_pairs.append(
                 ((popt, pcov), partial(_nppoly2val, popt)))
