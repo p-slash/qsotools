@@ -1394,9 +1394,9 @@ class QmleOutput():
         ratios = self.power.power_qmle / self.power.power_fid - 1
 
         if use_boot_errors:
-            total_cov = self.fisher_boot.invfisher
+            total_cov = self.fisher_boot.invfisher.copy()
         else:
-            total_cov = self.fisher_qmle.invfisher
+            total_cov = self.fisher_qmle.invfisher.copy()
 
         coeff_list = []
 
@@ -1406,7 +1406,9 @@ class QmleOutput():
             ratio = ratios[i][w]
             cov = total_cov[
                 i * self.nk:(i + 1) * self.nk, i * self.nk:(i + 1) * self.nk
-            ][w, :][:, w]
+            ][w, :][:, w].copy()
+            cov /= np.outer(self.power.power_fid[i], self.power.power_fid[i])
+
             if use_diag_errors:
                 cov = np.sqrt(cov.diagonal())
 
@@ -1418,7 +1420,9 @@ class QmleOutput():
 
         return coeff_list
 
-    def plotPolyCorrections(self, coeff_list, axs=None, plus_one=True):
+    def plotPolyCorrections(
+            self, coeff_list, axs=None, plus_one=True, plot_errors=False
+    ):
         if axs is None:
             axs = self.power.create_fig_axs()[1]
 
@@ -1435,6 +1439,13 @@ class QmleOutput():
             col = iz % ncols
             ax = axs[row, col]
             ax.semilogx(self.k_bins, y[iz], 'r--')
+
+            if plot_errors:
+                ax.fill_between(
+                    self.k_bins, 1 - self.errors[iz], 1 + self.errors[iz],
+                    alpha=0.6, color='grey')
+
+        return axs
 
     def applyPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
