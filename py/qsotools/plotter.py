@@ -1428,11 +1428,16 @@ class QmleOutput():
             axs = self.power.create_fig_axs()[1]
 
         y = np.empty((self.nz, self.nk))
+        errors = np.empty_like((2, self.nz, self.nk))
+        errors[0] = -self.power.error
+        errors[1] = self.power.error
+
         for iz in range(self.nz):
             y[iz] = _nppoly2val(self.k_bins, *coeff_list[iz][0])
 
         if plus_one:
             y += 1
+            errors += 1
 
         nrows, ncols = axs.shape
         for iz in range(self.nz):
@@ -1443,7 +1448,7 @@ class QmleOutput():
 
             if plot_errors:
                 ax.fill_between(
-                    self.k_bins, 1 - self.errors[iz], 1 + self.errors[iz],
+                    self.k_bins, errors[0][iz], errors[1][iz],
                     alpha=0.6, color='grey')
 
         return axs
