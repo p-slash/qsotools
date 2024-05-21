@@ -1407,7 +1407,8 @@ class QmleOutput():
             cov = total_cov[
                 i * self.nk:(i + 1) * self.nk, i * self.nk:(i + 1) * self.nk
             ][w, :][:, w].copy()
-            cov /= np.outer(self.power.power_fid[i], self.power.power_fid[i])
+            v = self.power.power_fid[i][w]
+            cov /= np.outer(v, v)
 
             if use_diag_errors:
                 cov = np.sqrt(cov.diagonal())
