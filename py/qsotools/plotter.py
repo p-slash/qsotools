@@ -1404,6 +1404,14 @@ class QmleOutput():
 
         return coeff_func_pairs
 
+    def plotPolyCorrections(self, list_funcs, axs):
+        nrows, ncols = axs.shape
+        for iz in range(self.nz):
+            row = int(iz / ncols)
+            col = iz % ncols
+            ax = axs[row, col]
+            ax.semilogx(self.k_bins, 1 + list_funcs[iz](self.k_bins), 'r--')
 
-
-
+    def applyPolyCorrections(self, list_funcs):
+        for i in range(self.nz):
+            self.power.power_fid[i] *= 1 + list_funcs[i](self.k_bins)
