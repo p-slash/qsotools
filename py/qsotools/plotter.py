@@ -1385,7 +1385,7 @@ class QmleOutput():
         dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.z_bins)
         ratios = self.power.power_qmle / self.power.power_fid - 1
 
-        coeff_func_pairs = []
+        coeff_list = []
 
         for i, z in enumerate(self.z_bins):
             kmax = alpha_knyq * np.pi / dvarr[i]
@@ -1399,19 +1399,20 @@ class QmleOutput():
                 _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
                 absolute_sigma=True)
 
-            coeff_func_pairs.append(
-                ((popt, pcov), partial(_nppoly2val, popt)))
+            coeff_list.append((popt, pcov))
 
-        return coeff_func_pairs
+        return coeff_list
 
-    def plotPolyCorrections(self, list_funcs, axs):
+    def plotPolyCorrections(self, coeff_list, axs):
         nrows, ncols = axs.shape
         for iz in range(self.nz):
             row = int(iz / ncols)
             col = iz % ncols
             ax = axs[row, col]
-            ax.semilogx(self.k_bins, 1 + list_funcs[iz](self.k_bins), 'r--')
+            y = _nppoly2val(self.k_bins, *coeff_list[iz][0])
+            ax.semilogx(self.k_bins, 1 + y, 'r--')
 
-    def applyPolyCorrections(self, list_funcs):
-        for i in range(self.nz):
-            self.power.power_fid[i] *= 1 + list_funcs[i](self.k_bins)
+    def applyPolyCorrections(self, coeff_list):
+        for iz in range(self.nz):
+            y = _nppoly2val(self.k_bins, *coeff_list[iz][0])
+            self.power.power_fid[iz] *= 1 + y
