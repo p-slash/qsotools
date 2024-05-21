@@ -735,6 +735,10 @@ class PowerPlotter(object):
             figsize=(colsize * ncols, rowsize * nrows)
         )
 
+        noff_cols = ncols * nrows - self.nz
+        for jj in range(noff_cols):
+            axs[-1, -1 - jj].set_axis_off()
+
         return fig, axs
 
     def plot_grid_all(
@@ -748,9 +752,6 @@ class PowerPlotter(object):
 
         previous_measurements, other_measurements = (
             PowerPlotter._parse_includes(includes, ratio_wrt_fid))
-
-        for jj in range(noff_cols):
-            axs[-1, -1 - jj].set_axis_off()
 
         kpi_factor = self.k_bins / np.pi
         if is_sb:
@@ -1266,6 +1267,17 @@ def _nppoly2val(k, p0, p1, p2):
     return np.polyval([p0, p1, p2], np.log(k / 0.01))
 
 
+def generatePoly2(k, popt, pcov, n=100, seed=0):
+    popts = np.random.default_rng(seed).multivariate_normal(
+        popt, pcov, size=n)
+
+    results = np.empty(n, popt.size)
+    for i, x in enumerate(popts):
+        results[i] = _nppoly2val(k, *x)
+
+    return results
+
+
 class QmleOutput():
     def __init__(self, path_fname_base, sparse="s0.000"):
         self.power = PowerPlotter(
@@ -1422,18 +1434,26 @@ class QmleOutput():
         return coeff_list
 
     def plotPolyCorrections(
-            self, coeff_list, axs=None, plus_one=True, plot_errors=False
+            self, coeff_list, axs=None, plus_one=True, plot_errors=False,
+            scale_errors=3, contour_poly=False
     ):
         if axs is None:
             axs = self.power.create_fig_axs()[1]
 
-        y = np.empty((self.nz, self.nk))
-        errors = np.empty_like((2, self.nz, self.nk))
+        errors = np.empty((2, self.nz, self.nk))
         errors[0] = -self.power.error
         errors[1] = self.power.error
+        errors /= scale_errors * self.power.power_fid
 
+        y = np.empty((self.nz, self.nk))
         for iz in range(self.nz):
             y[iz] = _nppoly2val(self.k_bins, *coeff_list[iz][0])
+
+        if contour_poly:
+            std_y = np.empty((self.nz, self.nk))
+            for iz in range(self.nz):
+                std_y[iz] = np.std(
+                    generatePoly2(self.k_bins, *coeff_list[iz]), axis=0)
 
         if plus_one:
             y += 1
@@ -1446,10 +1466,15 @@ class QmleOutput():
             ax = axs[row, col]
             ax.semilogx(self.k_bins, y[iz], 'r--')
 
+            if contour_poly:
+                ax.fill_between(
+                    self.k_bins, y[iz] - std_y[iz], y[iz] + std_y[iz],
+                    alpha=0.4, color='r')
+
             if plot_errors:
                 ax.fill_between(
                     self.k_bins, errors[0][iz], errors[1][iz],
-                    alpha=0.6, color='grey')
+                    alpha=0.4, color='grey')
 
         return axs
 
