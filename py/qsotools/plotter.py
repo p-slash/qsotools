@@ -725,13 +725,8 @@ class PowerPlotter(object):
 
         return previous_measurements, other_measurements
 
-    def plot_grid_all(
-            self, ncols=3, colsize=5, rowsize=3, label="DESI",
-            outplot_fname=None, includes=['karacayli', 'eboss'],
-            ratio_wrt_fid=False, is_sb=False, kmin=5e-4, fit_deg=-1,
-    ):
+    def create_fig_axs(self, ncols=3, colsize=5, rowsize=3):
         nrows = int(np.ceil(self.nz / ncols))
-        noff_cols = ncols * nrows - self.nz
 
         fig, axs = plt.subplots(
             nrows, ncols,
@@ -739,6 +734,17 @@ class PowerPlotter(object):
             gridspec_kw={'hspace': 0, 'wspace': 0},
             figsize=(colsize * ncols, rowsize * nrows)
         )
+
+        return fig, axs
+
+    def plot_grid_all(
+            self, ncols=3, colsize=5, rowsize=3, label="DESI",
+            outplot_fname=None, includes=['karacayli', 'eboss'],
+            ratio_wrt_fid=False, is_sb=False, kmin=5e-4, fit_deg=-1,
+    ):
+        fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
+        nrows = axs.shape[0]
+        noff_cols = ncols * nrows - self.nz
 
         previous_measurements, other_measurements = (
             PowerPlotter._parse_includes(includes, ratio_wrt_fid))
@@ -1378,12 +1384,19 @@ class QmleOutput():
         plt.xlim(auto_logxlimmer(self.k_bins))
         plt.ylabel(r"$\sigma_\mathrm{boot} / \sigma_\mathrm{qmle}$")
 
-    def fitPolyPerBins(self, kmin=0, alpha_knyq=0.75):
+    def fitPolyPerBins(
+            self, kmin=0, alpha_knyq=0.75,
+            use_diag_errors=False, use_boot_errors=False
+    ):
         from scipy.optimize import curve_fit
-        from functools import partial
 
         dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.z_bins)
         ratios = self.power.power_qmle / self.power.power_fid - 1
+
+        if use_boot_errors:
+            total_cov = self.fisher_boot.invfisher
+        else:
+            total_cov = self.fisher_qmle.invfisher
 
         coeff_list = []
 
@@ -1391,9 +1404,11 @@ class QmleOutput():
             kmax = alpha_knyq * np.pi / dvarr[i]
             w = (kmin <= self.k_bins) & (self.k_bins < kmax)
             ratio = ratios[i][w]
-            cov = self.fisher_boot.invfisher[
+            cov = total_cov[
                 i * self.nk:(i + 1) * self.nk, i * self.nk:(i + 1) * self.nk
             ][w, :][:, w]
+            if use_diag_errors:
+                cov = np.sqrt(cov.diagonal())
 
             popt, pcov = curve_fit(
                 _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
@@ -1403,14 +1418,23 @@ class QmleOutput():
 
         return coeff_list
 
-    def plotPolyCorrections(self, coeff_list, axs):
+    def plotPolyCorrections(self, coeff_list, axs=None, plus_one=True):
+        if axs is None:
+            axs = self.power.create_fig_axs()[1]
+
+        y = np.empty((self.nz, self.nk))
+        for iz in range(self.nz):
+            y[iz] = _nppoly2val(self.k_bins, *coeff_list[iz][0])
+
+        if plus_one:
+            y += 1
+
         nrows, ncols = axs.shape
         for iz in range(self.nz):
             row = int(iz / ncols)
             col = iz % ncols
             ax = axs[row, col]
-            y = _nppoly2val(self.k_bins, *coeff_list[iz][0])
-            ax.semilogx(self.k_bins, 1 + y, 'r--')
+            ax.semilogx(self.k_bins, y[iz], 'r--')
 
     def applyPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
