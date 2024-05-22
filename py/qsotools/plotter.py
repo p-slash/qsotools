@@ -691,9 +691,9 @@ class PowerPlotter(object):
         d = (self.power_qmle - self.power_true).ravel()
         to_remove = np.isclose(self.error.ravel(), 0)
 
-        if kmax is not None and np.all(kmax > 0):
+        if kmax is not None:
             to_remove |= (self.karray > kmax)
-        if kmin is not None and np.all(kmin > 0):
+        if kmin is not None:
             to_remove |= (self.karray < kmin)
 
         if zbin is not None:
