@@ -1494,8 +1494,8 @@ class QmleOutput():
         if contour_poly:
             std_y = np.empty((self.nz, self.nk))
             for iz in range(self.nz):
-                std_y[iz] = np.std(
-                    generatePoly2(self.k_bins, *coeff_list[iz]), axis=0)
+                std_y[iz] = np.std(generatePoly2(
+                    self.k_bins, coeff_list[iz][0], coeff_list[iz][1]), axis=0)
 
         if plus_one:
             y += 1
