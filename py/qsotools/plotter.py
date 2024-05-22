@@ -744,7 +744,8 @@ class PowerPlotter(object):
     def plot_grid_all(
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
-            ratio_wrt_fid=False, is_sb=False, kmin=5e-4, fit_deg=-1,
+            ratio_wrt_fid=False, is_sb=False, xscale='linear',
+            kmin=5e-4, fit_deg=-1
     ):
         fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
         nrows = axs.shape[0]
@@ -878,7 +879,7 @@ class PowerPlotter(object):
                 ax.xaxis.set_tick_params(which='both', labelbottom=True)
                 plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
                 # ha='left')
-                ax.set_xscale("log")
+                ax.set_xscale(xscale)
                 ax.set_xlim(auto_logxlimmer(self.k_bins))
 
             ax.grid(True, "major")
