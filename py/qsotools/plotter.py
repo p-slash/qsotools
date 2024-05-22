@@ -1271,7 +1271,7 @@ def generatePoly2(k, popt, pcov, n=100, seed=0):
     popts = np.random.default_rng(seed).multivariate_normal(
         popt, pcov, size=n)
 
-    results = np.empty(n, popt.size)
+    results = np.empty((n, k.size))
     for i, x in enumerate(popts):
         results[i] = _nppoly2val(k, *x)
 
