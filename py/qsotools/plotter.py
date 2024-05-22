@@ -1305,6 +1305,7 @@ class QmleOutput():
             k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
 
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
+        self.bias_correction = np.ones_like(self.power.power_qmle)
 
         if use_boot_errors:
             self.setBootError()
@@ -1520,4 +1521,7 @@ class QmleOutput():
     def applyPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
             y = _nppoly2val(self.k_bins, *coeff_list[iz][0])
-            self.power.power_fid[iz] *= 1 + y
+            self.bias_correction[iz] = 1 + y
+
+        self.power.power_qmle = (
+            self.power.power_fid + self.power.thetap) / self.bias_correction
