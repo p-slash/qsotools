@@ -336,7 +336,7 @@ class PowerPlotter(object):
     def __init__(self, filename):
         # Reading file into an ascii table
         self._readDBTFile(filename)
-        self.fisher = np.diag(1 / self.error.ravel()**2)
+        self.covariance = np.diag(self.error.ravel()**2)
         print(f"There are {self.nz:d} redshift bins and {self.nk:d} k bins.")
 
     def useNoFidEstimate(self):
@@ -345,8 +345,8 @@ class PowerPlotter(object):
     def useFiducialEstimate(self):
         self.power_qmle = self.power_fid + self.thetap
 
-    def setFisher(self, fisher):
-        self.fisher = fisher
+    def setCovariance(self, cov):
+        self.covariance = cov.copy()
 
     def saveAs(self, fname):
         names = (
@@ -682,11 +682,9 @@ class PowerPlotter(object):
 
         save_figure(outplot_fname)
 
-    def getChiSquare(self, zbin=None, fisher=None, kmin=None, kmax=None):
-        if isinstance(fisher, np.ndarray):
-            invcov = fisher
-        else:
-            invcov = self.fisher
+    def getChiSquare(self, zbin=None, cov=None, kmin=None, kmax=None):
+        if not isinstance(cov, np.ndarray):
+            cov = self.covariance.copy()
 
         d = (self.power_qmle - self.power_true).ravel()
         to_remove = np.isclose(self.error.ravel(), 0)
@@ -700,10 +698,11 @@ class PowerPlotter(object):
             to_remove |= (self.zarray != self.z_bins[zbin])
 
         if to_remove.any():
-            invcov = np.delete(invcov, to_remove, axis=0)
-            invcov = np.delete(invcov, to_remove, axis=1)
+            cov = np.delete(cov, to_remove, axis=0)
+            cov = np.delete(cov, to_remove, axis=1)
             d = np.delete(d, to_remove, axis=0)
 
+        invcov = np.linalg.inv(cov)
         return d.dot(invcov.dot(d)), d.size
 
     @staticmethod
@@ -1317,10 +1316,10 @@ class QmleOutput():
         w = (zmin <= self.power.zarray) & (self.power.zarray < zmax)
         kmax[~w] = 0
         self.chi2_qmle = self.power.getChiSquare(
-            fisher=self.fisher_qmle.fisher, kmin=kmin,
+            cov=self.fisher_qmle.invfisher, kmin=kmin,
             kmax=kmax)
         self.chi2_boot = self.power.getChiSquare(
-            fisher=self.fisher_boot.fisher, kmin=kmin,
+            cov=self.fisher_boot.invfisher, kmin=kmin,
             kmax=kmax)
 
     def convert2Undamped(self):
@@ -1505,7 +1504,7 @@ class QmleOutput():
             row = int(iz / ncols)
             col = iz % ncols
             ax = axs[row, col]
-            ax.semilogx(self.k_bins, y[iz], 'r--')
+            ax.plot(self.k_bins, y[iz], 'r--')
 
             if contour_poly:
                 ax.fill_between(
