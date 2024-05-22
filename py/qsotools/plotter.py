@@ -936,7 +936,7 @@ class FisherPlotter(object):
         self.zlabels = ["%.1f" % z for z in z1 + np.arange(nz) * dz]
 
         try:
-            self.invfisher = self._invert()
+            self.invfisher = self.invertFisher()
         except Exception as e:
             self.invfisher = None
             print(f"Cannot invert the Fisher matrix. {e}")
@@ -944,7 +944,7 @@ class FisherPlotter(object):
         if is_cov:
             self.fisher, self.invfisher = self.invfisher, self.fisher
 
-    def _invert(self):
+    def invertFisher(self):
         newf = self.fisher.copy()
         di = np.diag_indices(self.fisher.shape[0])
         w = newf[di] == 0
@@ -1262,6 +1262,15 @@ class FisherPlotter(object):
         save_figure(outplot_fname)
         return ax
 
+    def setFisherFromInverse(self):
+        self.fisher = self.invfisher.copy()
+
+        try:
+            self.fisher = self.invertFisher()
+        except Exception as e:
+            self.fisher = None
+            print(f"Cannot invert the Fisher matrix. {e}")
+
 
 def _nppoly2val(k, p0, p1, p2):
     return np.polyval([p0, p1, p2], np.log(k / 0.01))
@@ -1319,7 +1328,31 @@ class QmleOutput():
         self.power.error = np.sqrt(
             self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
 
-    def addOthersAverage(self, others):
+    def _addOthersAverageSimple(self, others):
+        n = len(others) + 1
+
+        for other in others:
+            self.power.power_qmle += other.power.power_qmle
+            self.power.thetap += other.power.thetap
+            self.power.power_qmle_full += other.power.power_qmle_full
+            self.power.power_qmle_noise += other.power.power_qmle_noise
+            self.power.power_qmle_fid += other.power.power_qmle_fid
+
+            self.fisher_qmle.invfisher += other.fisher_qmle.invfisher
+            self.fisher_boot.invfisher += other.fisher_boot.invfisher
+
+        self.power.power_qmle /= n
+        self.power.thetap /= n
+        self.power.power_qmle_full /= n
+        self.power.power_qmle_noise /= n
+        self.power.power_qmle_fid /= n
+        self.fisher_qmle.invfisher /= n * n
+        self.fisher_boot.invfisher /= n * n
+
+        self.fisher_qmle.setFisherFromInverse()
+        self.fisher_boot.setFisherFromInverse()
+
+    def _addOthersAverageWeighted(self, others):
         self.power.power_qmle = self.fisher_qmle.fisher.dot(
             self.power.power_qmle.ravel())
         self.power.thetap = self.fisher_qmle.fisher.dot(
@@ -1351,7 +1384,7 @@ class QmleOutput():
             self.fisher_boot.invfisher += other.fisher_qmle.fisher.dot(
                 other.fisher_boot.invfisher).dot(other.fisher_qmle.fisher)
 
-        self.fisher_qmle.invfisher = self.fisher_qmle._invert()
+        self.fisher_qmle.invfisher = self.fisher_qmle.invertFisher()
         self.power.power_qmle = self.fisher_qmle.invfisher.dot(
             self.power.power_qmle).reshape(self.nz, self.nk)
         self.power.thetap = self.fisher_qmle.invfisher.dot(
@@ -1365,10 +1398,13 @@ class QmleOutput():
 
         self.fisher_boot.invfisher = self.fisher_qmle.invfisher.dot(
             self.fisher_boot.invfisher).dot(self.fisher_qmle.invfisher)
-        self.fisher_boot.fisher = self.fisher_boot.invfisher
-        self.fisher_boot.invfisher = self.fisher_boot._invert()
-        self.fisher_boot.fisher, self.fisher_boot.invfisher = \
-            self.fisher_boot.invfisher, self.fisher_boot.fisher
+        self.fisher_boot.setFisherFromInverse()
+
+    def addOthersAverage(self, others, weighted=False):
+        if weighted:
+            self._addOthersAverageWeighted(others)
+        else:
+            self._addOthersAverageSimple(others)
 
         self.power.error = np.sqrt(
             self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
