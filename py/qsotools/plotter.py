@@ -226,7 +226,7 @@ def auto_logxlimmer(x, margins=(0.05, 0.05)):
     return xmin, xmax
 
 
-class PowerPlotter(object):
+class PowerPlotter():
     """PowerPlotter is an object to plot QMLE power spectrum results by
     individual redshift bins or all in one.
     Simply initialize with a filename.
@@ -333,11 +333,12 @@ class PowerPlotter(object):
             self.damping_constant = 0
         self.power_table = np.array(power_table)
 
-    def __init__(self, filename):
+    def __init__(self, filename, verbose=False):
         # Reading file into an ascii table
         self._readDBTFile(filename)
         self.covariance = np.diag(self.error.ravel()**2)
-        print(f"There are {self.nz:d} redshift bins and {self.nk:d} k bins.")
+        if verbose:
+            print(f"There are {self.nz:d} z bins and {self.nk:d} k bins.")
 
     def useNoFidEstimate(self):
         self.power_qmle = self.power_qmle_full - self.power_qmle_noise
