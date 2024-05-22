@@ -1273,7 +1273,7 @@ class FisherPlotter(object):
 
 
 def _nppoly2val(k, p0, p1, p2):
-    return np.polyval([p0, p1, p2], np.log(k / 0.01))
+    return np.polyval([p0, p1, p2], k / 0.009)
 
 
 def generatePoly2(k, popt, pcov, n=100, seed=0):
