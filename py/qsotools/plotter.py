@@ -1288,7 +1288,7 @@ def generatePoly2(k, popt, pcov, n=100, seed=0):
 
 
 class QmleOutput():
-    def __init__(self, path_fname_base, sparse="s0.000"):
+    def __init__(self, path_fname_base, sparse="s0.000", use_boot_errors=True):
         self.power = PowerPlotter(
             f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
         self.nz = self.power.nz
@@ -1305,6 +1305,9 @@ class QmleOutput():
             k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
 
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
+
+        if use_boot_errors:
+            self.setBootError()
         self.setChi2()
 
     def setChi2(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
@@ -1434,7 +1437,7 @@ class QmleOutput():
 
     def fitPolyPerBins(
             self, kmin=0, alpha_knyq=0.75,
-            use_diag_errors=False, use_boot_errors=False
+            use_diag_errors=False, use_boot_errors=True
     ):
         from scipy.optimize import curve_fit
 
