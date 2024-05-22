@@ -781,7 +781,7 @@ class PowerPlotter(object):
             ls.append(
                 ax.errorbar(
                     self.k_bins[w], pkpi[w], ekpi[w],
-                    label=label, fmt=".-", alpha=0.8
+                    label=label, fmt=".", alpha=0.8
                 )
             )
 
