@@ -237,7 +237,7 @@ def main():
 
     if args.force_posdef_diff:
         bootstrap_matrix = posdefDifference(
-            bootstrap_matrix, qmle_covariance, qmle_zero_idx, args.reg_in_cov)
+            bootstrap_matrix, qmle_covariance, args.reg_in_cov)
 
     covfis_txt = "cov" if args.reg_in_cov else "fisher"
     finalfname = (
