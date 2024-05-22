@@ -1468,8 +1468,10 @@ class QmleOutput():
             popt, pcov = curve_fit(
                 _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
                 absolute_sigma=True)
+            diff = _nppoly2val(self.k_bins[w], *popt) - ratio
+            chi2 = diff.dot(np.linalg.inv(cov).dot(diff))
 
-            coeff_list.append((popt, pcov))
+            coeff_list.append((popt, pcov, (chi2, diff.size)))
 
         return coeff_list
 
