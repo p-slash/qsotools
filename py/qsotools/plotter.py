@@ -1342,7 +1342,7 @@ class QmleOutput():
 
         results = np.empty((ndim, 3))
         for i, arg in enumerate(args):
-            results[i] = self.getChi2(*arg)
+            results[i] = self.calculateChi2(*arg)
 
         return results
 
