@@ -1310,18 +1310,41 @@ class QmleOutput():
 
         if use_boot_errors:
             self.setBootError()
-        self.setChi2()
 
-    def setChi2(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
+    def calculateChi2(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
         kmax = alpha_knyq * np.pi / self.dvarr
         w = (zmin <= self.power.zarray) & (self.power.zarray < zmax)
         kmax[~w] = 0
-        self.chi2_qmle = self.power.getChiSquare(
+        chi2_qmle = self.power.getChiSquare(
             cov=self.fisher_qmle.invfisher, kmin=kmin,
             kmax=kmax)
-        self.chi2_boot = self.power.getChiSquare(
+        chi2_boot = self.power.getChiSquare(
             cov=self.fisher_boot.invfisher, kmin=kmin,
             kmax=kmax)
+
+        return chi2_qmle[0], chi2_boot[0], chi2_qmle[1]
+
+    def getChi2s(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
+        def is_array_like(var):
+            return isinstance(var, list) or isinstance(var, np.ndarray)
+
+        ndim = 1
+        for var in [kmin, alpha_knyq, zmin, zmax]:
+            if is_array_like(var):
+                if len(var) != 1 and ndim != 1 and len(var) != ndim:
+                    raise Exception("Dimensions don't match.")
+
+                ndim = max(ndim, len(var))
+
+        args = np.empty((ndim, 4))
+        for i, var in enumerate([kmin, alpha_knyq, zmin, zmax]):
+            args[:, i] = var
+
+        results = np.empty((ndim, 3))
+        for i, arg in enumerate(args):
+            results[i] = self.getChi2(*arg)
+
+        return results
 
     def convert2Undamped(self):
         self.power.thetap = 0.5 * self.fisher_qmle.invfisher.dot(
