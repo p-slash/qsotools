@@ -1437,8 +1437,6 @@ class QmleOutput():
         self.power.error = np.sqrt(
             self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
 
-        self.setChi2()
-
     def plotBootErrVsQmleErr(self, cmap=plt.cm.turbo):
         booterr = np.sqrt(
             self.fisher_boot.invfisher.diagonal())
