@@ -337,6 +337,8 @@ class PowerPlotter():
         # Reading file into an ascii table
         self._readDBTFile(filename)
         self.covariance = np.diag(self.error.ravel()**2)
+        self._bivsmooth = None
+        self.power_smooth = None
         if verbose:
             print(f"There are {self.nz:d} z bins and {self.nk:d} k bins.")
 
@@ -348,6 +350,21 @@ class PowerPlotter():
 
     def setCovariance(self, cov):
         self.covariance = cov.copy()
+
+    def setSmoothBivariateSpline(self):
+        from scipy.interpolate import SmoothBivariateSpline
+        p = self.power_qmle.ravel()
+        e = self.error.ravel()
+        w = (p > 0) & (e > 0)
+        lnz = np.log(1 + self.zarray)
+        lnk = np.log(self.karray)
+        lnP = np.log(p[w])
+        lnE = e[w] / p[w]
+        self._bivsmooth = SmoothBivariateSpline(
+            lnz[w], lnk[w], lnP, w=1. / lnE, s=len(lnE) * 5)
+
+        self.power_smooth = np.exp(self._bivsmooth(
+            lnz, lnk, grid=False)).reshape(self.nz, self.nk)
 
     def saveAs(self, fname):
         names = (
@@ -1306,10 +1323,11 @@ class QmleOutput():
             k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
 
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
-        self.bias_correction = np.ones_like(self.power.power_qmle)
+        self.bias_correction = np.zeros_like(self.power.power_qmle)
 
         if use_boot_errors:
             self.setBootError()
+        self.power.setSmoothBivariateSpline()
 
     def calculateChi2(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
         kmax = alpha_knyq * np.pi / self.dvarr
@@ -1544,8 +1562,10 @@ class QmleOutput():
 
     def applyPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
-            y = _nppoly2val(self.k_bins, *coeff_list[iz][0])
-            self.bias_correction[iz] = 1 + y
+            self.bias_correction[iz] = _nppoly2val(
+                self.k_bins, *coeff_list[iz][0])
 
-        self.power.power_qmle = (
-            self.power.power_fid + self.power.thetap) / self.bias_correction
+        delta_power = -self.bias_correction / (self.bias_correction + 1)
+        delta_power *= self.power.power_smooth
+        self.power.power_qmle = \
+            self.power.power_fid + self.power.thetap + delta_power
