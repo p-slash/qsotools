@@ -762,7 +762,7 @@ class PowerPlotter():
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
-            kmin=5e-4, fit_deg=-1
+            kmin=5e-4, fit_deg=-1, use_smooth_power=False
     ):
         fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
         nrows = axs.shape[0]
@@ -791,7 +791,10 @@ class PowerPlotter():
             if is_sb:
                 ax.axhline(0, c='k')
 
-            pkpi = self.power_qmle[iz] * kpi_factor
+            if use_smooth_power:
+                pkpi = self.power_smooth[iz] * kpi_factor
+            else:
+                pkpi = self.power_qmle[iz] * kpi_factor
             ekpi = self.error[iz] * kpi_factor
 
             w = self.error[iz] > 0
