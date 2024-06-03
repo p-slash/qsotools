@@ -224,7 +224,8 @@ def auto_xlimmer(x, margins=(0.05, 0.05), xscale='log'):
         xmin = 10**(_pad_log_margin(x[0], -margins[0]))
         xmax = 10**(_pad_log_margin(x[-1], margins[1]))
     else:
-        xmin, xmax = x[0] * (1 - margins[0]), x[-1] * (1 + margins[-1])
+        xmin = x[0] - (x[1] - x[0])
+        xmax = x[-1] + (x[-1] - x[-2])
 
     return xmin, xmax
 
@@ -914,12 +915,12 @@ class PowerPlotter():
         return axs
 
     def plot_multiz_per_panel(
-            self, ncols=2, colsize=8, rowsize=5, alpha_knyq=0.75, delta_y=0.5,
+            self, ncols=2, colsize=6, rowsize=5, alpha_knyq=0.75, delta_y=0.5,
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
             kmin=5e-4, use_smooth_power=False
     ):
         fig, axs = plt.subplots(
-            1, ncols, sharey='row', gridspec_kw={'wspace': 0},
+            1, ncols, sharey='row', gridspec_kw={'wspace': 0.06},
             figsize=(colsize * ncols, rowsize)
         )
 
