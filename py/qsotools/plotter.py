@@ -219,9 +219,12 @@ def auto_logylimmer(k, pkpi, ekpi=None, kmax=0.04, margins=(0.05, 0.2)):
     return ymin, ymax
 
 
-def auto_logxlimmer(x, margins=(0.05, 0.05)):
-    xmin = 10**(_pad_log_margin(x[0], -margins[0]))
-    xmax = 10**(_pad_log_margin(x[-1], margins[1]))
+def auto_xlimmer(x, margins=(0.05, 0.05), xscale='log'):
+    if xscale == "log":
+        xmin = 10**(_pad_log_margin(x[0], -margins[0]))
+        xmax = 10**(_pad_log_margin(x[-1], margins[1]))
+    else:
+        xmin, xmax = x[0] * (1 - margins[0]), x[-1] * (1 + margins[-1])
 
     return xmin, xmax
 
@@ -900,7 +903,7 @@ class PowerPlotter():
                 plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
                 # ha='left')
                 ax.set_xscale(xscale)
-                ax.set_xlim(auto_logxlimmer(self.k_bins))
+                ax.set_xlim(auto_xlimmer(self.k_bins, xscale=xscale))
 
             ax.grid(True, "major")
             ax.grid(which='minor', linestyle=':', linewidth=0.8)
@@ -911,7 +914,7 @@ class PowerPlotter():
         return axs
 
     def plot_multiz_per_panel(
-            self, ncols=2, colsize=6, rowsize=5, alpha_knyq=0.75, delta_y=0.5,
+            self, ncols=2, colsize=8, rowsize=5, alpha_knyq=0.75, delta_y=0.5,
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
             kmin=5e-4, use_smooth_power=False
     ):
@@ -935,18 +938,19 @@ class PowerPlotter():
                 ax.axhline(0, c='k')
 
             for ii, iz in enumerate(izs):
+                itrue = ii * ncols + icol
                 z = self.z_bins[iz]
-                c = plt.cm.turbo((ii * ncols + icol) / self.nz)
+                c = plt.cm.turbo(itrue / self.nz)
 
-                y = y_data[ii * ncols + icol]
-                e = e_data[ii * ncols + icol]
+                y = y_data[itrue]
+                e = e_data[itrue]
                 if use_smooth_power:
                     y[:] = self.power_smooth[iz].copy()
                 else:
                     y[:] = self.power_qmle[iz].copy()
 
                 if ratio_wrt_fid:
-                    shift_y = ii * delta_y
+                    shift_y = itrue * delta_y / ncols
                     kpi_factor = 1 / self.power_fid[iz]
                     ax.axhline(1 + shift_y, c=c, ls='--')
                     y *= kpi_factor
@@ -971,6 +975,7 @@ class PowerPlotter():
         w = (self.karray > kmin) & (self.karray < k_nyq / 2)
         y_data = y_data.ravel()[w]
         e_data = e_data.ravel()[w]
+        k_bins = np.unique(self.karray[w])
 
         if is_sb:
             ymin, ymax = -1.5, 4.5
@@ -1002,7 +1007,7 @@ class PowerPlotter():
             ax.xaxis.set_tick_params(which='both', labelbottom=True)
 
             ax.set_xscale(xscale)
-            ax.set_xlim(auto_logxlimmer(self.k_bins))
+            ax.set_xlim(auto_xlimmer(k_bins, xscale=xscale))
 
             ax.grid(True, "major")
             ax.grid(which='minor', linestyle=':', linewidth=0.8)
@@ -1575,7 +1580,7 @@ class QmleOutput():
 
         plt.legend(ncol=3)
         plt.xlabel(r"$k$ [s km$^{-1}$]")
-        plt.xlim(auto_logxlimmer(self.k_bins))
+        plt.xlim(auto_xlimmer(self.k_bins))
         plt.ylabel(r"$\sigma_\mathrm{boot} / \sigma_\mathrm{qmle}$")
 
     def fitPolyPerBins(
