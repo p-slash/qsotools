@@ -956,7 +956,10 @@ class PowerPlotter():
 
                 e[:] = self.error[iz] * kpi_factor
                 k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
-                w = (self.error[iz] > 0) & (self.k_bins < k_nyq * alpha_knyq)
+                w = (
+                    (self.error[iz] > 0) & (self.k_bins <= k_nyq * alpha_knyq)
+                    & (self.k_bins >= kmin)
+                )
 
                 ax.errorbar(
                     self.k_bins[w], y[w], e[w], label=f"{z:.1f}",
