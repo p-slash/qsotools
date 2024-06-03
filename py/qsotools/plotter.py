@@ -951,6 +951,8 @@ class PowerPlotter():
                     ax.axhline(1 + shift_y, c=c, ls='--')
                     y *= kpi_factor
                     y += shift_y
+                else:
+                    y *= kpi_factor
 
                 e[:] = self.error[iz] * kpi_factor
                 k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
