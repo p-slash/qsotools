@@ -910,6 +910,100 @@ class PowerPlotter():
         save_figure(outplot_fname)
         return axs
 
+    def plot_multiz_per_panel(
+            self, ncols=2, colsize=6, rowsize=5, alpha_knyq=0.75, delta_y=0.5,
+            ratio_wrt_fid=False, is_sb=False, xscale='linear',
+            kmin=5e-4, use_smooth_power=False
+    ):
+        fig, axs = plt.subplots(
+            1, ncols, sharey='row', gridspec_kw={'wspace': 0},
+            figsize=(colsize * ncols, rowsize)
+        )
+
+        kpi_factor = self.k_bins / np.pi
+        if is_sb:
+            kpi_factor *= 10**3
+
+        y_data = np.empty((self.nz, self.nk))
+        e_data = np.empty((self.nz, self.nk))
+
+        for icol in range(ncols):
+            ax = axs[icol]
+            izs = np.arange(self.nz)[icol::ncols]
+
+            if is_sb:
+                ax.axhline(0, c='k')
+
+            for ii, iz in enumerate(izs):
+                z = self.z_bins[iz]
+                c = plt.cm.turbo((ii * ncols + icol) / self.nz)
+
+                y = y_data[ii * ncols + icol]
+                e = e_data[ii * ncols + icol]
+                if use_smooth_power:
+                    y[:] = self.power_smooth[iz].copy()
+                else:
+                    y[:] = self.power_qmle[iz].copy()
+
+                if ratio_wrt_fid:
+                    shift_y = ii * delta_y
+                    kpi_factor = 1 / self.power_fid[iz]
+                    ax.axhline(1 + shift_y, c=c, ls='--')
+                    y *= kpi_factor
+                    y += shift_y
+
+                e[:] = self.error[iz] * kpi_factor
+                k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
+                w = (self.error[iz] > 0) & (self.k_bins < k_nyq * alpha_knyq)
+
+                ax.errorbar(
+                    self.k_bins[w], y[w], e[w], label=f"{z:.1f}",
+                    fmt=".", alpha=0.8, c=c)
+
+            ax.legend(ncol=3)
+
+        k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + self.zarray))
+        w = (self.karray > kmin) & (self.karray < k_nyq / 2)
+        y_data = y_data.ravel()[w]
+        e_data = e_data.ravel()[w]
+
+        if is_sb:
+            ymin, ymax = -1.5, 4.5
+            use_yticks = np.arange(-1, 5)
+        elif not ratio_wrt_fid:
+            ymin, ymax = auto_logylimmer(self.karray[w], y_data, e_data)
+            use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
+            if ymin < 0.002:
+                use_yticks = [1e-3] + use_yticks
+        else:
+            ymin, ymax = None, None
+            use_yticks = []
+
+        ax = axs[0]
+        ax.set_ylim(ymin, ymax)
+        ax.set_yticks(use_yticks)
+
+        if ratio_wrt_fid:
+            ax.set_ylabel(r"$P/P_{\mathrm{true}}$")
+        elif is_sb:
+            ax.set_ylabel(r"$kP/\pi\,\times 10^3$")
+            ax.set_yscale("linear")
+        else:
+            ax.set_ylabel(r"$kP/\pi$")
+            ax.set_yscale("log")
+
+        for ax in axs:
+            ax.set_xlabel(r"$k$ [s km$^{-1}$]")
+            ax.xaxis.set_tick_params(which='both', labelbottom=True)
+
+            ax.set_xscale(xscale)
+            ax.set_xlim(auto_logxlimmer(self.k_bins))
+
+            ax.grid(True, "major")
+            ax.grid(which='minor', linestyle=':', linewidth=0.8)
+
+        return axs
+
 
 class FisherPlotter(object):
     """FisherPlotter is object to plot the Fisher matrix in its entirety or in
