@@ -976,7 +976,6 @@ class PowerPlotter():
         w = (self.karray > kmin) & (self.karray < k_nyq / 2)
         y_data = y_data.ravel()[w]
         e_data = e_data.ravel()[w]
-        k_bins = np.unique(self.karray[w])
 
         if is_sb:
             ymin, ymax = -1.5, 4.5
@@ -1003,6 +1002,7 @@ class PowerPlotter():
             ax.set_ylabel(r"$kP/\pi$")
             ax.set_yscale("log")
 
+        k_bins = np.unique(self.karray[self.karray < k_nyq * alpha_knyq])
         for ax in axs:
             ax.set_xlabel(r"$k$ [s km$^{-1}$]")
             ax.xaxis.set_tick_params(which='both', labelbottom=True)
