@@ -1605,7 +1605,8 @@ class QmleOutput():
 
     def fitPolyPerBins(
             self, kmin=0, alpha_knyq=0.75,
-            use_diag_errors=False, use_boot_errors=True, fit_square=False
+            use_diag_errors=False, use_boot_errors=True, fit_square=False,
+            degree=2
     ):
         from scipy.optimize import curve_fit
 
@@ -1641,8 +1642,8 @@ class QmleOutput():
                 cov = np.sqrt(cov.diagonal())
 
             popt, pcov = curve_fit(
-                _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
-                absolute_sigma=True, bounds=bounds)
+                _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(degree),
+                sigma=cov, absolute_sigma=True, bounds=bounds)
             diff = _nppoly2val(self.k_bins[w], *popt) - ratio
             chi2 = diff.dot(np.linalg.inv(cov).dot(diff))
 
