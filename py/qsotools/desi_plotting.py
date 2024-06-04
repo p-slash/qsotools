@@ -101,9 +101,12 @@ class DesiPlotter():
         # Start plotting
         plt.figure(figsize=figsize)
 
+        min_wave = np.min([wave[0] for wave in specobj.wave.values()])
+        max_wave = np.max([wave[-1] for wave in specobj.wave.values()])
+        xlims = (max(min_wave, xlims[0]), min(max_wave, xlims[1]))
+        del min_wave, max_wave
         ymax = getMaxFlux(specobj, (1 + zqso) * LYA_WAVELENGTH, 50.)
-        xlims = (max(specobj.wave['brz'][0], xlims[0]),
-                 min(specobj.wave['brz'][-1], xlims[1]))
+
         for key, value in emlines.items():
             wave_c = value[0] * (1 + zqso)
             if wave_c < xlims[0] or wave_c > xlims[1]:
