@@ -1642,8 +1642,8 @@ class QmleOutput():
         return coeff_list
 
     def plotPolyCorrections(
-            self, coeff_list, axs=None, plus_one=True, plot_errors=False,
-            scale_errors=3, contour_poly=False
+            self, coeff_list, axs=None, plus_one=True, square_root=False,
+            plot_errors=False, scale_errors=3, contour_poly=False
     ):
         if axs is None:
             axs = self.power.create_fig_axs()[1]
@@ -1656,6 +1656,8 @@ class QmleOutput():
         y = np.empty((self.nz, self.nk))
         for iz in range(self.nz):
             y[iz] = _nppoly2val(self.k_bins, *coeff_list[iz][0])
+        if square_root:
+            y = np.sqrt(y)
 
         if contour_poly:
             std_y = np.empty((self.nz, self.nk))
