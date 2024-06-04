@@ -1695,8 +1695,7 @@ class QmleOutput():
             self.power.power_fid + self.power.thetap + delta_power
 
     def inflateCovPolyCorrections(self, coeff_list):
-        self.extra_diag_errors = np.array([
+        self.extra_diag_errors = (np.array([
             _nppoly2val(self.k_bins, *coeff_list[iz][0])
             for iz in range(self.nz)
-        ]).ravel() * self.power.power_smooth
-        self.extra_diag_errors **= 2
+        ]) * self.power.power_smooth).ravel()**2
