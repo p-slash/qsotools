@@ -221,6 +221,10 @@ class DLASampler():
     settled on resampling the input Gaussian field, which reduced the excess
     clustering of DLAs.
 
+    This can be further tuned with ``sigma_kms`` option, which adds random
+    velocity separation to DLA redshift obtained from abundance matching. It
+    adds random ``dz = (1 + z_dla) * Normal(0, sigma_kms) / c`` to DLA redshift
+
     Other methods tested:
     - Optical depth mapping on the resampled (0.2 A) skewers. The PDF turns
     out non-trivial when smoothed; and you can't control excess clustering.
@@ -245,13 +249,14 @@ class DLASampler():
         return ((1 + z) / (1 + zpivot))**gamma_l
 
     def __init__(
-            self, wide_pix=2**10., nmin=19., nmax=23.,
+            self, wide_pix=2**10., sigma_kms=0, nmin=19., nmax=23.,
             zmin=0, zmax=20., nzbins=5000
     ):
         self.nmin = nmin
         self.nmax = nmax
 
         self.wide_pix = None
+        self.sigma_kms = sigma_kms
         self.sigma_scale = None
         self.set_var_gauss(wide_pix)
 
@@ -406,6 +411,13 @@ class DLASampler():
             num_dlas = w.sum()
 
             z_dlas = refac_z[w]
+            if self.sigma_kms > 0:
+                # Store and restore random state for backwards reproducibility
+                state = RNST.bit_generator.state
+                z_dlas += (1 + z_dlas) * RNST.normal(
+                    0, self.sigma_kms, size=z_dlas.size) / LIGHT_SPEED
+                RNST.bit_generator.state = state
+
             Nhi_dlas = self.get_random_NHi(num_dlas, RNST)
             id_dlas = np.array([
                 hash(f"{mockids[jj]:020d}{x:02d}") for x in np.arange(num_dlas)
