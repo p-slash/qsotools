@@ -1008,7 +1008,8 @@ class PowerPlotter():
             ax.set_ylabel(r"$kP/\pi$")
             ax.set_yscale("log")
 
-        k_bins = np.unique(self.karray[self.karray < k_nyq * alpha_knyq])
+        w = (self.karray > kmin) & (self.karray < k_nyq * alpha_knyq)
+        k_bins = np.unique(self.karray[w])
         for ax in axs:
             ax.set_xlabel(r"$k$ [s km$^{-1}$]")
             ax.xaxis.set_tick_params(which='both', labelbottom=True)
