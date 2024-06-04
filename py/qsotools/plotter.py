@@ -1599,20 +1599,24 @@ class QmleOutput():
 
     def fitPolyPerBins(
             self, kmin=0, alpha_knyq=0.75,
-            use_diag_errors=False, use_boot_errors=True, fit_abs=False
+            use_diag_errors=False, use_boot_errors=True, fit_square=False
     ):
         from scipy.optimize import curve_fit
 
         dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.z_bins)
         ratios = self.power.power_qmle / self.power.power_fid - 1
 
-        if fit_abs:
-            ratios = np.abs(ratios)
-
         if use_boot_errors:
             total_cov = self.fisher_boot.invfisher.copy()
         else:
             total_cov = self.fisher_qmle.invfisher.copy()
+
+        v = self.power.power_fid.ravel()
+        total_cov /= np.outer(v, v)
+        if fit_square:
+            ratios **= 2
+            total_cov **= 2
+            total_cov *= 2
 
         coeff_list = []
 
@@ -1623,8 +1627,6 @@ class QmleOutput():
             cov = total_cov[
                 i * self.nk:(i + 1) * self.nk, i * self.nk:(i + 1) * self.nk
             ][w, :][:, w].copy()
-            v = self.power.power_fid[i][w]
-            cov /= np.outer(v, v)
 
             if use_diag_errors:
                 cov = np.sqrt(cov.diagonal())
@@ -1698,4 +1700,4 @@ class QmleOutput():
         self.extra_diag_errors = (np.array([
             _nppoly2val(self.k_bins, *coeff_list[iz][0])
             for iz in range(self.nz)
-        ]) * self.power.power_smooth).ravel()**2
+        ]) * self.power.power_smooth**2).ravel()
