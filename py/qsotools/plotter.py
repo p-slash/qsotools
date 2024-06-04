@@ -1642,7 +1642,7 @@ class QmleOutput():
                 cov = np.sqrt(cov.diagonal())
 
             popt, pcov = curve_fit(
-                _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(degree),
+                _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(degree + 1),
                 sigma=cov, absolute_sigma=True, bounds=bounds)
             diff = _nppoly2val(self.k_bins[w], *popt) - ratio
             chi2 = diff.dot(np.linalg.inv(cov).dot(diff))
