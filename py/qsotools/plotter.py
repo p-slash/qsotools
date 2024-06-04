@@ -1623,6 +1623,9 @@ class QmleOutput():
             ratios **= 2
             total_cov **= 2
             total_cov *= 2
+            bounds = (0, 1)
+        else:
+            bounds = (-1, 1)
 
         coeff_list = []
 
@@ -1639,7 +1642,7 @@ class QmleOutput():
 
             popt, pcov = curve_fit(
                 _nppoly2val, self.k_bins[w], ratio, p0=np.zeros(3), sigma=cov,
-                absolute_sigma=True)
+                absolute_sigma=True, bounds=bounds)
             diff = _nppoly2val(self.k_bins[w], *popt) - ratio
             chi2 = diff.dot(np.linalg.inv(cov).dot(diff))
 
