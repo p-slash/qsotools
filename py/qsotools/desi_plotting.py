@@ -72,7 +72,7 @@ class DesiPlotter():
 
     def plot_spectrum_v3(
             self, targetid, coadd=False, smoothing_kernel=0, shift_z=0,
-            emlines=EMISSION_LINES, regions=REGIONS,
+            emlines=EMISSION_LINES, regions=REGIONS, xlims=(3550, 9800),
             plot_ivar=False, figsize=(13, 5)
     ):
         idx = np.nonzero(targetid == self.catalog['TARGETID'])[0]
@@ -102,9 +102,13 @@ class DesiPlotter():
         plt.figure(figsize=figsize)
 
         ymax = getMaxFlux(specobj, (1 + zqso) * LYA_WAVELENGTH, 50.)
-
+        xlims = (max(specobj.wave['brz'][0], xlims[0]),
+                 min(specobj.wave['brz'][-1], xlims[1]))
         for key, value in emlines.items():
             wave_c = value[0] * (1 + zqso)
+            if wave_c < xlims[0] or wave_c > xlims[1]:
+                continue
+
             y = getMaxFlux(specobj, wave_c, 20.) * 1.03
             ys = [y, y + ymax / 12]
             plt.plot([wave_c, wave_c], ys, c="xkcd:violet", lw=2.5, alpha=0.8)
@@ -117,8 +121,10 @@ class DesiPlotter():
 
         jj = 0
         for key, value in regions.items():
-            w1 = value[0] * (1 + zqso)
-            w2 = value[1] * (1 + zqso)
+            w1 = max(xlims[0], value[0] * (1 + zqso))
+            w2 = min(xlims[1], value[1] * (1 + zqso))
+            if w1 >= w2:
+                continue
             plt.axvspan(w1, w2, fc=plt.cm.tab10(jj), alpha=0.1)
             plt.text(
                 (w1 + w2) / 2, ymax * 1.1, key,
@@ -137,6 +143,7 @@ class DesiPlotter():
         else:
             plt.ylabel(r"Flux [$10^{-17}$ erg$~/~$(cm$^2~$s$~\AA$)]")
         plt.xlabel(r"Observed wavelength [$\AA$]")
+        plt.xlim(*xlims)
         # qplt.ticks_makeup(plt.gca())
 
         # def ticks_makeup(ax):
