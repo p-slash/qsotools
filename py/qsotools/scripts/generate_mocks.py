@@ -101,6 +101,9 @@ def get_parser():
     parser.add_argument(
         "--invcdf-nz", default=PKG_ICDF_Z_TABLE,
         help="Table for inverse cdf of n(z).")
+    parser.add_argument(
+        "--dla-sigma-kms", default=0, type=float,
+        help="Random shift central DLA redshift.")
 
     parser.add_argument(
         "--chunk-dyn", action="store_true",
@@ -590,7 +593,7 @@ def main():
         args.z_forest_min = 0
         args.keep_nolya_pixels = True
         args.save_full_flux = True
-        dla_sampler = lm.DLASampler()
+        dla_sampler = lm.DLASampler(sigma_kms=args.dla_sigma_kms)
     else:
         dla_sampler = None
 
