@@ -1432,6 +1432,7 @@ class QmleOutput():
 
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
         self.bias_correction = np.zeros_like(self.power.power_qmle)
+        self.extra_diag_errors = None
 
         if use_boot_errors:
             self.setBootError()
@@ -1441,12 +1442,24 @@ class QmleOutput():
         kmax = alpha_knyq * np.pi / self.dvarr
         w = (zmin <= self.power.zarray) & (self.power.zarray < zmax)
         kmax[~w] = 0
-        chi2_qmle = self.power.getChiSquare(
-            cov=self.fisher_qmle.invfisher, kmin=kmin,
-            kmax=kmax)
-        chi2_boot = self.power.getChiSquare(
-            cov=self.fisher_boot.invfisher, kmin=kmin,
-            kmax=kmax)
+
+        if self.extra_diag_errors is not None:
+            cov = self.fisher_qmle.invfisher.copy()
+            di = np.diag_indices(cov.shape[0])
+            cov[di] += self.extra_diag_errors
+        else:
+            cov = self.fisher_qmle.invfisher
+
+        chi2_qmle = self.power.getChiSquare(cov=cov, kmin=kmin, kmax=kmax)
+
+        if self.extra_diag_errors is not None:
+            cov = self.fisher_boot.invfisher.copy()
+            di = np.diag_indices(cov.shape[0])
+            cov[di] += self.extra_diag_errors
+        else:
+            cov = self.fisher_boot.invfisher
+
+        chi2_boot = self.power.getChiSquare(cov=cov, kmin=kmin, kmax=kmax)
 
         return chi2_qmle[0], chi2_boot[0], chi2_qmle[1]
 
@@ -1586,12 +1599,15 @@ class QmleOutput():
 
     def fitPolyPerBins(
             self, kmin=0, alpha_knyq=0.75,
-            use_diag_errors=False, use_boot_errors=True
+            use_diag_errors=False, use_boot_errors=True, fit_abs=False
     ):
         from scipy.optimize import curve_fit
 
         dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.z_bins)
         ratios = self.power.power_qmle / self.power.power_fid - 1
+
+        if fit_abs:
+            ratios = np.abs(ratios)
 
         if use_boot_errors:
             total_cov = self.fisher_boot.invfisher.copy()
@@ -1668,7 +1684,7 @@ class QmleOutput():
 
         return axs
 
-    def applyPolyCorrections(self, coeff_list):
+    def debiasPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
             self.bias_correction[iz] = _nppoly2val(
                 self.k_bins, *coeff_list[iz][0])
@@ -1677,3 +1693,10 @@ class QmleOutput():
         delta_power *= self.power.power_smooth
         self.power.power_qmle = \
             self.power.power_fid + self.power.thetap + delta_power
+
+    def inflateCovPolyCorrections(self, coeff_list):
+        self.extra_diag_errors = np.array([
+            _nppoly2val(self.k_bins, *coeff_list[iz][0])
+            for iz in range(self.nz)
+        ]).ravel() * self.power.power_smooth
+        self.extra_diag_errors **= 2
