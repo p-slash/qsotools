@@ -766,7 +766,8 @@ class PowerPlotter():
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
-            kmin=5e-4, fit_deg=-1, use_smooth_power=False
+            kmin=5e-4, fit_deg=-1, use_smooth_power=False,
+            plot_square_if_wrt_fid=False
     ):
         fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
         nrows = axs.shape[0]
@@ -800,6 +801,11 @@ class PowerPlotter():
             else:
                 pkpi = self.power_qmle[iz] * kpi_factor
             ekpi = self.error[iz] * kpi_factor
+
+            if plot_square_if_wrt_fid and ratio_wrt_fid:
+                pkpi = (pkpi - 1)**2 + 1
+                ekpi **= 2
+                ekpi *= 2
 
             w = self.error[iz] > 0
             ls.append(
@@ -1398,8 +1404,8 @@ class FisherPlotter(object):
             print(f"Cannot invert the Fisher matrix. {e}")
 
 
-def _nppoly2val(k, p0, p1, p2):
-    return np.polyval([p0, p1, p2], k / 0.009)
+def _nppoly2val(k, *popt):
+    return np.polyval(popt, k / 0.009)
 
 
 def generatePoly2(k, popt, pcov, n=100, seed=0):
