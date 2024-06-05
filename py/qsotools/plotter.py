@@ -1699,6 +1699,54 @@ class QmleOutput():
 
         return axs
 
+    def plotPolyCorrectionsSinglePanel(
+            self, coeff_list, zbins=[2, 4, 6], colsize=6, rowsize=5,
+            alpha_knyq=0.75, xscale='linear', kmin=1e-4, contour_poly=False
+    ):
+        plt.figure(figsize=(colsize, rowsize))
+
+        nz = len(zbins)
+        y = np.empty((nz, self.nk))
+        for ii, iz in enumerate(zbins):
+            y[ii] = _nppoly2val(self.k_bins, *coeff_list[iz][0])
+
+        if contour_poly:
+            std_y = np.empty((nz, self.nk))
+            for ii, iz in enumerate(zbins):
+                std_y[ii] = np.std(generatePoly2(
+                    self.k_bins, coeff_list[iz][0], coeff_list[iz][1]), axis=0)
+
+        plt.axhline(0, c='k')
+        for ii, iz in enumerate(zbins):
+            z = self.z_bins[iz]
+            c = plt.cm.tab10(ii)
+
+            k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
+            w = ((self.power.error[iz] > 0) & (self.k_bins >= kmin)
+                 & (self.k_bins <= k_nyq * alpha_knyq))
+
+            if contour_poly:
+                plt.fill_between(self.k_bins[w], y[ii][w] - std_y[ii][w],
+                                 y[ii][w] + std_y[ii][w], alpha=0.35, color=c)
+
+            plt.plot(self.k_bins[w], y[ii][w], c=c, label=f"{z:.1f}")
+
+        ax = plt.gca()
+        ax.grid(which='minor', linestyle=':', linewidth=0.8)
+        ax.legend()
+
+        k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + self.power.zarray))
+        karray = self.power.karray
+        w = (karray > kmin) & (karray < k_nyq * alpha_knyq)
+        k_bins = np.unique(karray[w])
+
+        ax.set_ylabel(r"$P/P_{\mathrm{true}} - 1$")
+        ax.set_xlabel(r"$k$ [s km$^{-1}$]")
+        ax.set_xscale(xscale)
+        ax.set_xlim(auto_xlimmer(k_bins, xscale=xscale))
+
+        return ax
+
     def debiasPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
             self.bias_correction[iz] = _nppoly2val(
