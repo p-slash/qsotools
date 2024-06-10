@@ -766,7 +766,7 @@ class PowerPlotter():
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
-            kmin=5e-4, fit_deg=-1, use_smooth_power=False,
+            kmin=5e-4, alpha_knyq=0.5, fit_deg=-1, use_smooth_power=False,
             plot_square_if_wrt_fid=False
     ):
         fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
@@ -835,9 +835,9 @@ class PowerPlotter():
 
             # kmax = rcoeff / mean_rkms[iz]
             k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
-            ax.axvline(k_nyq / 2, c='#db7b2b', alpha=0.5)
-            ax.axvspan(
-                k_nyq / 2, self.k_bins[-1], facecolor='#db7b2b', alpha=0.4)
+            ax.axvline(alpha_knyq * k_nyq, c='#db7b2b', alpha=0.5)
+            ax.axvspan(alpha_knyq * k_nyq, self.k_bins[-1],
+                       facecolor='#db7b2b', alpha=0.4)
             ax.axvline(kmin, c='0.5', alpha=0.5)
             ax.axvspan(
                 self.k_bins[0], kmin, facecolor='0.5', alpha=0.4)
@@ -1756,6 +1756,10 @@ class QmleOutput():
         delta_power *= self.power.power_smooth
         self.power.power_qmle = \
             self.power.power_fid + self.power.thetap + delta_power
+
+    def resetCorretions(self):
+        self.power.power_qmle = self.power.power_fid + self.power.thetap
+        self.extra_diag_errors = None
 
     def inflateCovPolyCorrections(self, coeff_list):
         self.extra_diag_errors = (np.array([
