@@ -57,7 +57,7 @@ class DesiPlotter():
 
         self.readerFunction = qsonic.io.get_spectra_reader_function(
             spectrumdir, ['B', 'R', 'Z'], is_mock, skip_resomat=True,
-            read_true_continuum=is_mock, is_tile=is_tile)
+            read_true_continuum=is_mock, is_tile=is_tile, read_exposures=False)
 
     def readSpectrum(self, targetid, coadd=False):
         idx = np.nonzero(targetid == self.catalog['TARGETID'])[0]
