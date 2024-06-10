@@ -1604,6 +1604,16 @@ class QmleOutput():
         plt.xlim(auto_xlimmer(self.k_bins))
         plt.ylabel(r"$\sigma_\mathrm{boot} / \sigma_\mathrm{qmle}$")
 
+    def fitPD13Lorentzian(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
+        from qsotools.fiducial import fitPD13Lorentzian as fit
+        p = self.power.power_qmle.ravel()
+        e = self.power.error.ravel()
+        w = (p > 0) & (e > 0)
+        kmax = alpha_knyq * np.pi / self.dvarr
+        w = (zmin <= self.power.zarray) & (self.power.zarray < zmax)
+        w &= (kmin < self.power.karray) & (self.power.karray < kmax)
+        return fit(self.power.karray[w], self.power.zarray[w], p[w], e[w])
+
     def fitPolyPerBins(
             self, kmin=0, alpha_knyq=0.75,
             use_diag_errors=False, use_boot_errors=True, fit_square=False,
