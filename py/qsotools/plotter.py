@@ -1786,3 +1786,50 @@ class QmleOutput():
             _nppoly2val(self.k_bins, *coeff_list[iz][0])
             for iz in range(self.nz)
         ]) * self.power.power_smooth**2).ravel()
+
+
+def plotPowerPerAmpPerRedshift(
+        qmle_outputs, forest, nz=13, cmap=plt.cm.tab10, alpha_nyq=0.6,
+        kmin=1e-3, amp_per_col=10, colsize=10, rowsize=7
+):
+    if forest not in qmle_outputs:
+        raise Exception(f"{forest} key not in qmle_outputs")
+
+    namplifiers = len(qmle_outputs[forest])
+    ncols = namplifiers // amp_per_col
+
+    for iz in range(nz):
+        fig, axs = plt.subplots(
+            1, ncols,
+            sharex='all', sharey='row',
+            gridspec_kw={'hspace': 0, 'wspace': 0},
+            figsize=(colsize * ncols, rowsize)
+        )
+
+        for jj in range(namplifiers):
+            pp = qmle_outputs[forest][jj].power
+
+            pkpi = pp.power_qmle[iz]
+            ekpi = pp.error[iz]
+
+            k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + pp.z_bins[iz]))
+            w = ((pp.error[iz] > 0)
+                 & (pp.k_bins < alpha_nyq * k_nyq)
+                 & (pp.k_bins > kmin))
+
+            axs[jj // amp_per_col].errorbar(
+                pp.k_bins[w], pkpi[w], ekpi[w], label=str(jj),
+                fmt='-', alpha=0.8, c=cmap(jj % amp_per_col))
+
+        for ax in axs:
+            ax.set_xscale("log")
+            ax.set_xticks([1e-3, 1e-2])
+            ax.legend(ncol=4)
+            ax.set_xlabel(r"$k$ [s km$^{-1}$]")
+            ax.grid(which='minor', linestyle=':', linewidth=0.8)
+            ax.axhline(0, c='k')
+
+        axs[0].set_yscale("linear")
+        axs[0].set_ylabel(rf"$P_{{{forest}}}$")
+        fig.suptitle(f"z={pp.z_bins[iz]}", fontsize=AXIS_LBL_FONT_SIZE + 2)
+        plt.show()
