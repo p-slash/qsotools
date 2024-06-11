@@ -713,7 +713,7 @@ class PowerPlotter():
         if bias is None or bias == 0:
             d = (self.power_qmle - self.power_true).ravel()
         else:
-            d = self.power_true.ravel().copy()
+            d = bias * self.power_true.ravel()
 
         to_remove = np.isclose(self.error.ravel(), 0)
 
