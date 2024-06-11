@@ -704,11 +704,17 @@ class PowerPlotter():
 
         save_figure(outplot_fname)
 
-    def getChiSquare(self, zbin=None, cov=None, kmin=None, kmax=None):
+    def getChiSquare(
+            self, zbin=None, cov=None, kmin=None, kmax=None, bias=None
+    ):
         if not isinstance(cov, np.ndarray):
             cov = self.covariance.copy()
 
-        d = (self.power_qmle - self.power_true).ravel()
+        if bias is None or bias == 0:
+            d = (self.power_qmle - self.power_true).ravel()
+        else:
+            d = self.power_true.ravel().copy()
+
         to_remove = np.isclose(self.error.ravel(), 0)
 
         if kmax is not None:
@@ -1445,7 +1451,9 @@ class QmleOutput():
             self.setBootError()
         self.power.setSmoothBivariateSpline()
 
-    def calculateChi2(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
+    def calculateChi2(
+            self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20, bias=None
+    ):
         kmax = alpha_knyq * np.pi / self.dvarr
         w = (zmin <= self.power.zarray) & (self.power.zarray < zmax)
         kmax[~w] = 0
@@ -1457,7 +1465,8 @@ class QmleOutput():
         else:
             cov = self.fisher_qmle.invfisher
 
-        chi2_qmle = self.power.getChiSquare(cov=cov, kmin=kmin, kmax=kmax)
+        chi2_qmle = self.power.getChiSquare(
+            cov=cov, kmin=kmin, kmax=kmax, bias=bias)
 
         if self.extra_diag_errors is not None:
             cov = self.fisher_boot.invfisher.copy()
@@ -1466,24 +1475,25 @@ class QmleOutput():
         else:
             cov = self.fisher_boot.invfisher
 
-        chi2_boot = self.power.getChiSquare(cov=cov, kmin=kmin, kmax=kmax)
+        chi2_boot = self.power.getChiSquare(
+            cov=cov, kmin=kmin, kmax=kmax, bias=bias)
 
         return chi2_qmle[0], chi2_boot[0], chi2_qmle[1]
 
-    def getChi2s(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20):
+    def getChi2s(self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20, bias=None):
         def is_array_like(var):
             return isinstance(var, list) or isinstance(var, np.ndarray)
 
         ndim = 1
-        for var in [kmin, alpha_knyq, zmin, zmax]:
+        for var in [kmin, alpha_knyq, zmin, zmax, bias]:
             if is_array_like(var):
                 if len(var) != 1 and ndim != 1 and len(var) != ndim:
                     raise Exception("Dimensions don't match.")
 
                 ndim = max(ndim, len(var))
 
-        args = np.empty((ndim, 4))
-        for i, var in enumerate([kmin, alpha_knyq, zmin, zmax]):
+        args = np.empty((ndim, 5))
+        for i, var in enumerate([kmin, alpha_knyq, zmin, zmax, bias]):
             args[:, i] = var
 
         results = np.empty((ndim, 3))
