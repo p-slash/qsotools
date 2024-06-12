@@ -1512,6 +1512,22 @@ class QmleOutput():
         self.power.error = np.sqrt(
             self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
 
+    def subtract(self, other):
+        self.power.power_qmle -= other.power.power_qmle
+        self.power.thetap -= other.power.thetap
+        self.power.power_qmle_full -= other.power.power_qmle_full
+        self.power.power_qmle_noise -= other.power.power_qmle_noise
+        self.power.power_qmle_fid -= other.power.power_qmle_fid
+
+        self.fisher_qmle.invfisher += other.fisher_qmle.invfisher
+        self.fisher_boot.invfisher += other.fisher_boot.invfisher
+
+        self.fisher_qmle.setFisherFromInverse()
+        self.fisher_boot.setFisherFromInverse()
+
+        self.power.error = np.sqrt(
+            self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
+
     def _addOthersAverageSimple(self, others):
         n = len(others) + 1
 
