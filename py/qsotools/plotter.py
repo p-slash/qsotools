@@ -1484,6 +1484,9 @@ class QmleOutput():
         def is_array_like(var):
             return isinstance(var, list) or isinstance(var, np.ndarray)
 
+        if bias is None:
+            bias = 0
+
         ndim = 1
         for var in [kmin, alpha_knyq, zmin, zmax, bias]:
             if is_array_like(var):
