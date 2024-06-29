@@ -379,7 +379,10 @@ class AttrFile():
         if show:
             plt.show()
 
-    def plot_eta(self, otherAttrs=None, ax=None, show=True, plotSpline=False):
+    def plot_eta(
+            self, otherAttrs=None, ax=None, show=True, plotSpline=False,
+            markAmpRegions=True
+    ):
         if ax is None:
             ax = plt.gca()
 
@@ -403,6 +406,14 @@ class AttrFile():
                 )
                 ax.plot(x, spl(x) - 1, '-', c=plt.cm.tab10(i), alpha=0.7)
 
+        if markAmpRegions:
+            b_line = np.sum(DESI_WLIMITS['B']) / 2.
+            ax.axvline(b_line, ls='--', c='k')
+            ax.axvspan(
+                DESI_WLIMITS['R'][0], DESI_WLIMITS['B'][1],
+                fc='k', alpha=0.5
+            )
+
         add_minor_grid(ax)
         ax.set_ylabel(r"$\eta - 1$")
         ax.axhline(0, c='k')
@@ -416,7 +427,10 @@ class AttrFile():
         if show:
             plt.show()
 
-    def plot_varlss(self, otherAttrs=None, ax=None, show=True, plotSpline=False):
+    def plot_varlss(
+            self, otherAttrs=None, ax=None, show=True, plotSpline=False,
+            markAmpRegions=False
+    ):
         if ax is None:
             ax = plt.gca()
 
@@ -439,6 +453,14 @@ class AttrFile():
                     100
                 )
                 ax.plot(x, spl(x), '-', c=plt.cm.tab10(i), alpha=0.7)
+
+        if markAmpRegions:
+            b_line = np.sum(DESI_WLIMITS['B']) / 2.
+            ax.axvline(b_line, ls='--', c='k')
+            ax.axvspan(
+                DESI_WLIMITS['R'][0], DESI_WLIMITS['B'][1],
+                fc='k', alpha=0.5
+            )
 
         add_minor_grid(ax)
         ax.set_ylabel(r"$\sigma^2_\mathrm{LSS}$")
