@@ -381,7 +381,7 @@ class AttrFile():
 
     def plot_eta(
             self, otherAttrs=None, ax=None, show=True, plotSpline=False,
-            markAmpRegions=True
+            markAmpRegions=True, colors=None, alphas=None
     ):
         if ax is None:
             ax = plt.gca()
@@ -390,11 +390,17 @@ class AttrFile():
         fattr = [self] + other_attrs
         fmt = '.' if plotSpline else '.-'
 
+        if not isinstance(colors, list):
+            colors = [plt.cm.tab10(i) for i in range(len(fattr))]
+
+        if not isinstance(alphas, list):
+            alphas = [1 for i in range(len(fattr))]
+
         for i, f in enumerate(fattr):
             varfunc = f.varfunc
             ax.errorbar(
                 varfunc['lambda'], varfunc['eta'] - 1, varfunc['e_eta'],
-                fmt=fmt, label=f.name, c=plt.cm.tab10(i))
+                fmt=fmt, label=f.name, c=colors[i], alpha=alphas[i])
 
         if plotSpline:
             for i, f in enumerate(fattr):
@@ -404,7 +410,7 @@ class AttrFile():
                     varfunc['lambda'][0] - 60., varfunc['lambda'][-1] + 60.,
                     100
                 )
-                ax.plot(x, spl(x) - 1, '-', c=plt.cm.tab10(i), alpha=0.7)
+                ax.plot(x, spl(x) - 1, '-', c=colors[i], alpha=alphas[i] * 0.7)
 
         if markAmpRegions:
             b_line = np.sum(DESI_WLIMITS['B']) / 2.
@@ -420,7 +426,7 @@ class AttrFile():
         ax.set_xlabel("Wavelength [A]")
         ax.set_ylim(-0.03, 0.02)
         plt.ticklabel_format(
-            style='sci', axis='y', scilimits=(0, 0), useMathText=True)
+            style='sci', axis='y', scilimits=(-2, -2), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
         ax.legend()
 
