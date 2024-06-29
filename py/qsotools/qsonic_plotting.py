@@ -476,7 +476,9 @@ class AttrFile():
         if show:
             plt.show()
 
-    def plot_stacked_flux(self, otherAttrs=None, ax=None, show=True):
+    def plot_stacked_flux(
+            self, otherAttrs=None, ax=None, show=True, colors=None, alphas=None
+    ):
         if ax is None:
             plt.figure(figsize=(12, 5))
             ax = plt.gca()
@@ -488,13 +490,19 @@ class AttrFile():
         minwave = 100000
         maxwave = -1
 
-        for f in fattr:
+        if not isinstance(colors, list):
+            colors = [plt.cm.tab10(i) for i in range(len(fattr))]
+
+        if not isinstance(alphas, list):
+            alphas = [alpha for i in range(len(fattr))]
+
+        for i, f in enumerate(fattr):
             data = f.stacked_flux
             minwave = min(minwave, data['lambda'].min())
             maxwave = max(maxwave, data['lambda'].max())
             ax.plot(
                 data['lambda'], data['stacked_flux'] - 1,
-                '-', label=f.name, alpha=alpha)
+                '-', label=f.name, alpha=alphas[i], color=colors[i])
 
         ax.set_ylabel("Stacked flux - 1")
         ax.axhline(0, c='k')
@@ -509,9 +517,9 @@ class AttrFile():
         add_minor_grid(ax)
 
         plt.ticklabel_format(
-            style='sci', axis='y', scilimits=(0, 0), useMathText=True)
+            style='sci', axis='y', scilimits=(-2, -2), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
-        ax.legend(ncol=2)
+        ax.legend()
 
         if show:
             plt.show()
