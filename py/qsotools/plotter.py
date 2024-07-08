@@ -756,7 +756,7 @@ class PowerPlotter():
         nrows = int(np.ceil(self.nz / ncols))
 
         fig, axs = plt.subplots(
-            nrows, ncols,
+            nrows, ncols, squeeze=False,
             sharex='all', sharey='row',
             gridspec_kw={'hspace': 0, 'wspace': 0},
             figsize=(colsize * ncols, rowsize * nrows)
