@@ -1439,9 +1439,13 @@ class QmleOutput():
             f"{path_fname_base}_it1_fisher_matrix.txt",
             k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
 
-        self.fisher_boot = FisherPlotter(
-            f"{path_fname_base}_regularized-bootstrap-fisher-{sparse}-boot-evecs.txt",
-            k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
+        try:
+            self.fisher_boot = FisherPlotter(
+                f"{path_fname_base}_regularized-bootstrap-fisher-{sparse}-boot-evecs.txt",
+                k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
+        except Exception as e:
+            print(e)
+            self.fisher_boot = self.fisher_qmle
 
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
         self.bias_correction = np.zeros_like(self.power.power_qmle)
