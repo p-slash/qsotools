@@ -551,7 +551,7 @@ class MockGenerator(object):
             wave, fluxes, errors, z_qso)
 
         if self.args.save_picca:
-            pcfname = ospath_join(self.args.OutputDir, f"delta-{ipix}.fits.gz")
+            pcfname = ospath_join(self.args.OutputDir, f"delta-{ipix}.fits")
             pcfile = PiccaFile(pcfname, 'rw')
         else:
             pcfile = None
