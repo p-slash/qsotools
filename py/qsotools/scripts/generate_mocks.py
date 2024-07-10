@@ -357,6 +357,10 @@ def remove_above_lya_absorption(wave, fluxes, z_qso):
     for i in range(nmocks):
         fluxes[i][nonlya_ind[i]] = 1
 
+    lya_lim_ind = wave <= (fid.LYA_LIMIT_WAVELENGTH * (1 + z_qso))
+    for i in range(nmocks):
+        fluxes[i][lya_lim_ind[i]] = 0
+
     return fluxes
 
 
@@ -513,9 +517,9 @@ class MockGenerator(object):
             w = data_dlas['MOCKID'] == targetid
             this_dlas = data_dlas[w]
             zdlas = this_dlas['Z_DLA_NO_RSD']
-            w2 = (
-                fid.LYA_WAVELENGTH * (1 + zdlas) > 910. * (1 + z_qso[jj])
-            ) & (zdlas < z_qso[jj])
+            w2 = ((fid.LYA_WAVELENGTH * (1 + zdlas)
+                   > fid.LYA_LIMIT_WAVELENGTH * (1 + z_qso[jj]))
+                  ) & (zdlas < z_qso[jj])
             new_data_dlas.append(this_dlas[w2])
 
         return np.concatenate(new_data_dlas)
