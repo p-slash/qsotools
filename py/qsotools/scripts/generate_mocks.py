@@ -266,22 +266,22 @@ def getMetadata(args, rng):
 
 def setResolutionMatrix(wave, args, ndiags=11):
     assert args.save_picca
-    assert args.fixed_zqso
 
     Ngrid = wave.size
     Rint = args.specres
     dv = args.pixel_dv
     if args.use_optimal_rmat:
-        logging.info("Using optimal resolution matrix.")
-        logging.info("Calculating correlation function.")
+        assert args.fixed_zqso
+        # logging.info("Using optimal resolution matrix.")
+        # logging.info("Calculating correlation function.")
         z = np.median(wave) / fid.LYA_WAVELENGTH - 1
         _, xi = lm.lognPowerSpGH(z, numvpoints=2**16, corr=True)
         xi = xi.ravel()
         xi = np.fft.fftshift(xi)
-        logging.info("Calculating optimal rmatrix.")
+        # logging.info("Calculating optimal rmatrix.")
         return so.getOptimalResolutionMatrix(Ngrid, xi, Rint, dv)
     else:
-        logging.info("Using Gaussian resolution matrix.")
+        # logging.info("Using Gaussian resolution matrix.")
         rmat = so.getGaussianResolutionMatrix(wave, Rint)
 
         if args.oversample_rmat > 1:
