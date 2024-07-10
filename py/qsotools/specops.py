@@ -168,8 +168,8 @@ def getGaussianResolutionMatrix(wave, Rint, ndiags=11):
     offsets = np.arange(ndiags // 2, -(ndiags // 2) - 1, -1)
 
     dvarr[:-1] = np.diff(wave)
-    dvarr *= LIGHT_SPEED / wave
     dvarr[-1] = dvarr[-2]
+    dvarr *= LIGHT_SPEED / wave
 
     for i, dv in enumerate(dvarr):
         resomat[:, i] = getSpectographWindow_x(offsets * dv, Rint, dv) * dv
