@@ -168,7 +168,7 @@ def getGaussianResolutionMatrix(wave, Rint, ndiags=11):
     offsets = np.arange(ndiags // 2, -(ndiags // 2) - 1, -1)
 
     dvarr[:-1] = np.diff(wave)
-    dvarr[-1] = dvarr[-2]
+    dvarr[-1] = dvarr[-2] + (dvarr[-2] - dvarr[-3])
     dvarr *= LIGHT_SPEED / wave
 
     for i, dv in enumerate(dvarr):
