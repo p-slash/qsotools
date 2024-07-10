@@ -1724,21 +1724,24 @@ class PiccaFile():
             ndiags = 11
 
         R_kms = fid.LIGHT_SPEED/specres/fid.ONE_SIGMA_2_FWHM
-        data = np.zeros(wave.size, dtype=[('LOGLAM','f8'),('DELTA','f8'),('IVAR','f8'),
+        data = np.zeros(
+            wave.size, dtype=[('LAMBDA','f8'),('DELTA','f8'),('IVAR','f8'),
                               ('RESOMAT','f8', ndiags)])
 
-        data['LOGLAM'] = np.log10(wave)
+        data['LAMBDA'] = wave
         data['DELTA']  = delta
-        data['IVAR']   = 1/error**2
+        data['IVAR']   = 1.0 / error**2
         if rmat is not None:
             data['RESOMAT'] = rmat
 
-        hdr_dict = {'TARGETID':tid, 'RA': ra/180.*np.pi, 'DEC': dec/180.*np.pi, 'Z': float(z_qso), \
-            'MEANZ': np.mean(wave)/fid.LYA_WAVELENGTH -1, 'MEANRESO': R_kms, \
-            'MEANSNR': np.mean(np.sqrt(data['IVAR'])), 'LIN_BIN': islinbin, \
-            'DLL':np.median(np.diff(data['LOGLAM'])) , 'DLAMBDA':np.median(np.diff(wave))}
+        hdr_dict = {
+            'TARGETID':tid, 'RA': ra / 180. * np.pi, 'DEC': dec / 180. * np.pi,
+            'Z': float(z_qso), 'MEANZ': np.mean(wave) / fid.LYA_WAVELENGTH - 1,
+            'MEANRESO': R_kms, 'MEANSNR': np.mean(np.sqrt(data['IVAR'])),
+            'LIN_BIN': islinbin, 'DLAMBDA':np.median(np.diff(wave))
+        }
 
-        if oversampling>1:
+        if oversampling > 1:
             hdr_dict['OVERSAMP'] = oversampling
 
         self.fitsfile.write(data, header=hdr_dict)
