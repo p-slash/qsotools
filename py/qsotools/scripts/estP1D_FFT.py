@@ -61,7 +61,8 @@ class FFTEstimator(object):
         qso.dv = fid.LIGHT_SPEED * dlambda / qso.wave[int(qso.size / 2)]
 
         # pad arrays
-        qso.flux = np.pad(qso.flux, (0, qso.size * pad_mult))
+        padsize = qso.size * pad_mult
+        qso.flux = np.pad(qso.flux, (0, padsize))
         # Need to use original size for proper normalization
         # of the power spectrum
         length_in_A = dlambda * qso.size
@@ -78,7 +79,7 @@ class FFTEstimator(object):
         if qso_2 is not None:
             if qso.size != qso_2.size:
                 raise Exception("different sized cross delta file")
-            qso_2.flux = np.pad(qso_2.flux, (0, qso.size * pad_mult))
+            qso_2.flux = np.pad(qso_2.flux, (0, padsize))
             delta_k_2 = np.fft.rfft(qso_2.flux)
             pcross = np.real(delta_k.conj() * delta_k_2)
             pcross *= dlambda**2 / length_in_A
@@ -89,7 +90,7 @@ class FFTEstimator(object):
             pnoise = np.zeros_like(p1d_f)
             for _ in range(self.args.noise_realizations):
                 delta_noise = np.pad(np.random.default_rng().normal(
-                    0, qso.error), (0, qso.size * pad_mult))
+                    0, qso.error), (0, padsize))
                 pnoise += np.abs(np.fft.rfft(delta_noise))**2 * \
                     dlambda**2 / length_in_A
 
