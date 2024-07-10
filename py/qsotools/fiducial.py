@@ -7,6 +7,7 @@ from numba import njit
 
 warnings.simplefilter("error", OptimizeWarning)
 
+LYA_LIMIT_WAVELENGTH = 911.8
 LYA_WAVELENGTH = 1215.67
 LYA_FIRST_WVL = 1050.
 LYA_LAST_WVL = 1180.
