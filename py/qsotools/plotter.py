@@ -346,6 +346,35 @@ class PowerPlotter():
         if verbose:
             print(f"There are {self.nz:d} z bins and {self.nk:d} k bins.")
 
+    def dropZBins(self, idx):
+        if isinstance(idx, int):
+            idx = [idx]
+
+        self.z_bins = np.delete(self.z_bins, idx)
+        self.zarray = np.delete(
+            self.zarray.reshape(self.nz, self.nk), idx, axis=0
+        ).ravel()
+        self.karray = np.delete(
+            self.karray.reshape(self.nz, self.nk), idx, axis=0
+        ).ravel()
+
+        self.power_qmle = np.delete(self.power_qmle, idx, axis=0)
+        self.power_fid = np.delete(self.power_fid, idx, axis=0)
+        self.error = np.delete(self.error, idx, axis=0)
+        self.power_table = np.delete(self.power_table, idx, axis=0)
+
+        self.thetap = np.delete(self.thetap, idx, axis=0)
+        self.power_qmle_full = np.delete(self.power_qmle_full, idx, axis=0)
+        self.power_qmle_noise = np.delete(self.power_qmle_noise, idx, axis=0)
+        self.power_qmle_fid = np.delete(self.power_qmle_fid, idx, axis=0)
+        self.covariance = self.covariance.reshape(
+            self.nz, self.nk, self.nz, self.nk)
+        self.covariance = np.delete(self.covariance, idx, axis=0)
+        self.covariance = np.delete(self.covariance, idx, axis=2)
+        self.nz -= len(idx)
+        self.covariance = self.covariance.reshape(
+            self.nz * self.nk, self.nz * self.nk)
+
     def useNoFidEstimate(self):
         self.power_qmle = self.power_qmle_full - self.power_qmle_noise
 
@@ -1074,21 +1103,55 @@ class FisherPlotter(object):
         self.nk = int(self.fisher.shape[0] / nz)
         self.zlabels = ["%.1f" % z for z in z1 + np.arange(nz) * dz]
 
-        try:
-            self.invfisher = self.invertFisher()
-        except Exception as e:
-            self.invfisher = None
-            print(f"Cannot invert the Fisher matrix. {e}")
+        self.invfisher = self.invertFisher()
 
         if is_cov:
             self.fisher, self.invfisher = self.invfisher, self.fisher
 
-    def invertFisher(self):
-        newf = self.fisher.copy()
-        di = np.diag_indices(self.fisher.shape[0])
+    def dropZBins(self, idx):
+        if isinstance(idx, int):
+            idx = [idx]
+
+        newnz = self.nz - len(idx)
+
+        if self.invfisher is not None:
+            self.invfisher = self.invfisher.reshape(
+                self.nz, self.nk, self.nz, self.nk)
+            self.invfisher = np.delete(self.invfisher, idx, axis=0)
+            self.invfisher = np.delete(self.invfisher, idx, axis=2)
+            self.invfisher = self.invfisher.reshape(
+                newnz * self.nk, newnz * self.nk)
+            self.fisher = self.invertFisher(self.invfisher)
+        else:
+            self.fisher = self.fisher.reshape(
+                self.nz, self.nk, self.nz, self.nk)
+            self.fisher = np.delete(self.fisher, idx, axis=0)
+            self.fisher = np.delete(self.fisher, idx, axis=2)
+            self.fisher = self.fisher.reshape(
+                newnz * self.nk, newnz * self.nk)
+            self.invfisher = self.invertFisher(self.invfisher)
+
+        z_bins = self.z1 + np.arange(self.nz) * self.dz
+        self.z1 = np.delete(z_bins, idx)[0]
+        self.zlabels = np.delete(self.zlabels, idx)
+        self.nz = newnz
+
+    def invertFisher(self, inarr=None):
+        if inarr is None:
+            newf = self.fisher.copy()
+        else:
+            newf = inarr.copy()
+
+        di = np.diag_indices(newf.shape[0])
         w = newf[di] == 0
         newf[di] = np.where(w, 1, newf[di])
-        newf = np.linalg.inv(newf)
+
+        try:
+            newf = np.linalg.inv(newf)
+        except Exception as e:
+            print(f"Cannot invert the Fisher matrix. {e}")
+            return None
+
         newf[di] = np.where(w, 0, newf[di])
         return newf
 
@@ -1427,9 +1490,12 @@ def generatePoly2(k, popt, pcov, n=100, seed=0):
 
 
 class QmleOutput():
-    def __init__(self, path_fname_base, sparse="s0.000", use_boot_errors=True):
+    def __init__(
+            self, path_fname_base, sparse="s0.000", use_boot_errors=True
+    ):
         self.power = PowerPlotter(
             f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
+
         self.nz = self.power.nz
         self.nk = self.power.nk
         self.k_bins = self.power.k_bins
@@ -1453,6 +1519,17 @@ class QmleOutput():
 
         if use_boot_errors:
             self.setBootError()
+        self.power.setSmoothBivariateSpline()
+
+    def dropZBins(self, idx):
+        self.power.dropZBins(idx)
+        self.fisher_qmle.dropZBins(idx)
+        if self.fisher_boot != self.fisher_qmle:
+            self.fisher_boot.dropZBins(idx)
+        self.nz = self.power.nz
+        self.z_bins = self.power.z_bins
+        self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
+        self.bias_correction = np.delete(self.bias_correction, idx, axis=0)
         self.power.setSmoothBivariateSpline()
 
     def calculateChi2(
