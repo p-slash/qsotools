@@ -360,6 +360,7 @@ class PowerPlotter():
 
         self.power_qmle = np.delete(self.power_qmle, idx, axis=0)
         self.power_fid = np.delete(self.power_fid, idx, axis=0)
+        self.power_true = self.power_fid
         self.error = np.delete(self.error, idx, axis=0)
         self.power_table = np.delete(self.power_table, idx, axis=0)
 
