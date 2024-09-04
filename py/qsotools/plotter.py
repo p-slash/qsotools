@@ -1615,7 +1615,8 @@ class QmleOutput():
         self.fisher_boot.setFisherFromInverse()
 
         self.power.error = np.sqrt(
-            self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
+            self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
+        self.power.setSmoothBivariateSpline()
 
     def _addOthersAverageSimple(self, others):
         n = len(others) + 1
@@ -1696,7 +1697,7 @@ class QmleOutput():
             self._addOthersAverageSimple(others)
 
         self.power.error = np.sqrt(
-            self.fisher_qmle.invfisher.diagonal()).reshape(self.nz, self.nk)
+            self.fisher_boot.invfisher.diagonal()).reshape(self.nz, self.nk)
 
     def plotBootErrVsQmleErr(self, cmap=plt.cm.turbo):
         booterr = np.sqrt(
