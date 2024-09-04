@@ -1492,10 +1492,14 @@ def generatePoly2(k, popt, pcov, n=100, seed=0):
 
 class QmleOutput():
     def __init__(
-            self, path_fname_base, sparse="s0.000", use_boot_errors=True
+            self, path_fname_base, sparse="s0.000", use_boot_errors=True,
+            use_nofid_estimate=False
     ):
         self.power = PowerPlotter(
             f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
+
+        if use_nofid_estimate:
+            self.power.useNoFidEstimate()
 
         self.nz = self.power.nz
         self.nk = self.power.nk
@@ -1868,6 +1872,55 @@ class QmleOutput():
 
         return ax
 
+    def plotComparePolyCorrections(
+            self, coeff_lists, labels, iz, colsize=6, rowsize=5,
+            alpha_knyq=0.75, xscale='linear', kmin=1e-4, contour_poly=False
+    ):
+        plt.figure(figsize=(colsize, rowsize))
+        plt.axhline(0, c='k')
+        z = self.z_bins[iz]
+
+        k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
+        w = ((self.power.error[iz] > 0) & (self.k_bins >= kmin)
+             & (self.k_bins <= k_nyq * alpha_knyq))
+
+        y = _nppoly2val(self.k_bins, *coeff_lists[0][iz][0])
+        if contour_poly:
+            std_y = np.std(generatePoly2(
+                self.k_bins, coeff_lists[0][iz][0], coeff_lists[0][iz][1]),
+                axis=0)
+            plt.fill_between(
+                self.k_bins[w], y[w] - std_y[w], y[w] + std_y[w],
+                alpha=0.35, color=plt.cm.tab10(0))
+
+        plt.plot(self.k_bins[w], y[w], c=plt.cm.tab10(0), label=labels[0])
+
+        y = _nppoly2val(self.k_bins, *coeff_lists[1][iz][0])
+        if contour_poly:
+            std_y = np.std(generatePoly2(
+                self.k_bins, coeff_lists[1][iz][0], coeff_lists[1][iz][1]),
+                axis=0)
+            plt.fill_between(
+                self.k_bins[w], y[w] - std_y[w], y[w] + std_y[w],
+                alpha=0.35, color=plt.cm.tab10(1))
+
+        plt.plot(self.k_bins[w], y[w], c=plt.cm.tab10(1), label=labels[1])
+
+        plt.grid(which='minor', linestyle=':', linewidth=0.8)
+        plt.legend()
+
+        k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + self.power.zarray))
+        karray = self.power.karray
+        w = (karray > kmin) & (karray < k_nyq * alpha_knyq)
+        k_bins = np.unique(karray[w])
+
+        plt.ylabel(r"$P/P_{\mathrm{true}} - 1$")
+        plt.xlabel(r"$k$ [s km$^{-1}$]")
+        plt.xscale(xscale)
+        plt.xlim(auto_xlimmer(k_bins, xscale=xscale))
+
+        return plt.gca()
+
     def debiasPolyCorrections(self, coeff_list):
         for iz in range(self.nz):
             self.bias_correction[iz] = _nppoly2val(
@@ -1886,7 +1939,7 @@ class QmleOutput():
         self.extra_diag_errors = (np.array([
             _nppoly2val(self.k_bins, *coeff_list[iz][0])
             for iz in range(self.nz)
-        ]) * self.power.power_smooth**2).ravel()
+        ]) * self.power.power_smooth).ravel()**2
 
 
 def plotPowerPerAmpPerRedshift(
