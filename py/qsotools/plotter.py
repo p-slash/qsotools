@@ -420,7 +420,7 @@ class PowerPlotter():
             self.power_qmle_fid.ravel()
         ], names=names)
         power_table.write(
-            fname, format='fixed_width', delimiter=' ', overwrite=True,
+            fname, format='ascii.fixed_width', delimiter=' ', overwrite=True,
             formats=formats)
 
     def addTruePowerFile(self, filename):
