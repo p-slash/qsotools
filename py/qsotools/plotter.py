@@ -406,21 +406,21 @@ class PowerPlotter():
         ).split(" | ")
         formats = {}
         for name in names:
-            formats[name] = '%.5e'
-        # formats['z'] = '%.3f'
+            formats[name] = '%14e'
+        formats['z'] = '%5.3f'
 
         # z | k1 | k2 | kc | Pfid | ThetaP | Pest | ErrorP | d | b | t
         k1 = np.tile(self.k_edges[:-1], self.nz)
         k2 = np.tile(self.k_edges[1:], self.nz)
         power_table = Table([
             self.zarray, k1, k2, self.karray,
-            self.power_fid.ravel(), self.thetap,
+            self.power_fid.ravel(), self.thetap.ravel(),
             self.power_qmle.ravel(), self.error.ravel(),
             self.power_qmle_full.ravel(), self.power_qmle_noise.ravel(),
             self.power_qmle_fid.ravel()
         ], names=names)
         power_table.write(
-            fname, format='ascii', overwrite=True,
+            fname, format='fixed_width', delimiter=' ', overwrite=True,
             formats=formats)
 
     def addTruePowerFile(self, filename):
@@ -1536,6 +1536,17 @@ class QmleOutput():
         self.dvarr = LIGHT_SPEED * 0.8 / LYA_WAVELENGTH / (1 + self.power.zarray)
         self.bias_correction = np.delete(self.bias_correction, idx, axis=0)
         self.power.setSmoothBivariateSpline()
+
+    def saveAs(self, fbase):
+        self.power.saveAs(f"{fbase}_qmle_power_estimate.txt")
+        if self.extra_diag_errors is not None:
+            cov = self.fisher_boot.invfisher.copy()
+            di = np.diag_indices(cov.shape[0])
+            cov[di] += self.extra_diag_errors
+        else:
+            cov = self.fisher_boot.invfisher
+
+        np.savetxt(f"{fbase}_qmle_cov_bootstrap.txt", cov)
 
     def calculateChi2(
             self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20, bias=None
