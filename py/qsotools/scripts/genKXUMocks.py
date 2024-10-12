@@ -97,7 +97,6 @@ def safeResample(qso, lowdv, keep_masked_pix=False):
     qso.flux  = fluxes[0]
     qso.error = errors[0]
     qso.mask  = np.logical_and(qso.error>ERROR_EPS_CUT, qso.error<10)
-    qso.size  = qso.wave.size
     
     qso.applyMask(removePixels=not keep_masked_pix)
 
@@ -330,7 +329,7 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
         if not args.nosave:
             saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
 
-if __name__ == '__main__':
+def main():
     # Arguments passed to run the script
     print("Parsing arguments....", flush=True)
     parser = argparse.ArgumentParser()
@@ -338,7 +337,7 @@ if __name__ == '__main__':
     parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
 
     parser.add_argument("--KODIAQDir", help="Directory of KODIAQ")
-    parser.add_argument("--coadd-kodiaq", type=float, \
+    parser.add_argument("--coadd-kodiaq", action="store_true", \
         help="Co-adds different observations of the same quasar onto given dv grid.")
 
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
@@ -383,7 +382,7 @@ if __name__ == '__main__':
     parser.add_argument("--z-forest-min", help="Lower end of the forest. Default: %(default)s", \
         type=float, default=1.7)
     parser.add_argument("--z-forest-max", help="Upper end of the forest. Default: %(default)s", \
-        type=float, default=4.3)
+        type=float, default=4.7)
     
     parser.add_argument("--side-band", type=int, default=0, help="Side band. Default: %(default)s")
     parser.add_argument("--real-data", action="store_true")
@@ -496,30 +495,3 @@ if __name__ == '__main__':
     temp_fname = ospath_join(args.OutputDir, "file_list_qso-nonduplicates.txt")
     print("Saving chunk spectra file list as ", temp_fname)
     qio.saveListByLine(filename_list, temp_fname)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

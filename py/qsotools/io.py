@@ -1145,7 +1145,6 @@ class KODIAQ_OBS_Iterator:
         obs.spectrum.error   = coadded_error
         obs.spectrum.specres = new_specres
         obs.spectrum.mask    = obs.spectrum.error > 0
-        obs.spectrum.size    = len(obs.spectrum.wave)
         obs.spectrum.s2n     = np.mean(1./obs.spectrum.error[obs.spectrum.mask])
         obs.spectrum.s2n_lya = obs.spectrum.getS2NLya()
 
