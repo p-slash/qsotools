@@ -414,11 +414,12 @@ class Spectrum:
     def setZScoreMask(self, fsigma=1, esigma=3.5):
         # zsc_mask_f = np.abs(Spectrum.modifiedZScore(self.flux)) < thres
         # instead demand f - 0 > - thres * MAD & f - 1 < thres * MAD
-        zsc_mask_f_0 = Spectrum.modifiedZScore(self.flux, 0) > -fsigma
-        zsc_mask_f_1 = Spectrum.modifiedZScore(self.flux, 1) < fsigma
-        zsc_mask_f = np.logical_and(zsc_mask_f_0, zsc_mask_f_1)
+        MAD = fsigma * max(1.0, 1.4826 * scipy_mad(self.flux))
+        zsc_mask_f =  (-MAD < self.flux) & (self.flux < (1.0 + MAD))
 
-        zsc_mask_e = Spectrum.modifiedZScore(self.error) < esigma
+        median = np.median(self.error)
+        MAD = esigma * 1.4826 * np.median(np.abs(self.error - median))
+        zsc_mask_e = self.error < (median + esigma)
 
         zsc_mask = np.logical_and(zsc_mask_f, zsc_mask_e)
         # zsc_mask = np.abs(scipy_zscore(self.flux))<thres
@@ -1048,8 +1049,10 @@ class KODIAQ_OBS_Iterator:
 
     """
 
-    def __init__(self, kqso_iter):
+    def __init__(self, kqso_iter, fsigma=1, esigma=3.5):
         self.kqso_iter = kqso_iter
+        self.fsigma = fsigma
+        self.esigma = esigma
         self.iter_obs = iter(self.kqso_iter.readme_table)
 
         self._set_pidate_specprefix(self.kqso_iter.readme_table[0])
@@ -1077,7 +1080,7 @@ class KODIAQ_OBS_Iterator:
             self.kqso_iter.qso_name, self.pi_date, self.spec_prefix, \
             self.kqso_iter.z_qso)
 
-        self.spectrum.setZScoreMask(fsigma=1, esigma=3.5)
+        self.spectrum.setZScoreMask(fsigma=self.fsigma, esigma=self.esigma)
         self.spectrum.applyMask(removePixels=self.kqso_iter.clean_pix)
 
     def maxLyaObservation(self, w1=fid.LYA_FIRST_WVL, w2=fid.LYA_LAST_WVL):
