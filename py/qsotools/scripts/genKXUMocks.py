@@ -13,14 +13,9 @@ import qsotools.io as qio
 import qsotools.fiducial as fid
 
 # Global variables
-global filename_list
-global specres_list
-global spectral_record_list
-global lya_m
-
-filename_list = []
-specres_list  = set()
+specres_list = set()
 spectral_record_list = qio.SpectralRecordList()
+lya_m = None
 
 ERROR_EPS_CUT = 1e-6
 
@@ -109,7 +104,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     if args.mask_sigma_percentile:
         qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
-        qso.setZScoreMask(fsigma=1, esigma=args.mask_spikes_zscore)
+        qso.setZScoreMask(fsigma=5.0, esigma=args.mask_spikes_zscore)
 
     # This sets err=1e10 and flux=0
     qso.applyMask(removePixels=False)
@@ -135,14 +130,18 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     # Resample real data onto lower resolution grid
     resamplingCondition = args.lowdv and args.lowdv > qso.dv
     if resamplingCondition:
-        print("Resampling from %.2f to %.2f km/s" %(qso.dv, args.lowdv))
-        qso = safeResample(qso, args.lowdv, args.keep_masked_pix)
+        jj = round(args.lowdv / qso.dv)
+        if jj > 1:
+            ldv = qso.dv * jj
+            print("Resampling from %.2f to %.2f km/s" % (qso.dv, ldv))
+            qso = safeResample(qso, ldv, args.keep_masked_pix)
 
     return qso
 
 # This function is the main pipeline for reduction
 # Pass mean_flux_hist=None to produce chunks
 def pipeline(qso, f1, f2, meanFluxFunc, mean_flux_hist, args, disableChunk=False):
+    global specres_list
     qso = cleanup(qso, f1, f2, meanFluxFunc, args)
 
     # If computing mean flux end the pipeline here.
@@ -203,7 +202,7 @@ def getFileIterator(dataset, directory):
 
 def readFile(it, dataset, f1, f2, args):
     if dataset == 'KOD':
-        obs_iter = qio.KODIAQ_OBS_Iterator(it)
+        obs_iter = qio.KODIAQ_OBS_Iterator(it, fsigma=5.0, esigma=args.mask_spikes_zscore)
         if args.coadd_kodiaq:
             # Co-add multiple observations
             qso = obs_iter.coaddObservations(args.coadd_kodiaq)
@@ -254,7 +253,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
 
     # Use a fiducial mean flux to ID DLAs.
     meanFluxFunc = fid.meanFluxFG08
-        
+
     for it in getFileIterator(dataset, directory):
         try:
             qso = readFile(it, dataset, f1, f2, args)
@@ -284,6 +283,7 @@ def computeMeanFlux(directory, dataset, f1, f2, settings_txt, args):
 
 # This function is wrapper for iterations of each data set
 def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args):
+    global spectral_record_list
     if args.real_data and args.side_band == 0:
         if args.compute_mean_flux:
             p_meanf = computeMeanFlux(directory, dataset, f1, f2, settings_txt, args)
@@ -298,6 +298,8 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
 
     elif args.real_data and args.side_band != 0:
         meanFluxFunc = lambda z: 1.0
+
+    filename_list = []
 
     for it in getFileIterator(dataset, directory):
         print("********************************************", flush=True)
@@ -321,13 +323,17 @@ def iterateSpectra(directory, dataset, f1, f2, meanFluxFunc, settings_txt, args)
         temp_fname = ["%s-%s-%d_%dA_%dA%s.dat" % (dataset, qso.qso_name, nc, \
             wave[nc][0], wave[nc][-1], settings_txt) for nc in range(nchunks)]
         
-        spectral_record_list.append(dataset, qso.qso_name, qso.s2n_lya/np.sqrt(qso.dv), \
+        spectral_record_list.append(
+            dataset, qso.qso_name, qso.s2n_lya / np.sqrt(qso.dv),
             qso.coord, temp_fname)
 
         filename_list.extend(temp_fname) 
 
         if not args.nosave:
             saveData(wave, fluxes, errors, temp_fname, qso, lspecr, pixw, args)
+
+    return filename_list
+
 
 def main():
     # Arguments passed to run the script
@@ -448,6 +454,7 @@ def main():
         lya_m = lm.LyaMocks(args.seed, N_CELLS=args.ngrid, DV_KMS=args.griddv, \
             REDSHIFT_ON=not args.without_z_evo, GAUSSIAN_MOCKS=args.gauss)
 
+    filename_list = []
     # ------------------------------    
     # Start with KODIAQ
     if args.KODIAQDir and not args.continuum_power:
@@ -455,22 +462,30 @@ def main():
         # Start iterating quasars in KODIAQ sample
         # Each quasar has multiple observations
         # Pick the one with highest signal to noise in Ly-alpha region
-        iterateSpectra(args.KODIAQDir, 'KOD', forest_1, forest_2, meanFluxFunc, settings_txt, args)
+        filename_list.extend(iterateSpectra(
+            args.KODIAQDir, 'KOD', forest_1, forest_2, meanFluxFunc,
+            settings_txt, args))
     # ------------------------------
     # XQ-100
     if args.XQ100Dir:
         print("RUNNING ON XQ-100.........", flush=True)
-        iterateSpectra(args.XQ100Dir, 'XQ', forest_1, forest_2, meanFluxFunc, settings_txt, args)
+        filename_list.extend(iterateSpectra(
+            args.XQ100Dir, 'XQ', forest_1, forest_2, meanFluxFunc,
+            settings_txt, args))
     # ------------------------------
     # UVES/SQUAD
     if args.UVESSQUADDir:
         print("RUNNING ON SQUAD/UVES.........", flush=True)
-        iterateSpectra(args.UVESSQUADDir, 'UVE', forest_1, forest_2, meanFluxFunc, settings_txt, args)
+        filename_list.extend(iterateSpectra(
+            args.UVESSQUADDir, 'UVE', forest_1, forest_2, meanFluxFunc,
+            settings_txt, args))
     # ------------------------------
     # MOCKS
     if args.MockDir:
         print("RUNNING ON MOCKS.........", flush=True)
-        iterateSpectra(args.MockDir, 'MOCK', forest_1, forest_2, meanFluxFunc, settings_txt, args)
+        filename_list.extend(iterateSpectra(
+            args.MockDir, 'MOCK', forest_1, forest_2, meanFluxFunc,
+            settings_txt, args))
     # ------------------------------
 
     # if args.find_dlas:
