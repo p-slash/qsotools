@@ -344,7 +344,7 @@ def main():
     parser.add_argument("--seed", help="Seed to generate random numbers.", type=int, default=68970)
 
     parser.add_argument("--KODIAQDir", help="Directory of KODIAQ")
-    parser.add_argument("--coadd-kodiaq", action="store_true", \
+    parser.add_argument("--coadd-kodiaq", type=float, \
         help="Co-adds different observations of the same quasar onto given dv grid.")
 
     parser.add_argument("--XQ100Dir", help="Directory of XQ100")
