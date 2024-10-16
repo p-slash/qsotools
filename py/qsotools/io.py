@@ -631,11 +631,11 @@ class BinaryQSO(Spectrum):
 
         d = self.file.read(header_size)
 
-        (self.size, self.z_qso, self.dec, self.ra,
+        (size, self.z_qso, self.dec, self.ra,
          self.specres, self.s2n, self.dv,
          low_ob_l, upp_ob_l, low_re_l, upp_re_l) = struct.unpack(header_fmt, d)
 
-        array_fmt = 'd' * self.size
+        array_fmt = 'd' * size
         array_size = struct.calcsize(array_fmt)
 
         d = self.file.read(array_size)
