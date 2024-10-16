@@ -1143,6 +1143,7 @@ class KODIAQ_OBS_Iterator:
         coadded_error[coadded_weight<1e-6] = 0
 
         new_specres = int(np.around(new_specres/total_exp_time, decimals=-2))
+        obs.spectrum.dv = dv
         obs.spectrum.wave    = new_wave_centers
         obs.spectrum.flux    = coadded_flux
         obs.spectrum.error   = coadded_error
