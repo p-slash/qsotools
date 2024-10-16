@@ -130,11 +130,12 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     # Resample real data onto lower resolution grid
     resamplingCondition = args.lowdv and args.lowdv > qso.dv
     if resamplingCondition:
-        jj = round(args.lowdv / qso.dv)
-        if jj > 1:
-            ldv = qso.dv * jj
-            print("Resampling from %.2f to %.2f km/s" % (qso.dv, ldv))
-            qso = safeResample(qso, ldv, args.keep_masked_pix)
+        # This is not good
+        # jj = round(args.lowdv / qso.dv)
+        # if jj > 1:
+        #     ldv = qso.dv * jj
+        print("Resampling from %.2f to %.2f km/s" % (qso.dv, args.lowdv))
+        qso = safeResample(qso, args.lowdv, args.keep_masked_pix)
 
     return qso
 
