@@ -802,8 +802,8 @@ class PowerPlotter():
             self, ncols=3, colsize=5, rowsize=3, label="DESI",
             outplot_fname=None, includes=['karacayli', 'eboss'],
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
-            kmin=5e-4, alpha_knyq=0.5, fit_deg=-1, use_smooth_power=False,
-            plot_square_if_wrt_fid=False
+            kmin=5e-4, alpha_knyq=0.5, kmax=0.1,
+            fit_deg=-1, use_smooth_power=False, plot_square_if_wrt_fid=False
     ):
         fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
         nrows = axs.shape[0]
@@ -871,8 +871,8 @@ class PowerPlotter():
 
             # kmax = rcoeff / mean_rkms[iz]
             k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
-            ax.axvline(alpha_knyq * k_nyq, c='#db7b2b', alpha=0.5)
-            ax.axvspan(alpha_knyq * k_nyq, self.k_bins[-1],
+            ax.axvline(min(kmax, alpha_knyq * k_nyq), c='#db7b2b', alpha=0.5)
+            ax.axvspan(min(kmax, alpha_knyq * k_nyq), self.k_bins[-1],
                        facecolor='#db7b2b', alpha=0.4)
             ax.axvline(kmin, c='0.5', alpha=0.5)
             ax.axvspan(
