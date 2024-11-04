@@ -393,7 +393,7 @@ class PowerPlotter():
         lnz = np.log(1 + self.zarray)
         lnk = np.log(self.karray)
         lnP = np.log(p[w])
-        lnE = e[w] / p[w]
+        lnE = e[w] / p[w] + 0.01
         self._bivsmooth = SmoothBivariateSpline(
             lnz[w], lnk[w], lnP, w=1. / lnE, s=len(lnE) * 5)
 
@@ -871,9 +871,9 @@ class PowerPlotter():
 
             # kmax = rcoeff / mean_rkms[iz]
             k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
-            ax.axvline(min(kmax, alpha_knyq * k_nyq), c='#db7b2b', alpha=0.5)
-            ax.axvspan(min(kmax, alpha_knyq * k_nyq), self.k_bins[-1],
-                       facecolor='#db7b2b', alpha=0.4)
+            kk = min(kmax, alpha_knyq * k_nyq)
+            ax.axvline(kk, c='#db7b2b', alpha=0.5)
+            ax.axvspan(kk, self.k_bins[-1], facecolor='#db7b2b', alpha=0.4)
             ax.axvline(kmin, c='0.5', alpha=0.5)
             ax.axvspan(
                 self.k_bins[0], kmin, facecolor='0.5', alpha=0.4)
@@ -888,7 +888,7 @@ class PowerPlotter():
                 j2 = min(j1 + ncols, self.nz)
                 pkpi_row = self.power_qmle[j1:j2] * kpi_factor
                 ekpi_row = self.error[j1:j2] * kpi_factor
-                w = (self.k_bins > kmin) & (self.k_bins < k_nyq / 2)
+                w = (self.k_bins > kmin) & (self.k_bins < kk)
 
                 if is_sb:
                     ymin, ymax = -1.5, 4.5
@@ -1492,7 +1492,7 @@ def generatePoly2(k, popt, pcov, n=100, seed=0):
 
 class QmleOutput():
     def __init__(
-            self, path_fname_base, sparse="s0.000", use_boot_errors=True,
+            self, path_fname_base, sparse="fisher-s0.000", use_boot_errors=True,
             use_nofid_estimate=False
     ):
         self.power = PowerPlotter(
@@ -1512,8 +1512,9 @@ class QmleOutput():
 
         try:
             self.fisher_boot = FisherPlotter(
-                f"{path_fname_base}_regularized-bootstrap-fisher-{sparse}-boot-evecs.txt",
-                k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0])
+                f"{path_fname_base}_regularized-bootstrap-{sparse}-boot-evecs.txt",
+                k_edges=self.power.k_edges, nz=self.nz, z1=self.power.z_bins[0],
+                is_cov=sparse.startswith("cov"))
         except Exception as e:
             print(e)
             self.fisher_boot = self.fisher_qmle
