@@ -1505,7 +1505,7 @@ class QmleOutput():
         self.nk = self.power.nk
         self.k_bins = self.power.k_bins
         self.z_bins = self.power.z_bins
-        self._sparse = sparse.copy()
+        self._sparse = sparse
 
         self.fisher_qmle = FisherPlotter(
             f"{path_fname_base}_it1_fisher_matrix.txt",
