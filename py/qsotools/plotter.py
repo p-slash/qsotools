@@ -1558,8 +1558,12 @@ class QmleOutput():
         else:
             sparse = self._sparse
 
-        np.savetxt(f"{fbase}_regularized-bootstrap-{sparse}-boot-evecs.txt", cov)
-        np.savetxt(f"{fbase}_it1_fisher_matrix.txt", self.fisher_qmle.fisher)
+        np.savetxt(
+            f"{fbase}_regularized-bootstrap-{sparse}-boot-evecs.txt", cov,
+            header=f"{cov.shape[0]} {cov.shape[0]}")
+        np.savetxt(
+            f"{fbase}_it1_fisher_matrix.txt", self.fisher_qmle.fisher,
+            header=f"{cov.shape[0]} {cov.shape[0]}"))
 
     def calculateChi2(
             self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20, bias=None
