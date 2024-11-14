@@ -1505,6 +1505,7 @@ class QmleOutput():
         self.nk = self.power.nk
         self.k_bins = self.power.k_bins
         self.z_bins = self.power.z_bins
+        self._sparse = sparse.copy()
 
         self.fisher_qmle = FisherPlotter(
             f"{path_fname_base}_it1_fisher_matrix.txt",
@@ -1539,7 +1540,7 @@ class QmleOutput():
         self.power.setSmoothBivariateSpline()
 
     def saveAs(self, fbase):
-        self.power.saveAs(f"{fbase}_qmle_power_estimate.txt")
+        self.power.saveAs(f"{fbase}_it1_quadratic_power_estimate_detailed.txt")
         if self.extra_diag_errors is not None:
             cov = self.fisher_boot.invfisher.copy()
             di = np.diag_indices(cov.shape[0])
@@ -1547,7 +1548,12 @@ class QmleOutput():
         else:
             cov = self.fisher_boot.invfisher
 
-        np.savetxt(f"{fbase}_qmle_cov_bootstrap.txt", cov)
+        if self._sparse.startswith("fisher"):
+            sparse = self._sparse.replace("fisher", "cov")
+        else:
+            sparse = self._sparse
+
+        np.savetxt(f"{fbase}_regularized-bootstrap-{sparse}-boot-evecs.txt", cov)
 
     def calculateChi2(
             self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20, bias=None
