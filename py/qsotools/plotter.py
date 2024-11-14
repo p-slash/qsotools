@@ -327,7 +327,9 @@ class PowerPlotter():
 
         self.power_true = self.power_fid
 
-        if power_table.meta['comments'][-4].startswith("Damped"):
+        if ('comments' in power_table.meta
+            and power_table.meta['comments'][-4].startswith("Damped")
+        ):
             self.is_damped = bool(
                 power_table.meta['comments'][-4].split(' ')[1])
             self.damping_constant = float(
@@ -406,7 +408,7 @@ class PowerPlotter():
         ).split(" | ")
         formats = {}
         for name in names:
-            formats[name] = '%14e'
+            formats[name] = '%18e'
         formats['z'] = '%5.3f'
 
         # z | k1 | k2 | kc | Pfid | ThetaP | Pest | ErrorP | d | b | t
@@ -1493,10 +1495,13 @@ def generatePoly2(k, popt, pcov, n=100, seed=0):
 class QmleOutput():
     def __init__(
             self, path_fname_base, sparse="fisher-s0.000", use_boot_errors=True,
-            use_nofid_estimate=False
+            use_nofid_estimate=False, keep_astropy_table=False
     ):
         self.power = PowerPlotter(
             f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
+        if keep_astropy_table:
+            self.power_astable = ascii.read(
+                f"{path_fname_base}_it1_quadratic_power_estimate_detailed.txt")
 
         if use_nofid_estimate:
             self.power.useNoFidEstimate()
@@ -1554,6 +1559,7 @@ class QmleOutput():
             sparse = self._sparse
 
         np.savetxt(f"{fbase}_regularized-bootstrap-{sparse}-boot-evecs.txt", cov)
+        np.savetxt(f"{fbase}_it1_fisher_matrix.txt", self.fisher_qmle.fisher)
 
     def calculateChi2(
             self, kmin=0, alpha_knyq=0.75, zmin=0, zmax=20, bias=None
