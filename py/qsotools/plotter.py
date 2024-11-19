@@ -883,7 +883,7 @@ class PowerPlotter():
             do_set_ylim = ((
                 ax.get_subplotspec().is_last_row()
                 and ax.get_subplotspec().is_first_col()
-            )) or col == 1
+            )) or col == ncols // 2
 
             if do_set_ylim:
                 j1 = row * ncols
