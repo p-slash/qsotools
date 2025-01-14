@@ -72,7 +72,7 @@ class P1DMeasurements():
             np.sum(chab_syst_table**2, axis=1) + e**2
         ).reshape((nz, nk))
 
-        self.measurements['Chabanier+2019'] = {
+        self.measurements['Chabanier et al. (2019)'] = {
             'z': z,
             'k': k,
             'kppi': k * p / np.pi,
@@ -103,7 +103,7 @@ class P1DMeasurements():
         p = np.array(karac_tbl['P'], dtype=np.double).reshape((nz, nk))
         e = np.array(karac_tbl['e'], dtype=np.double).reshape((nz, nk))
 
-        self.measurements['Karaçayli+2022'] = {
+        self.measurements['Karaçaylı et al. (2022)'] = {
             'z': z,
             'k': k,
             'kppi': k * p / np.pi,
@@ -134,7 +134,7 @@ class P1DMeasurements():
         kppi = [karac_tbl['p_final'][wz] for wz in wzlist]
         ekpi = [karac_tbl['e_total'][wz] for wz in wzlist]
 
-        self.measurements['Karaçayli+2023'] = {
+        self.measurements['Karaçaylı et al. (2024)'] = {
             'z': zbins,
             'k': k,
             'kppi': kppi,
