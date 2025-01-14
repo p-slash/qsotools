@@ -899,10 +899,10 @@ class PowerPlotter():
                 ax.semilogx(self.k_bins, 1 + np.polyval(X, lnk), 'r--')
 
             for (opp, olbl) in other_measurements:
-                oiz = np.nonzero(np.isclose(opp.z_bins, z))
-                if not oiz:
+                oiz = np.nonzero(np.isclose(opp.z_bins, z))[0]
+                if len(oiz) == 0:
                     continue
-                oiz = oiz[0][0]
+                oiz = oiz[0]
                 w = opp.error[iz] > 0
                 okfactor = np.interp(opp.k_bins[w], self.k_bins, kpi_factor)
                 ls.append(
