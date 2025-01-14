@@ -988,7 +988,8 @@ class PowerPlotter():
                 plt.setp(ax.get_xticklabels(), fontsize=TICK_LBL_FONT_SIZE)
                 # ha='left')
                 ax.set_xscale(xscale)
-                ax.set_xlim(auto_xlimmer(self.k_bins, xscale=xscale))
+                ax.set_xlim(
+                    auto_xlimmer(self.k_bins[self.k_bins < kk], xscale=xscale))
 
             ax.grid(True, "major")
             ax.grid(which='minor', linestyle=':', linewidth=0.8)
