@@ -837,7 +837,8 @@ class PowerPlotter():
             outplot_fname=None, includes=['karacayli', 'eboss'],
             ratio_wrt_fid=False, is_sb=False, xscale='linear',
             kmin=5e-4, alpha_knyq=0.5, kmax=0.1,
-            fit_deg=-1, use_smooth_power=False, plot_square_if_wrt_fid=False
+            fit_deg=-1, use_smooth_power=False, plot_square_if_wrt_fid=False,
+            transpose_rowcol=False
     ):
         fig, axs = self.create_fig_axs(ncols, colsize, rowsize)
         nrows = axs.shape[0]
@@ -851,8 +852,12 @@ class PowerPlotter():
             kpi_factor *= 10**3
 
         for iz in range(self.nz):
-            row = int(iz / ncols)
-            col = iz % ncols
+            if transpose_rowcol:
+                row = iz % nrows
+                col = int(iz / nrows)
+            else:
+                row = int(iz / ncols)
+                col = iz % ncols
             ax = axs[row, col]
             z = self.z_bins[iz]
 
@@ -881,7 +886,7 @@ class PowerPlotter():
             ls.append(
                 ax.errorbar(
                     self.k_bins[w], pkpi[w], ekpi[w],
-                    label=label, fmt=".", alpha=0.8
+                    label=label, fmt=".-", alpha=0.8
                 )
             )
 
@@ -903,7 +908,7 @@ class PowerPlotter():
                 ls.append(
                     ax.errorbar(
                         opp.k_bins[w], opp.power_qmle[oiz][w] * okfactor,
-                        opp.error[iz][w] * okfactor, label=olbl, fmt=".-")
+                        opp.error[iz][w] * okfactor, label=olbl, fmt=".")
                 )
 
             # kmax = rcoeff / mean_rkms[iz]
