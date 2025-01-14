@@ -339,10 +339,42 @@ class PowerPlotter():
             self.damping_constant = 0
         self.power_table = np.array(power_table)
 
-    def __init__(self, filename, verbose=False):
+    def readFitsFile(self, filename):
+        import fitsio
+        with fitsio.FITS(filename) as fts:
+            hdr = fts[1].read_header()
+            self.data = fts[1].read()
+            self.covariance = fts['COVARIANCE'].read()
+        self.nz = hdr['NZ']
+        self.nk = hdr['NK']
+
+        self.zarray = self.data['Z']
+        self.karray = self.data['K']
+        self.z_bins = np.unique(self.zarray)
+        self.k_bins = np.unique(self.karray)
+        k1 = np.unique(self.data['K1'])
+        k2 = np.unique(self.data['K2'])
+        self.k_edges = np.append(k1, k2[-1])
+
+        self.data = self.data.reshape(self.nz, self.nk)
+
+        self.thetap = self.data['ThetaP']
+        self.power_fid = self.data['PINPUT']
+        self.error = self.data['E_PK']
+        self.power_qmle_full = self.data['PRAW']
+        self.power_qmle_noise = self.data['PNOISE']
+        self.power_qmle_fid = self.data['PFID']
+        self.power_qmle = self.data['PLYA']
+        self.power_table = None
+
+    def __init__(self, filename, verbose=False, txt_file=True):
         # Reading file into an ascii table
-        self._readDBTFile(filename)
-        self.covariance = np.diag(self.error.ravel()**2)
+        if txt_file:
+            self._readDBTFile(filename)
+            self.covariance = np.diag(self.error.ravel()**2)
+        else:
+            self.readFitsFile(filename)
+
         self._bivsmooth = None
         self.power_smooth = None
         if verbose:
