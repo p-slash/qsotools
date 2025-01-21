@@ -396,7 +396,8 @@ class PowerPlotter():
         self.power_fid = np.delete(self.power_fid, idx, axis=0)
         self.power_true = self.power_fid
         self.error = np.delete(self.error, idx, axis=0)
-        self.power_table = np.delete(self.power_table, idx, axis=0)
+        if self.power_table is not None:
+            self.power_table = np.delete(self.power_table, idx, axis=0)
 
         self.thetap = np.delete(self.thetap, idx, axis=0)
         self.power_qmle_full = np.delete(self.power_qmle_full, idx, axis=0)
@@ -864,6 +865,19 @@ class PowerPlotter():
             fs = previous_measurements.plot_all(z, ax)
             ls = []
 
+            for oii, (opp, olbl) in enumerate(other_measurements):
+                oiz = np.nonzero(np.isclose(opp.z_bins, z))[0]
+                if len(oiz) == 0:
+                    continue
+                oiz = oiz[0]
+                w = opp.error[iz] > 0
+                okfactor = np.interp(opp.k_bins[w], self.k_bins, kpi_factor)
+                ls.append(
+                    ax.errorbar(
+                        opp.k_bins[w], opp.power_qmle[oiz][w] * okfactor,
+                        opp.error[iz][w] * okfactor, label=olbl, fmt="v",
+                        alpha=0.7, c=plt.cm.tab10(oii + 1))
+                )
             if ratio_wrt_fid:
                 ax.axhline(1, c='k')
                 kpi_factor = 1 / self.power_fid[iz]
@@ -883,11 +897,10 @@ class PowerPlotter():
                 ekpi *= 2
 
             w = self.error[iz] > 0
-            ls.append(
-                ax.errorbar(
-                    self.k_bins[w], pkpi[w], ekpi[w],
-                    label=label, fmt=".-", alpha=0.8
-                )
+            ls.insert(0, ax.errorbar(
+                self.k_bins[w], pkpi[w], ekpi[w],
+                label=label, fmt=".-", alpha=0.8,
+                c=plt.cm.tab10(0))
             )
 
             if fit_deg > -1:
@@ -897,19 +910,6 @@ class PowerPlotter():
                     w=1 / ekpi[w])
                 print(self.z_bins[iz], "Fit: ", X)
                 ax.semilogx(self.k_bins, 1 + np.polyval(X, lnk), 'r--')
-
-            for (opp, olbl) in other_measurements:
-                oiz = np.nonzero(np.isclose(opp.z_bins, z))[0]
-                if len(oiz) == 0:
-                    continue
-                oiz = oiz[0]
-                w = opp.error[iz] > 0
-                okfactor = np.interp(opp.k_bins[w], self.k_bins, kpi_factor)
-                ls.append(
-                    ax.errorbar(
-                        opp.k_bins[w], opp.power_qmle[oiz][w] * okfactor,
-                        opp.error[iz][w] * okfactor, label=olbl, fmt=".")
-                )
 
             # kmax = rcoeff / mean_rkms[iz]
             k_nyq = np.pi / (3e5 * 0.8 / 1215.67 / (1 + z))
@@ -938,15 +938,17 @@ class PowerPlotter():
                 elif not ratio_wrt_fid:
                     ymin, ymax = auto_logylimmer(
                         self.k_bins[w], pkpi_row[:, w], ekpi_row[:, w])
-                    use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
-                    if ymin < 0.002:
-                        use_yticks = [1e-3] + use_yticks
+                    # use_yticks = [1e-2, 1e-1] if ymax > 0.08 else [1e-2]
+                    # if ymin < 0.002:
+                    #     use_yticks = [1e-3] + use_yticks
+                    use_yticks=None
                 else:
                     ymin, ymax = 0.8, 1.2
                     use_yticks = [0.85, 1.0, 1.15]
 
                 ax.set_ylim(ymin, ymax)
-                ax.set_yticks(use_yticks)
+                if use_yticks is not None:
+                    ax.set_yticks(use_yticks)
 
             ax.text(
                 0.06, 0.94, f"z={z:.1f}",
