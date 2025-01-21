@@ -93,6 +93,7 @@ class AttrFile():
         self.varstats = hdr
 
         fattr.close()
+        self.marker = None
 
     def plot_varpipe_varobs(self, iwave, ax=None, plotfit=True, show=True):
         if ax is None:
@@ -388,7 +389,6 @@ class AttrFile():
 
         other_attrs = AttrFile._parse_otherattrs(otherAttrs)
         fattr = [self] + other_attrs
-        fmt = '.' if plotSpline else '.-'
 
         if not isinstance(colors, list):
             colors = [plt.cm.tab10(i) for i in range(len(fattr))]
@@ -396,15 +396,24 @@ class AttrFile():
         if not isinstance(alphas, list):
             alphas = [1 for i in range(len(fattr))]
 
+        if markAmpRegions:
+            b_line = np.sum(DESI_WLIMITS['B']) / 2.
+            ax.axvline(b_line, ls='--', c='k', label="Amplifier boundary in B")
+            ax.axvspan(
+                DESI_WLIMITS['R'][0], DESI_WLIMITS['B'][1],
+                fc='k', alpha=0.6, label="Transition from B to R"
+            )
+
         for i, f in enumerate(fattr):
+            fmt = f.marker if f.marker else '.'
+            if not plotSpline:
+                fmt += '-'
             varfunc = f.varfunc
             ax.errorbar(
                 varfunc['lambda'], varfunc['eta'] - 1, varfunc['e_eta'],
                 fmt=fmt, label=f.name, c=colors[i], alpha=alphas[i])
 
-        if plotSpline:
-            for i, f in enumerate(fattr):
-                varfunc = f.varfunc
+            if plotSpline:
                 spl = CubicSpline(varfunc['lambda'], varfunc['eta'])
                 x = np.linspace(
                     varfunc['lambda'][0] - 60., varfunc['lambda'][-1] + 60.,
@@ -412,20 +421,12 @@ class AttrFile():
                 )
                 ax.plot(x, spl(x) - 1, '-', c=colors[i], alpha=alphas[i] * 0.7)
 
-        if markAmpRegions:
-            b_line = np.sum(DESI_WLIMITS['B']) / 2.
-            ax.axvline(b_line, ls='--', c='k')
-            ax.axvspan(
-                DESI_WLIMITS['R'][0], DESI_WLIMITS['B'][1],
-                fc='k', alpha=0.5
-            )
-
         add_minor_grid(ax)
         ax.set_ylabel(r"$\eta - 1$")
         ax.axhline(0, c='k')
         ax.set_xlabel("Wavelength [A]")
         ax.set_ylim(-0.03, 0.02)
-        plt.ticklabel_format(
+        ax.ticklabel_format(
             style='sci', axis='y', scilimits=(-2, -2), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
         ax.legend()
@@ -516,7 +517,7 @@ class AttrFile():
 
         add_minor_grid(ax)
 
-        plt.ticklabel_format(
+        ax.ticklabel_format(
             style='sci', axis='y', scilimits=(-2, -2), useMathText=True)
         ax.yaxis.get_offset_text().set_fontsize(16)
         ax.legend()
