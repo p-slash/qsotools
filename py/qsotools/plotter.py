@@ -421,7 +421,9 @@ class PowerPlotter():
         self.covariance = cov.copy()
 
     def setSmoothBivariateSpline(self):
-        from scipy.interpolate import SmoothBivariateSpline
+        import warnings
+        from scipy.interpolate import SmoothBivariateSpline, UnivariateSpline
+
         p = self.power_qmle.ravel()
         e = self.error.ravel()
         w = (p > 0) & (e > 0)
@@ -429,11 +431,36 @@ class PowerPlotter():
         lnk = np.log(self.karray)
         lnP = np.log(p[w])
         lnE = e[w] / p[w] + 0.01
-        self._bivsmooth = SmoothBivariateSpline(
-            lnz[w], lnk[w], lnP, w=1. / lnE, s=len(lnE) * 5)
 
-        self.power_smooth = np.exp(self._bivsmooth(
-            lnz, lnk, grid=False)).reshape(self.nz, self.nk)
+        self._bivsmooth = None
+        with warnings.catch_warnings():
+            warnings.filterwarnings('error')
+            try:
+                self._bivsmooth = SmoothBivariateSpline(
+                    lnz[w], lnk[w], lnP, w=1. / lnE, s=len(lnE) * 5)
+            except Exception:
+                print("SmoothBivariateSpline failed", e)
+                self._bivsmooth = None
+
+        if self._bivsmooth is not None:
+            self.power_smooth = np.exp(self._bivsmooth(
+                lnz, lnk, grid=False)).reshape(self.nz, self.nk)
+            return
+
+        print("Smoothing bin by bin.")
+        power_smooth = []
+        for iz in range(self.nz):
+            p = self.power_qmle[iz]
+            e = self.error[iz]
+            w = (p > 0) & (e > 0)
+            lnk = np.log(self.k_bins)
+            lnP = np.log(p[w])
+            lnE = e[w] / p[w] + 0.01
+
+            spl = UnivariateSpline(lnk[w], lnP, w=1. / lnE, s=len(lnE) * 5)
+            power_smooth.append(np.exp(spl(lnk)))
+
+        self.power_smooth = np.vstack(power_smooth)
 
     def saveAs(self, fname):
         names = (
