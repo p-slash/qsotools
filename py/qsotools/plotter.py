@@ -438,8 +438,8 @@ class PowerPlotter():
             try:
                 self._bivsmooth = SmoothBivariateSpline(
                     lnz[w], lnk[w], lnP, w=1. / lnE, s=len(lnE) * 5)
-            except Exception:
-                print("SmoothBivariateSpline failed", e)
+            except Exception as ex:
+                print("SmoothBivariateSpline failed", ex)
                 self._bivsmooth = None
 
         if self._bivsmooth is not None:
