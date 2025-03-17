@@ -1,3 +1,4 @@
+import struct
 import numpy as np
 from scipy.interpolate import CubicSpline
 
@@ -216,3 +217,55 @@ class QmleSimulator():
         self.bk = self.invfisher.dot(self.bk)
 
         return self.dk, self.bk, self.fisher
+
+
+class SqTable:
+    """
+    typedef struct
+    {
+        int nvpoints;
+        int nzpoints;
+
+        double v_length;
+        double z1;
+        double z_length;
+
+        int spectrograph_resolution;
+        double pixel_width;
+
+        double k1;
+        double k2;
+    } SQ_IO_Header;
+    """
+    header_fmt = 'iidddiddd'
+    header_size = struct.calcsize(header_fmt)
+
+    def readHeader(self, fl):
+        d = fl.read(SqTable.header_size)
+
+        nv, nz, Lv, z1, Lz, Rfwhm, dv, k1, k2 = struct.unpack(
+            SqTable.header_fmt, d)
+
+        self.nv = nv
+        self.nz = nz
+        self.Lv = Lv
+        self.z1 = z1
+        self.Lz = Lz
+        self.Rfwhm = Rfwhm
+        self.dv = dv
+        self.k1 = k1
+        self.k2 = k2
+
+        if nz == 0:
+            self.size = nv
+        else:
+            self.size = nz * nv
+
+    def __init__(self, fname):
+        with open(fname, mode='rb') as fl:
+            self.readHeader(fl)
+            self.data = np.fromfile(fl, count=self.size)
+
+            if self.nz != 0:
+                self.data = self.data.reshape(
+                    self.nv, self.nz).T
