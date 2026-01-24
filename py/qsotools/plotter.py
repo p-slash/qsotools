@@ -342,8 +342,13 @@ class PowerPlotter():
     def readFitsFile(self, filename):
         import fitsio
         with fitsio.FITS(filename) as fts:
-            hdr = fts[1].read_header()
-            self.data = fts[1].read()
+            if 'P1D_BLIND' in fts:
+                hdu = fts['P1D_BLIND']
+            else:
+                hdu = fts['P1D']
+
+            hdr = hdu.read_header()
+            self.data = hdu.read()
             self.covariance = fts['COVARIANCE'].read()
         self.nz = hdr['NZ']
         self.nk = hdr['NK']
