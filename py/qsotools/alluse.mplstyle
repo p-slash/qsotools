@@ -1,21 +1,24 @@
 #Computer Modern font
-font.family:  sans-serif
+mathtext.fontset: cm
+font.family:  serif
+font.serif : cmr10
 font.style:   normal
 font.variant: normal
 font.weight:  normal
 font.stretch: normal
-font.size:    10.0
+font.size:    12.0
 
 #text.usetex : True
 text.latex.preamble : \usepackage{amsmath, amssymb} \usepackage{bm}
 
 #Line width and font size
-legend.fontsize : x-large
+legend.fontsize : large
 axes.labelsize : 18
 axes.titlesize : 18
+axes.formatter.use_mathtext : True
 figure.titlesize : 20
-xtick.labelsize : 16
-ytick.labelsize : 16
+xtick.labelsize : 15
+ytick.labelsize : 15
 
 #ticks in all axis, towards the interior
 xtick.top : True
@@ -24,16 +27,16 @@ xtick.direction : in
 ytick.direction : in
 
 #Tick size
-xtick.major.size : 7
-xtick.minor.size : 4
-ytick.major.size : 7
-ytick.minor.size : 4
+xtick.major.size : 5
+xtick.minor.size : 2
+ytick.major.size : 5
+ytick.minor.size : 2
 
 #Tick width
 xtick.major.width : 1
-xtick.minor.width : 1
+xtick.minor.width : 0.7
 ytick.major.width : 1
-ytick.minor.width : 1
+ytick.minor.width : 0.7
 
 #minor ticks
 xtick.minor.visible : True
@@ -51,7 +54,7 @@ errorbar.capsize : 1.5
 
 # Figure saving
 savefig.bbox : tight
-savefig.dpi: 150
+savefig.dpi: 200
 
 #Grid
 axes.grid.axis : both
