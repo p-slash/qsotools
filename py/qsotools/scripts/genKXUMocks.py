@@ -104,7 +104,7 @@ def cleanup(qso, f1, f2, meanFluxFunc, args):
     if args.mask_sigma_percentile:
         qso.setOutliersMask(args.mask_sigma_percentile)
     if args.mask_spikes_zscore:
-        qso.setZScoreMask(fsigma=5.0, esigma=args.mask_spikes_zscore)
+        qso.setZScoreMask(fsigma=1.0, esigma=args.mask_spikes_zscore)
 
     # This sets err=1e10 and flux=0
     qso.applyMask(removePixels=False)
@@ -203,7 +203,7 @@ def getFileIterator(dataset, directory):
 
 def readFile(it, dataset, f1, f2, args):
     if dataset == 'KOD':
-        obs_iter = qio.KODIAQ_OBS_Iterator(it, fsigma=5.0, esigma=args.mask_spikes_zscore)
+        obs_iter = qio.KODIAQ_OBS_Iterator(it, fsigma=1.0, esigma=args.mask_spikes_zscore)
         if args.coadd_kodiaq:
             # Co-add multiple observations
             qso = obs_iter.coaddObservations(args.coadd_kodiaq)
