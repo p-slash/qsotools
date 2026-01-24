@@ -5,6 +5,20 @@ from itertools import groupby
 import numpy as np
 
 
+def latex_formatter(x, dec=2):
+    if x == 0:
+        return "$0$"
+    s = f"{x:.18e}"
+
+    mantissa, exp = s.split('e')
+    mantissa = round(float(mantissa), dec)
+    exp = int(exp)
+    if exp == 0:
+        return rf"${mantissa}$"
+    exp = str(exp)
+    return rf"${mantissa} \times 10^{{{exp}}}$"
+
+
 def decomposePiccaFname(picca_fname):
     i1 = picca_fname.rfind('[') + 1
     i2 = picca_fname.rfind(']')
