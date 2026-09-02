@@ -187,6 +187,8 @@ def main():
     parser.add_argument("--iterations", type=int, default=500,
                         help="Number of iterations")
     parser.add_argument("--reg-in-cov", action="store_true")
+    parser.add_argument("--smooth-sigma", type=float, default=2.0,
+                        help="Sigma for smoothing the matrix.")
     parser.add_argument(
         "--force-posdef-diff", action="store_true",
         help="Forces semi-positive definite difference between QMLE.")
@@ -210,7 +212,7 @@ def main():
         qmle_covariance if args.reg_in_cov else qmle_fisher)
 
     bootstrap_matrix = smooth_matrix_3(
-        bootstrap_matrix, matrix_to_use_for_input_qmle, args.nz)
+        bootstrap_matrix, matrix_to_use_for_input_qmle, args.nz, args.smooth_sigma)
     # prevent leakage to zero elements
     bootstrap_matrix[qmle_zero_idx, :] = 0
     bootstrap_matrix[:, qmle_zero_idx] = 0
